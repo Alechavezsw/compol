@@ -1,0 +1,388 @@
+// ---------------------------------------------------------------------------
+// Tipos del dominio + tipado de la base para el cliente de Supabase.
+// Espejo de supabase/migrations/*.sql
+// ---------------------------------------------------------------------------
+
+export type UserRole = "super_admin" | "org_admin" | "org_analyst" | "surveyor";
+export type OrgType = "gobierno" | "institucion" | "ong" | "privado";
+export type OrgStatus = "activa" | "suspendida" | "prueba";
+export type SurveyStatus = "borrador" | "activa" | "pausada" | "cerrada";
+export type QuestionType =
+  | "texto_corto"
+  | "texto_largo"
+  | "opcion_unica"
+  | "opcion_multiple"
+  | "escala"
+  | "numero"
+  | "fecha"
+  | "si_no";
+export type ResponseStatus = "en_curso" | "completada" | "descartada";
+export type ReportStatus = "generando" | "listo" | "error";
+export type ReportKind = "ejecutivo" | "tecnico" | "comunicacional" | "comparativo";
+
+export type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  type: OrgType;
+  status: OrgStatus;
+  contact_email: string | null;
+  contact_phone: string | null;
+  country: string | null;
+  region: string | null;
+  logo_url: string | null;
+  brand_color: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type Profile = {
+  id: string;
+  organization_id: string | null;
+  full_name: string;
+  email: string | null;
+  phone: string | null;
+  role: UserRole;
+  avatar_url: string | null;
+  is_active: boolean;
+  last_seen_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type Project = {
+  id: string;
+  organization_id: string;
+  name: string;
+  description: string | null;
+  color: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type Survey = {
+  id: string;
+  organization_id: string;
+  project_id: string | null;
+  title: string;
+  description: string | null;
+  status: SurveyStatus;
+  target_responses: number;
+  starts_at: string | null;
+  ends_at: string | null;
+  geography: string | null;
+  methodology: string | null;
+  /** Canal web: la encuesta se puede responder por link o widget embebido. */
+  web_enabled: boolean;
+  public_token: string | null;
+  web_settings: WebSettings;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type WidgetMode = "inline" | "flotante" | "emergente";
+
+export type WebSettings = {
+  accent?: string | null;
+  welcome_title?: string | null;
+  welcome_text?: string | null;
+  thanks_title?: string | null;
+  thanks_text?: string | null;
+  button_label?: string | null;
+  mode?: WidgetMode | null;
+  /** Una respuesta por dispositivo (huella anónima, sin datos personales). */
+  one_per_device?: boolean | null;
+  /** Segundos antes de abrir la ventana emergente. */
+  popup_delay?: number | null;
+};
+
+export type ResponseChannel = "campo" | "web";
+
+export type Question = {
+  id: string;
+  survey_id: string;
+  position: number;
+  type: QuestionType;
+  text: string;
+  help_text: string | null;
+  is_required: boolean;
+  section: string | null;
+  /** Escala y número: rango válido. Opción múltiple: `max_value` es el tope de marcas. */
+  min_value: number | null;
+  max_value: number | null;
+  logic: QuestionLogic | null;
+  created_at: string;
+}
+
+/**
+ * Lógica de salto. Los `values` son ids de opción para preguntas de opción y
+ * "si" / "no" para las de Sí/No: es lo mismo que queda guardado en la respuesta.
+ */
+export type QuestionLogic = {
+  /** La pregunta solo se hace si la respuesta a `question_id` incluye alguno de `values`. */
+  show_if?: { question_id: string; values: string[] } | null;
+  /** Si la respuesta a ESTA pregunta incluye alguno de estos valores, la entrevista termina (filtro). */
+  end_if?: string[] | null;
+};
+
+export type QuestionOption = {
+  id: string;
+  question_id: string;
+  position: number;
+  label: string;
+  value: string | null;
+  is_exclusive: boolean;
+}
+
+export type SurveyAssignment = {
+  id: string;
+  survey_id: string;
+  surveyor_id: string;
+  quota: number;
+  zone: string | null;
+  created_at: string;
+}
+
+export type SurveyResponse = {
+  id: string;
+  survey_id: string;
+  organization_id: string;
+  surveyor_id: string | null;
+  status: ResponseStatus;
+  channel: ResponseChannel;
+  /** Web: página donde estaba embebido el widget (origen + ruta, sin query). */
+  source_url: string | null;
+  /** Web: hash anónimo del dispositivo, para limitar a una respuesta. */
+  respondent_hash: string | null;
+  zone: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  duration_seconds: number | null;
+  started_at: string;
+  submitted_at: string | null;
+}
+
+export type Answer = {
+  id: string;
+  response_id: string;
+  question_id: string;
+  value_text: string | null;
+  value_number: number | null;
+  value_date: string | null;
+  option_ids: string[];
+  created_at: string;
+}
+
+export type AiReport = {
+  id: string;
+  survey_id: string;
+  organization_id: string;
+  title: string;
+  kind: ReportKind;
+  status: ReportStatus;
+  model: string | null;
+  audience: string | null;
+  focus: string | null;
+  content: string | null;
+  highlights: ReportHighlight[];
+  error_message: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export type ReportHighlight = {
+  titulo: string;
+  detalle: string;
+  metrica?: string | null;
+}
+
+// --- Humor en redes ----------------------------------------------------------
+
+export type SocialNetwork = "x" | "facebook" | "instagram" | "tiktok" | "youtube" | "noticias" | "otros";
+export type SentimentLabel = "positivo" | "neutral" | "negativo";
+export type Emotion = "enojo" | "miedo" | "tristeza" | "alegria" | "confianza" | "sorpresa";
+
+/** Un tema que la organización sigue en redes: nombre y palabras clave. */
+export type SocialTracker = {
+  id: string;
+  organization_id: string;
+  name: string;
+  keywords: string[];
+  exclude: string[];
+  is_active: boolean;
+  created_at: string;
+};
+
+export type SocialPost = {
+  id: string;
+  organization_id: string;
+  network: SocialNetwork;
+  external_id: string | null;
+  author: string | null;
+  url: string | null;
+  text: string;
+  published_at: string;
+  engagement: number;
+  /** -1 (muy negativo) a 1 (muy positivo). */
+  sentiment: number;
+  label: SentimentLabel;
+  emotion: Emotion | null;
+  topics: string[];
+  classified_by: string;
+  created_at: string;
+};
+
+export const NETWORK_LABEL: Record<SocialNetwork, string> = {
+  x: "X / Twitter",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  noticias: "Portales de noticias",
+  otros: "Otras fuentes",
+};
+
+export const EMOTION_LABEL: Record<Emotion, string> = {
+  enojo: "Enojo",
+  miedo: "Miedo",
+  tristeza: "Tristeza",
+  alegria: "Alegría",
+  confianza: "Confianza",
+  sorpresa: "Sorpresa",
+};
+
+// --- Composiciones usadas en la UI -----------------------------------------
+
+export type QuestionWithOptions = Question & { options: QuestionOption[] };
+
+export type SurveyWithMeta = Survey & {
+  organization?: Pick<Organization, "id" | "name" | "slug"> | null;
+  project?: Pick<Project, "id" | "name"> | null;
+  response_count?: number;
+};
+
+// --- Tipado para @supabase/supabase-js --------------------------------------
+
+type TableDef<Row, Rel extends unknown[] = []> = {
+  Row: Row;
+  Insert: Partial<Row>;
+  Update: Partial<Row>;
+  Relationships: Rel;
+};
+
+/** Atajo para declarar una clave foránea sin repetir la forma completa. */
+type FK<Col extends string, Ref extends string> = {
+  foreignKeyName: `fk_${Col}_${Ref}`;
+  columns: [Col];
+  isOneToOne: false;
+  referencedRelation: Ref;
+  referencedColumns: ["id"];
+};
+
+export type Database = {
+  public: {
+    Tables: {
+      organizations: TableDef<Organization>;
+      profiles: TableDef<Profile, [FK<"organization_id", "organizations">]>;
+      projects: TableDef<
+        Project,
+        [FK<"organization_id", "organizations">, FK<"created_by", "profiles">]
+      >;
+      surveys: TableDef<
+        Survey,
+        [
+          FK<"organization_id", "organizations">,
+          FK<"project_id", "projects">,
+          FK<"created_by", "profiles">,
+        ]
+      >;
+      questions: TableDef<Question, [FK<"survey_id", "surveys">]>;
+      question_options: TableDef<QuestionOption, [FK<"question_id", "questions">]>;
+      survey_assignments: TableDef<
+        SurveyAssignment,
+        [FK<"survey_id", "surveys">, FK<"surveyor_id", "profiles">]
+      >;
+      responses: TableDef<
+        SurveyResponse,
+        [
+          FK<"survey_id", "surveys">,
+          FK<"organization_id", "organizations">,
+          FK<"surveyor_id", "profiles">,
+        ]
+      >;
+      answers: TableDef<Answer, [FK<"response_id", "responses">, FK<"question_id", "questions">]>;
+      social_trackers: TableDef<SocialTracker, [FK<"organization_id", "organizations">]>;
+      social_posts: TableDef<SocialPost, [FK<"organization_id", "organizations">]>;
+      ai_reports: TableDef<
+        AiReport,
+        [
+          FK<"survey_id", "surveys">,
+          FK<"organization_id", "organizations">,
+          FK<"created_by", "profiles">,
+        ]
+      >;
+    };
+    Views: { [_ in never]: never };
+    Functions: { [_ in never]: never };
+    Enums: {
+      user_role: UserRole;
+      org_type: OrgType;
+      org_status: OrgStatus;
+      survey_status: SurveyStatus;
+      question_type: QuestionType;
+      response_status: ResponseStatus;
+      report_status: ReportStatus;
+      report_kind: ReportKind;
+    };
+    CompositeTypes: { [_ in never]: never };
+  };
+};
+
+// --- Etiquetas legibles ------------------------------------------------------
+
+export const ROLE_LABEL: Record<UserRole, string> = {
+  super_admin: "Administración central",
+  org_admin: "Administrador de cliente",
+  org_analyst: "Analista",
+  surveyor: "Encuestador",
+};
+
+export const SURVEY_STATUS_LABEL: Record<SurveyStatus, string> = {
+  borrador: "Borrador",
+  activa: "En campo",
+  pausada: "Pausada",
+  cerrada: "Cerrada",
+};
+
+export const ORG_TYPE_LABEL: Record<OrgType, string> = {
+  gobierno: "Gobierno",
+  institucion: "Institución",
+  ong: "ONG",
+  privado: "Privado",
+};
+
+export const ORG_STATUS_LABEL: Record<OrgStatus, string> = {
+  activa: "Activa",
+  suspendida: "Suspendida",
+  prueba: "En prueba",
+};
+
+export const QUESTION_TYPE_LABEL: Record<QuestionType, string> = {
+  texto_corto: "Texto corto",
+  texto_largo: "Texto largo",
+  opcion_unica: "Opción única",
+  opcion_multiple: "Opción múltiple",
+  escala: "Escala numérica",
+  numero: "Número",
+  fecha: "Fecha",
+  si_no: "Sí / No",
+};
+
+export const REPORT_KIND_LABEL: Record<ReportKind, string> = {
+  ejecutivo: "Informe ejecutivo",
+  tecnico: "Informe técnico",
+  comunicacional: "Placa comunicacional",
+  comparativo: "Análisis comparativo",
+};

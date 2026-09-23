@@ -1,0 +1,308 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ---------------------------------------------------------------------------
+   Tokens de marca
+   --------------------------------------------------------------------------- */
+/* `.force-light` vuelve a los tokens claros dentro de un bloque: la encuesta web
+   embebida no hereda el tema oscuro del panel de quien la está configurando. */
+:root,
+.force-light {
+  --background: #ebe7f6;
+  --surface: #fffdfb;
+  --surface-2: #f4f1fb;
+  --foreground: #14111f;
+  --muted: #5b5570;
+  --border: #ddd6ee;
+
+  --primary: #3d2de0;
+  --primary-hover: #2c1cc8;
+  --primary-soft: #ebe6ff;
+  --primary-fg: #ffffff;
+
+  --accent: #0d9a86;
+  --accent-soft: #d4f5ef;
+
+  --success: #15803d;
+  --success-soft: #dcfce7;
+  --warning: #b45309;
+  --warning-soft: #fef3c7;
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
+
+  --chart-1: #3d2de0;
+  --chart-2: #0d9a86;
+  --chart-3: #c2410c;
+  --chart-4: #7c3aed;
+  --chart-5: #0284c7;
+  --chart-6: #b45309;
+  --chart-7: #be185d;
+  --chart-8: #4d7c0f;
+
+  --ring: #3d2de0;
+  --radius: 1rem;
+  --shadow-card: 0 1px 0 color-mix(in oklab, white 70%, transparent) inset,
+    0 14px 36px -22px rgba(32, 20, 72, 0.28);
+}
+
+.dark:not(.force-light) {
+  --background: #07060f;
+  --surface: #110f1d;
+  --surface-2: #181528;
+  --foreground: #f3effc;
+  --muted: #a89fc0;
+  --border: #2c2742;
+
+  --primary: #8b7cff;
+  --primary-hover: #a498ff;
+  --primary-soft: #221c48;
+  --primary-fg: #0b0814;
+
+  --accent: #2dd4bf;
+  --accent-soft: #0d2c28;
+
+  --success: #4ade80;
+  --success-soft: #0d2a1a;
+  --warning: #fbbf24;
+  --warning-soft: #2e2208;
+  --danger: #f87171;
+  --danger-soft: #331414;
+
+  --chart-1: #8b7cff;
+  --chart-2: #2dd4bf;
+  --chart-3: #fb923c;
+  --chart-4: #a78bfa;
+  --chart-5: #38bdf8;
+  --chart-6: #fbbf24;
+  --chart-7: #f472b6;
+  --chart-8: #a3e635;
+
+  --ring: #8b7cff;
+  --shadow-card: 0 1px 0 color-mix(in oklab, white 6%, transparent) inset,
+    0 18px 40px -20px rgba(0, 0, 0, 0.55);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-primary-fg: var(--primary-fg);
+
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+
+  --color-ring: var(--ring);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-instrument), ui-serif, Georgia, serif;
+
+  --radius-card: var(--radius);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(1100px 560px at -8% -12%, color-mix(in oklab, var(--primary) 16%, transparent), transparent 58%),
+      radial-gradient(900px 480px at 108% -8%, color-mix(in oklab, var(--accent) 14%, transparent), transparent 52%),
+      radial-gradient(700px 380px at 50% 120%, color-mix(in oklab, var(--primary) 8%, transparent), transparent 60%);
+    background-attachment: fixed;
+    color: var(--foreground);
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--primary-soft);
+    color: var(--foreground);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: color-mix(in oklab, var(--muted) 35%, transparent);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: color-mix(in oklab, var(--muted) 55%, transparent);
+    background-clip: content-box;
+  }
+}
+
+@layer components {
+  .card {
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+  }
+
+  .glass {
+    background: color-mix(in oklab, var(--surface) 78%, transparent);
+    backdrop-filter: blur(18px) saturate(1.15);
+    border: 1px solid color-mix(in oklab, var(--border) 80%, white 20%);
+  }
+
+  .surface-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--border) 70%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--border) 70%, transparent) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  .display {
+    font-family: var(--font-display);
+    letter-spacing: -0.03em;
+  }
+
+  .gradient-text {
+    background: linear-gradient(120deg, var(--primary) 0%, #7c3aed 48%, var(--accent) 120%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .orb {
+    position: absolute;
+    border-radius: 999px;
+    filter: blur(48px);
+    pointer-events: none;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes shine {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -20% 0;
+  }
+}
+
+.animate-rise {
+  animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.animate-float {
+  animation: float 7s ease-in-out infinite;
+}
+
+.animate-pulse-soft {
+  animation: pulse-soft 2.4s ease-in-out infinite;
+}
+
+/* Impresión / PDF: solo el documento, sin la cáscara de la app ni fondos. */
+@media print {
+  @page {
+    margin: 16mm 14mm;
+  }
+  html,
+  body {
+    background: #fff !important;
+    background-image: none !important;
+    color: #14111f !important;
+  }
+  .print-hidden {
+    display: none !important;
+  }
+  .card,
+  [class*="shadow-"] {
+    box-shadow: none !important;
+  }
+  h1,
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+  table,
+  blockquote,
+  li {
+    break-inside: avoid;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-float,
+  .animate-pulse-soft {
+    animation: none;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
