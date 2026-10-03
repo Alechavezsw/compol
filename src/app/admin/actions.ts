@@ -5,13 +5,14 @@ import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { slugify } from "@/lib/utils";
-import type { OrgStatus, OrgType, UserRole } from "@/lib/types";
+import type { InvoiceStatus, OrgStatus, OrgType, UserRole } from "@/lib/types";
 
 export type ActionState = { error?: string | null; ok?: string | null };
 
 const ORG_TYPES: OrgType[] = ["gobierno", "institucion", "ong", "privado"];
 const ORG_STATUSES: OrgStatus[] = ["activa", "prueba", "suspendida"];
 const ROLES: UserRole[] = ["super_admin", "org_admin", "org_analyst", "surveyor"];
+const INVOICE_STATUSES: InvoiceStatus[] = ["pendiente", "pagada", "vencida", "anulada"];
 
 export async function createOrganizationAction(
   _prev: ActionState,
@@ -235,4 +236,67 @@ export async function removeAssignmentAction(formData: FormData) {
   await supabase.from("survey_assignments").delete().eq("id", id);
   revalidatePath("/admin/encuestadores");
   revalidatePath("/campo");
+}
+
+// ---------------------------------------------------------------------------
+// Facturación
+//
+// Interna de la administración central: la consultora factura a cada
+// organización cliente. Ningún otro rol lee ni escribe esta tabla (ver RLS).
+// ---------------------------------------------------------------------------
+
+export async function createInvoiceAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole(["super_admin"]);
+
+  const organizationId = String(formData.get("organization_id") ?? "");
+  const number = String(formData.get("number") ?? "").trim();
+  const concept = String(formData.get("concept") ?? "").trim();
+  const amount = Number(formData.get("amount") ?? 0);
+  const currency = String(formData.get("currency") ?? "ARS").trim() || "ARS";
+  const dueAt = String(formData.get("due_at") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  if (!organizationId) return { error: "Elegí la organización a facturar." };
+  if (number.length < 2) return { error: "Ingresá el número de comprobante." };
+  if (concept.length < 3) return { error: "Ingresá el concepto de la factura." };
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { error: "El monto tiene que ser mayor a cero." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("invoices").insert({
+    organization_id: organizationId,
+    number,
+    concept,
+    amount,
+    currency,
+    due_at: dueAt,
+    notes,
+  });
+
+  if (error) return { error: `No se pudo crear la factura: ${error.message}` };
+
+  revalidatePath("/admin/facturacion");
+  revalidatePath("/admin/contabilidad");
+  redirect("/admin/facturacion");
+}
+
+export async function updateInvoiceStatusAction(formData: FormData) {
+  await requireRole(["super_admin"]);
+
+  const id = String(formData.get("id") ?? "");
+  const status = String(formData.get("status") ?? "") as InvoiceStatus;
+  if (!id || !INVOICE_STATUSES.includes(status)) return;
+
+  const supabase = await createClient();
+  await supabase
+    .from("invoices")
+    .update({ status, paid_at: status === "pagada" ? new Date().toISOString() : null })
+    .eq("id", id);
+
+  revalidatePath("/admin/facturacion");
+  revalidatePath("/admin/contabilidad");
 }

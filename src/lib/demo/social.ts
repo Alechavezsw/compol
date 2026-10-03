@@ -3,8 +3,8 @@ import { classifyText } from "@/lib/social/lexicon";
 
 type Template = { topic: string; label: SentimentLabel; emotion: Emotion | null; text: string };
 
-const BARRIOS = ["Centro", "Barrio Norte", "Pueblo Diamante", "Villa 25 de Mayo", "Cuadro Nacional", "Rama Caída", "Las Paredes", "El Cerrito"];
-const CALLES = ["Av. Mitre", "calle Pellegrini", "Ortiz de Rozas", "Av. El Libertador", "calle Chile", "Ruta 143"];
+const BARRIOS = ["Centro", "Rivadavia", "Chimbas", "Rawson", "Santa Lucía", "Pocito", "Desamparados", "Trinidad"];
+const CALLES = ["Av. Libertador", "calle Mendoza", "Av. Ignacio de la Roza", "calle Entre Ríos", "Av. Rawson", "Ruta 40"];
 
 const T: Template[] = [
   // Seguridad
@@ -40,7 +40,7 @@ const T: Template[] = [
   // Gestión
   { topic: "Gestión municipal", label: "positivo", emotion: "confianza", text: "Muy buena la gestión del intendente con las obras en los distritos, se nota el cambio" },
   { topic: "Gestión municipal", label: "negativo", emotion: "enojo", text: "El municipio solo hace fotos para las redes, gestión pésima" },
-  { topic: "Empleo", label: "negativo", emotion: "tristeza", text: "No hay trabajo para los pibes en San Rafael, se van todos a Mendoza" },
+  { topic: "Empleo", label: "negativo", emotion: "tristeza", text: "No hay trabajo para los pibes en San Juan, se van todos a Mendoza" },
   { topic: "Empleo", label: "positivo", emotion: "alegria", text: "Arrancó la capacitación en oficios del municipio, excelente para los jóvenes" },
 ];
 
@@ -80,8 +80,8 @@ export function buildDemoSocial(
       id: "trk-gestion",
       organization_id: organizationId,
       name: "Gestión municipal",
-      keywords: ["municipalidad de san rafael", "intendente", "municipio"],
-      exclude: ["san rafael de mendoza club"],
+      keywords: ["municipalidad de san juan", "intendente", "municipio"],
+      exclude: ["san juan, puerto rico"],
       is_active: true,
       created_at: created,
     },
@@ -109,7 +109,7 @@ export function buildDemoSocial(
       organization_id: organizationId,
       network,
       external_id: `demo-${n}`,
-      author: network === "noticias" ? pick(["Diario San Rafael", "Radio Sol", "El Sureño"]) : `usuario-${(n * 7919).toString(16).slice(-6)}`,
+      author: network === "noticias" ? pick(["Diario de Cuyo", "Radio Sarmiento", "El Zonda"]) : `usuario-${(n * 7919).toString(16).slice(-6)}`,
       url: null,
       text,
       published_at: when.toISOString(),

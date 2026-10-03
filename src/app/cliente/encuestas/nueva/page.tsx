@@ -11,11 +11,18 @@ export default async function NuevaEncuestaPage() {
   const { organization } = await requireOrganization(["org_admin"]);
   const supabase = await createClient();
 
-  const { data: surveys } = await supabase
-    .from("surveys")
-    .select("id, title")
-    .eq("organization_id", organization.id)
-    .order("updated_at", { ascending: false });
+  const [{ data: surveys }, { data: projects }] = await Promise.all([
+    supabase
+      .from("surveys")
+      .select("id, title")
+      .eq("organization_id", organization.id)
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("projects")
+      .select("id, name")
+      .eq("organization_id", organization.id)
+      .order("name", { ascending: true }),
+  ]);
   const ids = (surveys ?? []).map((s) => s.id);
   const { data: questions } = ids.length
     ? await supabase.from("questions").select("survey_id").in("survey_id", ids)
@@ -32,7 +39,10 @@ export default async function NuevaEncuestaPage() {
       />
       <Card>
         <CardContent className="p-6">
-          <SurveyForm surveys={(surveys ?? []).map((s) => ({ id: s.id, title: s.title, questions: count.get(s.id) ?? 0 }))} />
+          <SurveyForm
+            surveys={(surveys ?? []).map((s) => ({ id: s.id, title: s.title, questions: count.get(s.id) ?? 0 }))}
+            projects={(projects ?? []).map((p) => ({ id: p.id, name: p.name }))}
+          />
         </CardContent>
       </Card>
     </div>

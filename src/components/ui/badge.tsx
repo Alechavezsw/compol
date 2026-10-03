@@ -1,11 +1,15 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import {
+  INVOICE_STATUS_LABEL,
   ORG_STATUS_LABEL,
   ROLE_LABEL,
+  SERVICE_LINE_LABEL,
   SURVEY_STATUS_LABEL,
+  type InvoiceStatus,
   type OrgStatus,
   type ReportStatus,
+  type ServiceLine,
   type SurveyStatus,
   type UserRole,
 } from "@/lib/types";
@@ -92,4 +96,32 @@ const reportLabel: Record<ReportStatus, string> = {
 
 export function ReportStatusBadge({ status }: { status: ReportStatus }) {
   return <Badge tone={reportTone[status]}>{reportLabel[status]}</Badge>;
+}
+
+const invoiceTone: Record<InvoiceStatus, Tone> = {
+  pendiente: "warning",
+  pagada: "success",
+  vencida: "danger",
+  anulada: "neutral",
+};
+
+export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
+  return <Badge tone={invoiceTone[status]}>{INVOICE_STATUS_LABEL[status]}</Badge>;
+}
+
+const serviceLineTone: Record<ServiceLine, Tone> = {
+  opinion_publica: "primary",
+  tracking: "accent",
+  monitor_gestion: "warning",
+  inteligencia_territorial: "success",
+  banco_dirigentes: "primary",
+  cualitativo: "neutral",
+  laboratorio_opinion: "accent",
+  radar_conversacion: "success",
+  estudios_tematicos: "neutral",
+  flash: "warning",
+};
+
+export function ServiceLineBadge({ line }: { line: ServiceLine }) {
+  return <Badge tone={serviceLineTone[line]}>{SERVICE_LINE_LABEL[line]}</Badge>;
 }

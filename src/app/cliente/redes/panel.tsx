@@ -173,7 +173,7 @@ export function PostFeed({
 }
 
 // -------------------------------------------------------------- importar
-export function ImportPanel({ withModel }: { withModel: boolean }) {
+export function ImportPanel({ modelName }: { modelName: string | null }) {
   const [state, formAction] = useActionState<SocialActionState, FormData>(importSocialAction, {});
   const [mode, setMode] = useState<"csv" | "pegar" | "rss">("csv");
 
@@ -239,7 +239,7 @@ export function ImportPanel({ withModel }: { withModel: boolean }) {
 
       <p className="flex items-center gap-1.5 text-xs text-[var(--muted)]">
         <Sparkles className="size-3.5" />
-        {withModel ? "Se clasifican con Gemini (detecta ironía y contexto)." : "Sin clave de Gemini: se clasifican con el léxico local."}
+        {modelName ? `Se clasifican con ${modelName} (detecta ironía y contexto).` : "Sin clave de TypeSafe ni Gemini: se clasifican con el léxico local."}
       </p>
 
       {state.error ? <FormMessage>{state.error}</FormMessage> : null}
@@ -276,7 +276,7 @@ export function ReclassifyButton({ pending }: { pending: number }) {
     <form action={formAction} className="space-y-2">
       <SubmitButton pendingLabel="Reclasificando…" variant="secondary" size="sm" className="w-full" disabled={!pending}>
         <Sparkles />
-        Reclasificar {formatNumber(pending)} con Gemini
+        Reclasificar {formatNumber(pending)} con IA
       </SubmitButton>
       {state.error ? <FormMessage>{state.error}</FormMessage> : null}
       {state.ok ? <FormMessage tone="success">{state.ok}</FormMessage> : null}

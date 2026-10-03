@@ -10,11 +10,14 @@ import {
   FileText,
   FolderKanban,
   Gauge,
+  IdCard,
+  Landmark,
   LayoutDashboard,
   ListChecks,
   LogOut,
   Menu,
   Radar,
+  Receipt,
   Sparkles,
   Users,
   X,
@@ -36,7 +39,10 @@ export type IconName =
   | "field"
   | "results"
   | "ai"
-  | "social";
+  | "social"
+  | "billing"
+  | "accounting"
+  | "leaders";
 
 const ICONS: Record<IconName, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -49,6 +55,9 @@ const ICONS: Record<IconName, LucideIcon> = {
   results: BarChart3,
   ai: Sparkles,
   social: Radar,
+  billing: Receipt,
+  accounting: Landmark,
+  leaders: IdCard,
 };
 
 export type NavItem = {

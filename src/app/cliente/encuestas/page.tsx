@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, ClipboardList, MapPin, Users } from "lucide-react";
+import { BarChart3, ClipboardList, FolderKanban, MapPin, Users } from "lucide-react";
 import { EmptyState, PageHeader, Progress } from "@/components/ui/misc";
 import { ButtonLink } from "@/components/ui/button";
 import { SurveyStatusBadge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ export default async function EncuestasPage() {
   const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
   const supabase = await createClient();
 
-  const [{ data: surveyRows }, { data: responseRows }, { data: questionRows }, { data: assignRows }] =
+  const [{ data: surveyRows }, { data: responseRows }, { data: questionRows }, { data: assignRows }, { data: projectRows }] =
     await Promise.all([
       supabase
         .from("surveys")
@@ -32,9 +32,11 @@ export default async function EncuestasPage() {
     ).then((data) => ({ data })),
       supabase.from("questions").select("survey_id"),
       supabase.from("survey_assignments").select("survey_id"),
+      supabase.from("projects").select("id, name").eq("organization_id", organization.id),
     ]);
 
   const surveys = (surveyRows ?? []) as Survey[];
+  const projectName = new Map((projectRows ?? []).map((p) => [p.id, p.name]));
 
   const tally = (rows: { survey_id: string }[] | null) => {
     const map = new Map<string, number>();
@@ -90,6 +92,12 @@ export default async function EncuestasPage() {
                 </div>
 
                 <dl className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--muted)]">
+                  {s.project_id && projectName.get(s.project_id) ? (
+                    <div className="flex items-center gap-1.5">
+                      <FolderKanban className="size-3.5" />
+                      {projectName.get(s.project_id)}
+                    </div>
+                  ) : null}
                   <div className="flex items-center gap-1.5">
                     <ClipboardList className="size-3.5" />
                     {formatNumber(questions.get(s.id) ?? 0)} preguntas

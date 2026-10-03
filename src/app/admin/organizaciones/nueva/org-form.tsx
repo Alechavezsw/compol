@@ -12,7 +12,7 @@ export function OrgForm() {
   return (
     <form action={formAction} className="space-y-5">
       <Field label="Nombre de la organización">
-        <Input name="name" required placeholder="Municipalidad de San Rafael" autoFocus />
+        <Input name="name" required placeholder="Municipalidad de San Juan" autoFocus />
       </Field>
 
       <div className="grid gap-5 sm:grid-cols-2">
@@ -36,15 +36,15 @@ export function OrgForm() {
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Provincia o región" hint="Opcional">
-          <Input name="region" placeholder="Mendoza" />
+          <Input name="region" placeholder="San Juan" />
         </Field>
         <Field label="Teléfono de contacto" hint="Opcional">
-          <Input name="contact_phone" placeholder="+54 260 442 0000" />
+          <Input name="contact_phone" placeholder="+54 264 422 0000" />
         </Field>
       </div>
 
       <Field label="Correo de contacto" hint="A donde se envían las notificaciones institucionales.">
-        <Input name="contact_email" type="email" placeholder="direccion@sanrafael.gob.ar" />
+        <Input name="contact_email" type="email" placeholder="direccion@sanjuan.gob.ar" />
       </Field>
 
       <Field label="Notas internas" hint="Solo visibles para la administración central.">

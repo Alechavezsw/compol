@@ -78,7 +78,7 @@ export type SocialAnalytics = {
 };
 
 const STOP = new Set(
-  "que los las del con una por para como pero mas este esta hay son muy todo nos les sus desde cuando donde porque ser fue van tiene tienen hace hoy ahora siempre gracias vecinos vecino barrio municipio san rafael".split(
+  "que los las del con una por para como pero mas este esta hay son muy todo nos les sus desde cuando donde porque ser fue van tiene tienen hace hoy ahora siempre gracias vecinos vecino barrio municipio san juan".split(
     " ",
   ),
 );

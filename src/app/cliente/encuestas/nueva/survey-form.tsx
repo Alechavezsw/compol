@@ -20,7 +20,13 @@ const METHODS = {
   mixta: ["Mixta: presencial por cuotas y autoadministrada online"],
 };
 
-export function SurveyForm({ surveys }: { surveys: { id: string; title: string; questions: number }[] }) {
+export function SurveyForm({
+  surveys,
+  projects,
+}: {
+  surveys: { id: string; title: string; questions: number }[];
+  projects: { id: string; name: string }[];
+}) {
   const [state, formAction] = useActionState<ActionState, FormData>(createSurveyAction, {});
   const [channel, setChannel] = useState<keyof typeof METHODS>("campo");
   const [target, setTarget] = useState(400);
@@ -35,6 +41,19 @@ export function SurveyForm({ surveys }: { surveys: { id: string; title: string; 
       <Field label="Objetivo" hint="Se lo pasamos al motor de IA como contexto cuando redacta los informes.">
         <Textarea name="description" placeholder="Medir imagen de gestión, prioridades vecinales y satisfacción con servicios públicos." />
       </Field>
+
+      {projects.length ? (
+        <Field label="Proyecto" hint="Agrupa esta encuesta con otras olas de la misma línea de servicio.">
+          <Select name="project_id" defaultValue="">
+            <option value="">Sin proyecto</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      ) : null}
 
       <Field label="¿Cómo se va a responder?">
         <div className="grid gap-2 sm:grid-cols-3">
@@ -66,7 +85,7 @@ export function SurveyForm({ surveys }: { surveys: { id: string; title: string; 
 
       <div className="grid gap-5 sm:grid-cols-2">
         <Field label="Ámbito geográfico">
-          <Input name="geography" placeholder="San Rafael, Mendoza" />
+          <Input name="geography" placeholder="San Juan, Argentina" />
         </Field>
         <Field
           label="Meta de casos"

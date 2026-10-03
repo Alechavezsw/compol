@@ -254,6 +254,29 @@
   }
 }
 
+@keyframes marker-pop {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  55% {
+    transform: scale(1.8);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Leaflet dibuja los CircleMarker como <path> SVG: fill-box hace que la escala
+   pivotee sobre el propio punto y no sobre el origen del mapa. */
+.field-map-marker-new {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: marker-pop 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 .animate-rise {
   animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -299,7 +322,8 @@
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-float,
-  .animate-pulse-soft {
+  .animate-pulse-soft,
+  .field-map-marker-new {
     animation: none;
   }
   * {

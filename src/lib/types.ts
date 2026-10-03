@@ -19,6 +19,20 @@ export type QuestionType =
 export type ResponseStatus = "en_curso" | "completada" | "descartada";
 export type ReportStatus = "generando" | "listo" | "error";
 export type ReportKind = "ejecutivo" | "tecnico" | "comunicacional" | "comparativo";
+export type InvoiceStatus = "pendiente" | "pagada" | "vencida" | "anulada";
+
+/** Las 10 líneas de producto del portfolio de investigación. */
+export type ServiceLine =
+  | "opinion_publica"
+  | "tracking"
+  | "monitor_gestion"
+  | "inteligencia_territorial"
+  | "banco_dirigentes"
+  | "cualitativo"
+  | "laboratorio_opinion"
+  | "radar_conversacion"
+  | "estudios_tematicos"
+  | "flash";
 
 export type Organization = {
   id: string;
@@ -57,6 +71,7 @@ export type Project = {
   name: string;
   description: string | null;
   color: string | null;
+  service_line: ServiceLine;
   created_by: string | null;
   created_at: string;
 }
@@ -253,6 +268,60 @@ export const EMOTION_LABEL: Record<Emotion, string> = {
   sorpresa: "Sorpresa",
 };
 
+// --- Facturación --------------------------------------------------------------
+
+/** Facturación interna de la consultora hacia cada organización cliente. */
+export type Invoice = {
+  id: string;
+  organization_id: string;
+  number: string;
+  concept: string;
+  amount: number;
+  currency: string;
+  status: InvoiceStatus;
+  issued_at: string;
+  due_at: string | null;
+  paid_at: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// --- Banco de dirigentes ------------------------------------------------------
+
+/** Ficha longitudinal de un dirigente: conocimiento e imagen medidos en el tiempo. */
+export type Dirigente = {
+  id: string;
+  organization_id: string;
+  name: string;
+  role: string | null;
+  affiliation: string | null;
+  photo_url: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Una medición puntual de un dirigente, opcionalmente atada al proyecto que la generó. */
+export type DirigenteMedicion = {
+  id: string;
+  dirigente_id: string;
+  project_id: string | null;
+  /** Porcentaje 0-100 que reconoce al dirigente. */
+  conocimiento: number | null;
+  /** Porcentaje 0-100 con imagen positiva. */
+  imagen_positiva: number | null;
+  /** Porcentaje 0-100 con imagen negativa. */
+  imagen_negativa: number | null;
+  segmento: string | null;
+  notes: string | null;
+  measured_at: string;
+  created_by: string | null;
+  created_at: string;
+}
+
 // --- Composiciones usadas en la UI -----------------------------------------
 
 export type QuestionWithOptions = Question & { options: QuestionOption[] };
@@ -323,6 +392,18 @@ export type Database = {
           FK<"created_by", "profiles">,
         ]
       >;
+      invoices: TableDef<
+        Invoice,
+        [FK<"organization_id", "organizations">, FK<"created_by", "profiles">]
+      >;
+      dirigentes: TableDef<
+        Dirigente,
+        [FK<"organization_id", "organizations">, FK<"created_by", "profiles">]
+      >;
+      dirigente_mediciones: TableDef<
+        DirigenteMedicion,
+        [FK<"dirigente_id", "dirigentes">, FK<"project_id", "projects">, FK<"created_by", "profiles">]
+      >;
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -335,6 +416,8 @@ export type Database = {
       response_status: ResponseStatus;
       report_status: ReportStatus;
       report_kind: ReportKind;
+      invoice_status: InvoiceStatus;
+      service_line: ServiceLine;
     };
     CompositeTypes: { [_ in never]: never };
   };
@@ -385,4 +468,44 @@ export const REPORT_KIND_LABEL: Record<ReportKind, string> = {
   tecnico: "Informe técnico",
   comunicacional: "Placa comunicacional",
   comparativo: "Análisis comparativo",
+};
+
+export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
+  pendiente: "Pendiente",
+  pagada: "Pagada",
+  vencida: "Vencida",
+  anulada: "Anulada",
+};
+
+export const SERVICE_LINE_LABEL: Record<ServiceLine, string> = {
+  opinion_publica: "Estudios de opinión pública",
+  tracking: "Tracking político",
+  monitor_gestion: "Monitor de gestión",
+  inteligencia_territorial: "Inteligencia territorial",
+  banco_dirigentes: "Banco de dirigentes",
+  cualitativo: "Investigación cualitativa",
+  laboratorio_opinion: "Laboratorio de opinión",
+  radar_conversacion: "Radar de conversación pública",
+  estudios_tematicos: "Estudios temáticos",
+  flash: "Estudios Flash",
+};
+
+export const SERVICE_LINE_DESCRIPTION: Record<ServiceLine, string> = {
+  opinion_publica:
+    "Imagen, gestión, problemas, expectativas e intención de voto en un territorio.",
+  tracking:
+    "Mediciones comparables en el tiempo con indicadores nucleares estables.",
+  monitor_gestion:
+    "Seguimiento de servicios, prioridades y demandas territoriales para gobiernos.",
+  inteligencia_territorial:
+    "Mapas y cruces geográficos cuando el diseño y la muestra lo permiten.",
+  banco_dirigentes:
+    "Fichas longitudinales de conocimiento, imagen y atributos de dirigentes.",
+  cualitativo: "Focus groups, entrevistas en profundidad e informantes clave.",
+  laboratorio_opinion:
+    "Pruebas de comprensión y evaluación de formulaciones con diseños experimentales.",
+  radar_conversacion:
+    "Análisis de fuentes digitales públicas: temas, volumen y evolución.",
+  estudios_tematicos: "Investigación propia sobre agenda pública y temas específicos.",
+  flash: "Operativos breves para preguntas puntuales, con alcance acotado.",
 };

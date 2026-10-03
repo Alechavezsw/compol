@@ -21,6 +21,19 @@ export function formatPercent(value: number | null | undefined) {
   return `${percentFmt.format(value)}%`;
 }
 
+export function formatCurrency(value: number | null | undefined, currency = "ARS") {
+  if (value === null || value === undefined || Number.isNaN(value)) return "—";
+  try {
+    return new Intl.NumberFormat("es-AR", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(value);
+  } catch {
+    return `${currency} ${numberFmt.format(value)}`;
+  }
+}
+
 export function formatDate(value: string | Date | null | undefined) {
   if (!value) return "—";
   const date = typeof value === "string" ? new Date(value) : value;

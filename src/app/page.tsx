@@ -3,6 +3,8 @@ import {
   BarChart3,
   Building2,
   ClipboardList,
+  FolderKanban,
+  IdCard,
   Lock,
   MapPin,
   Smartphone,
@@ -52,9 +54,23 @@ const MODULES = [
     alt: "Consulta de resultados en una computadora",
   },
   {
+    icon: FolderKanban,
+    title: "Proyectos y líneas de servicio",
+    text: "Agrupá encuestas por proyecto: tracking, monitor de gestión, estudios temáticos o flash. Cada ola queda comparable con la anterior.",
+    image: IMG.ullum,
+    alt: "Quebrada y dique de Ullum, San Juan",
+  },
+  {
+    icon: IdCard,
+    title: "Banco de dirigentes",
+    text: "Fichas longitudinales de conocimiento e imagen. Quién sube, quién baja y por qué, medición tras medición.",
+    image: IMG.plaza,
+    alt: "Plaza 25 de Mayo, San Juan",
+  },
+  {
     icon: Sparkles,
     title: "Informes con IA",
-    text: "Gemini redacta el informe ejecutivo, técnico o comunicacional sobre los agregados reales, citando la base de cada cifra.",
+    text: "La IA redacta el informe ejecutivo, técnico o comunicacional sobre los agregados reales, citando la base de cada cifra.",
     image: IMG.ciudad,
     alt: "Vista de la ciudad de San Juan hacia la precordillera",
   },
@@ -106,7 +122,7 @@ export default async function LandingPage() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--background)_72%,transparent)] backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--background)_92%,transparent)] shadow-sm backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3.5 sm:px-6">
           <Logo />
           <div className="flex items-center gap-2 sm:gap-3">
@@ -128,8 +144,8 @@ export default async function LandingPage() {
       <main className="flex-1">
         <section className="relative min-h-[88vh] overflow-hidden">
           <Photo
-            src={IMG.hero}
-            alt="Catedral de San Juan Bautista y su campanil, frente a la Plaza 25 de Mayo"
+            src={IMG.peatonal}
+            alt="Gente caminando por la peatonal de San Juan"
             priority
             sizes="100vw"
           />
@@ -149,13 +165,13 @@ export default async function LandingPage() {
               </h1>
 
               <p className="mt-6 max-w-xl text-base leading-relaxed text-white/75 sm:text-lg">
-                De la Plaza 25 de Mayo a la peatonal: diseñá el cuestionario, coordiná a los
-                encuestadores y entregale a cada organismo su tablero, con informes escritos sobre
-                los datos reales del relevamiento.
+                Diseñá el cuestionario, coordiná a los encuestadores desde el celular y entregale a
+                cada organismo su tablero en vivo, con informes escritos sobre los datos reales del
+                relevamiento.
               </p>
 
               <div className="mt-8 flex flex-wrap gap-2">
-                {["Plaza 25", "Catedral", "Peatonal", "Ullum"].map((w) => (
+                {["Cuestionarios", "Campo en vivo", "Tableros", "Informes con IA"].map((w) => (
                   <span
                     key={w}
                     className="rounded-full border border-white/20 bg-white/8 px-3 py-1 text-[12px] font-medium tracking-wide text-white/80"
@@ -187,43 +203,67 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        <section className="relative mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+        <section className="border-b border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_60%,transparent)]">
+          <div className="mx-auto grid w-full max-w-6xl grid-cols-2 divide-y divide-[var(--border)] px-4 sm:grid-cols-4 sm:divide-x sm:divide-y-0 sm:px-6">
+            {[
+              [ClipboardList, "Cuestionarios flexibles"],
+              [Smartphone, "Carga desde el celular"],
+              [BarChart3, "Resultados en vivo"],
+              [Lock, "Datos aislados por cliente"],
+            ].map(([Icon, label]) => {
+              const I = Icon as typeof ClipboardList;
+              return (
+                <div key={label as string} className="flex items-center gap-3 px-2 py-6 sm:px-6">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+                    <I className="size-4" />
+                  </span>
+                  <span className="text-sm font-medium text-[var(--foreground)]">
+                    {label as string}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
           <div className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--primary)] uppercase">
-              San Juan
+              El operativo
             </p>
             <h2 className="display mt-3 text-4xl text-[var(--foreground)] sm:text-5xl">
               La encuesta pasa en la calle, no en una planilla.
             </h2>
             <p className="mt-4 text-[var(--muted)]">
-              Fotos reales de la ciudad: la plaza, la peatonal, el Centro Cívico y el dique de
-              Ullum. Ahí se pregunta. Acá se ve el resultado.
+              Los encuestadores relevan cara a cara con el teléfono en mano, el organismo sigue el
+              operativo desde su panel y cada respuesta queda cargada al instante, sin planillas
+              que se pierdan en el camino.
             </p>
           </div>
 
           <div className="mt-12 grid grid-cols-2 items-end gap-4 md:grid-cols-4">
             <Polaroid
               src={IMG.plaza}
-              alt="Gente caminando por la Plaza 25 de Mayo"
-              caption="Plaza 25"
+              alt="Encuestador relevando cara a cara en la plaza"
+              caption="Trabajo de campo"
               className="-rotate-2"
             />
             <Polaroid
               src={IMG.peatonal}
-              alt="Peatonal Rivadavia con vecinos y comercios"
-              caption="Peatonal"
+              alt="Encuestador cargando respuestas desde el celular"
+              caption="Carga desde el celular"
               className="rotate-3 md:mb-10"
             />
             <Polaroid
               src={IMG.civico}
-              alt="Centro Cívico de San Juan"
-              caption="Cívico"
+              alt="Organismo público que recibe su tablero de resultados"
+              caption="Panel del organismo"
               className="-rotate-1"
             />
             <Polaroid
               src={IMG.ullum}
-              alt="Quebrada y dique de Ullum, San Juan"
-              caption="Ullum"
+              alt="Cobertura del operativo en toda la provincia"
+              caption="Cobertura total"
               className="rotate-2 md:mb-6"
             />
           </div>
@@ -232,13 +272,15 @@ export default async function LandingPage() {
         <section id="modulos" className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 sm:pb-24">
           <div className="max-w-2xl">
             <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--primary)] uppercase">
-              El ciclo completo
+              El portfolio completo
             </p>
             <h2 className="display mt-3 text-4xl text-[var(--foreground)] sm:text-5xl">
-              Todo el ciclo de una encuesta
+              De la encuesta puntual a la inteligencia política continua
             </h2>
             <p className="mt-4 text-[var(--muted)]">
-              Sin planillas sueltas ni bases que viajan por mail entre el operativo y la dirección.
+              Proyectos, tracking, banco de dirigentes e informes con IA sobre la misma base de
+              datos. Sin planillas sueltas ni bases que viajan por mail entre el operativo y la
+              dirección.
             </p>
           </div>
 
@@ -271,23 +313,37 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        <section className="relative overflow-hidden border-y border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_70%,transparent)]">
-          <div className="relative mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
-            <h2 className="display text-4xl text-[var(--foreground)] sm:text-5xl">Cómo se opera</h2>
-            <ol className="mt-12 grid gap-6 md:grid-cols-3">
+        <section className="border-y border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_70%,transparent)]">
+          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-20">
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--primary)] uppercase">
+              Paso a paso
+            </p>
+            <h2 className="display mt-3 text-4xl text-[var(--foreground)] sm:text-5xl">
+              Cómo se opera
+            </h2>
+            <ol className="relative mt-12 grid gap-6 md:grid-cols-3">
+              <div className="pointer-events-none absolute inset-x-0 top-6 hidden h-px bg-gradient-to-r from-transparent via-[var(--border)] to-transparent md:block" />
               {STEPS.map((s) => (
                 <li
                   key={s.n}
-                  className="overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]"
+                  className="group overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] transition-all duration-300 hover:-translate-y-1"
                 >
-                  <div className="relative h-48">
-                    <Photo src={s.image} alt={s.alt} sizes="(max-width: 768px) 100vw, 33vw" />
-                    <span className="absolute bottom-3 left-3 display rounded-full bg-white/92 px-3 py-1 text-lg text-[var(--foreground)] shadow-sm">
+                  <div className="relative h-48 overflow-hidden">
+                    <Photo
+                      src={s.image}
+                      alt={s.alt}
+                      sizes="(max-width: 768px) 100vw, 33vw"
+                      className="transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/45 to-transparent" />
+                    <span className="absolute bottom-3 left-3 display rounded-full bg-white/92 px-3 py-1 text-lg text-[#14111f] shadow-sm">
                       {s.word}
                     </span>
                   </div>
-                  <div className="p-6">
-                    <span className="display text-3xl gradient-text">{s.n}</span>
+                  <div className="relative p-6">
+                    <span className="display absolute -top-9 right-6 flex size-11 items-center justify-center rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--accent)] text-lg text-white shadow-[0_10px_24px_-10px_var(--primary)]">
+                      {s.n}
+                    </span>
                     <h3 className="mt-3 font-semibold text-[var(--foreground)]">{s.title}</h3>
                     <p className="mt-2 text-sm leading-relaxed text-[var(--muted)]">{s.text}</p>
                   </div>
@@ -297,18 +353,19 @@ export default async function LandingPage() {
           </div>
         </section>
 
-        <section className="mx-auto grid w-full max-w-6xl gap-4 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-5">
-          <div className="overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] lg:col-span-3">
+        <section className="relative mx-auto grid w-full max-w-6xl gap-4 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-5">
+          <div className="group overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] transition-all duration-300 hover:-translate-y-1 lg:col-span-3">
             <div className="relative h-56 sm:h-64">
               <Photo
                 src={IMG.vinedos}
                 alt="Viñedos sanjuaninos con la precordillera de fondo"
                 sizes="(max-width: 1024px) 100vw, 60vw"
+                className="transition-transform duration-500 group-hover:scale-105"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-[var(--surface)] via-transparent to-transparent" />
             </div>
             <div className="relative -mt-10 p-8 pt-0">
-              <span className="flex size-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
+              <span className="flex size-11 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)] shadow-[0_0_0_6px_color-mix(in_oklab,var(--accent)_12%,transparent)]">
                 <Sparkles className="size-5" />
               </span>
               <h2 className="display mt-5 text-3xl text-[var(--foreground)]">
@@ -339,14 +396,16 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] lg:col-span-2">
-            <div className="relative h-44">
+          <div className="group overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] transition-all duration-300 hover:-translate-y-1 lg:col-span-2">
+            <div className="relative h-44 overflow-hidden">
               <Photo
                 src={IMG.plaza}
                 alt="Plaza 25 de Mayo, San Juan"
                 sizes="40vw"
+                className="transition-transform duration-500 group-hover:scale-105"
               />
-              <span className="absolute bottom-3 left-3 display rounded-full bg-white/92 px-3 py-1 text-lg text-[var(--foreground)]">
+              <div className="absolute inset-0 bg-gradient-to-t from-black/35 to-transparent" />
+              <span className="absolute bottom-3 left-3 display rounded-full bg-white/92 px-3 py-1 text-lg text-[#14111f]">
                 Cada quien ve lo suyo
               </span>
             </div>
@@ -394,7 +453,7 @@ export default async function LandingPage() {
                   El operativo, el tablero y el informe. Juntos.
                 </h2>
                 <p className="mx-auto mt-4 max-w-xl text-white/75">
-                  Entrá con un rol de demo y recorré la plataforma como administración, cliente o campo.
+                  Ingresá con tu usuario institucional. Cada organismo ve solo sus propios datos.
                 </p>
                 <div className="mt-8">
                   <ButtonLink href="/login" size="lg">
@@ -402,17 +461,31 @@ export default async function LandingPage() {
                     <ArrowRight />
                   </ButtonLink>
                 </div>
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                  {["Sin instalación", "Roles por organismo", "Datos aislados por cliente"].map(
+                    (t) => (
+                      <span
+                        key={t}
+                        className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[12px] font-medium text-white/80 backdrop-blur"
+                      >
+                        {t}
+                      </span>
+                    ),
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="border-t border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_70%,transparent)]">
+      <footer className="relative border-t border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_70%,transparent)]">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--primary)] to-transparent opacity-40" />
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
           <Logo />
           <p className="text-xs text-[var(--muted)]">
-            Plataforma de encuestas · Next.js, Supabase y Gemini
+            © {new Date().getFullYear()} Consulta · Plataforma de encuestas para gobiernos e
+            instituciones
           </p>
           <ThemeToggle />
         </div>

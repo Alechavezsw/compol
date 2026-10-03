@@ -15,11 +15,12 @@ import { computeSocial, moodLabel, type SocialAnalytics } from "@/lib/social/ana
 import { classifyText } from "@/lib/social/lexicon";
 import { getSurveyAnalytics } from "@/lib/analytics";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
+import { isTypesafeConfigured } from "@/lib/ai/typesafe";
 import { addDays, todayKey } from "@/lib/stats";
 import { cn, formatNumber, formatPercent } from "@/lib/utils";
 import { EMOTION_LABEL, NETWORK_LABEL, type SocialNetwork, type SocialPost, type SocialTracker } from "@/lib/types";
 
-export const metadata: Metadata = { title: "Humor en redes" };
+export const metadata: Metadata = { title: "Radar de conversación pública" };
 
 const NETWORKS: SocialNetwork[] = ["facebook", "x", "instagram", "tiktok", "youtube", "noticias", "otros"];
 
@@ -131,6 +132,7 @@ export default async function RedesPage({
   const a = computeSocial(posts, { days, network, topic: query.tema || null }, today);
   const canManage = profile.role === "org_admin";
   const pendingModel = posts.filter((p) => p.classified_by === "lexico").length;
+  const modelName = isTypesafeConfigured() ? "TypeSafe" : isGeminiConfigured() ? "Gemini" : null;
   const allTopics = [...new Set(posts.flatMap((p) => p.topics))].sort((x, y) => x.localeCompare(y, "es"));
 
   // --- Agenda de la encuesta vs. agenda en redes ----------------------------
@@ -161,7 +163,7 @@ export default async function RedesPage({
             Escucha social
           </Badge>
         }
-        title="Humor en redes"
+        title="Radar de conversación pública"
         description="Qué se dice de la gestión en redes y portales: sentimiento, temas, emociones y picos de conversación."
       />
 
@@ -180,7 +182,7 @@ export default async function RedesPage({
                 <CardTitle>Importar publicaciones</CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
-                <ImportPanel withModel={isGeminiConfigured()} />
+                <ImportPanel modelName={modelName} />
               </CardContent>
             </Card>
           ) : null}
@@ -188,7 +190,7 @@ export default async function RedesPage({
       ) : (
         <>
           {a.alerts.length ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {a.alerts.map((al, i) => (
                 <Link
                   key={i}
@@ -196,6 +198,7 @@ export default async function RedesPage({
                   scroll={false}
                   className={cn(
                     "flex gap-3 rounded-[20px] border p-4 transition-transform hover:-translate-y-0.5",
+                    i === 0 && a.alerts.length > 1 && "sm:col-span-2 xl:col-span-2",
                     al.kind === "tema_emergente"
                       ? "border-[color-mix(in_oklab,var(--primary)_30%,var(--border))] bg-[var(--primary-soft)]"
                       : "border-[color-mix(in_oklab,var(--danger)_30%,var(--border))] bg-[var(--danger-soft)]",
@@ -218,8 +221,8 @@ export default async function RedesPage({
             </div>
           ) : null}
 
-          <div className="grid gap-4 lg:grid-cols-[320px_1fr]">
-            <Card className="relative overflow-hidden">
+          <div className="grid items-start gap-4 lg:grid-cols-[280px_1fr]">
+            <Card className="relative overflow-hidden lg:sticky lg:top-8">
               <div className={cn("orb -top-16 left-1/2 size-56 -translate-x-1/2 opacity-15", a.mood >= 0 ? "bg-[var(--success)]" : "bg-[var(--danger)]")} />
               <CardContent className="relative p-6">
                 <p className="text-center text-[13px] font-medium text-[var(--muted)]">Índice de humor · últimos {days} días</p>
@@ -265,8 +268,8 @@ export default async function RedesPage({
             </div>
           </div>
 
-          <div className="grid items-start gap-4 xl:grid-cols-5">
-            <Card className="xl:col-span-3">
+          <div className="grid items-start gap-4 xl:grid-cols-[2fr_1fr]">
+            <Card>
               <CardHeader>
                 <div>
                   <CardTitle>Temas de la conversación</CardTitle>
@@ -282,7 +285,7 @@ export default async function RedesPage({
                       href={`?${new URLSearchParams({ ...(query.dias ? { dias: query.dias } : {}), ...(query.red ? { red: query.red } : {}), tema: t.name }).toString()}`}
                       scroll={false}
                       className={cn(
-                        "grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-xl px-3 py-2.5 transition-colors hover:bg-[var(--surface-2)] sm:grid-cols-[180px_1fr_auto]",
+                        "grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1.5 rounded-xl px-3 py-3 transition-colors hover:bg-[var(--surface-2)] sm:grid-cols-[180px_1fr_auto]",
                         query.tema === t.name && "bg-[var(--primary-soft)]",
                       )}
                     >
@@ -311,7 +314,7 @@ export default async function RedesPage({
               </CardContent>
             </Card>
 
-            <div className="space-y-4 xl:col-span-2">
+            <div className="space-y-4">
               <Card>
                 <CardHeader>
                   <CardTitle>Por red</CardTitle>
@@ -359,8 +362,8 @@ export default async function RedesPage({
             </div>
           </div>
 
-          <div className="grid items-start gap-4 xl:grid-cols-5">
-            <Card className="xl:col-span-3">
+          <div className="grid items-start gap-4 xl:grid-cols-[2fr_1fr]">
+            <Card>
               <CardHeader>
                 <CardTitle>Qué se está diciendo</CardTitle>
               </CardHeader>
@@ -369,7 +372,7 @@ export default async function RedesPage({
               </CardContent>
             </Card>
 
-            <div className="space-y-4 xl:col-span-2">
+            <div className="space-y-4">
               {agenda.length ? (
                 <Card>
                   <CardHeader>
@@ -417,7 +420,7 @@ export default async function RedesPage({
                       <CardTitle>Importar publicaciones</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-4">
-                      <ImportPanel withModel={isGeminiConfigured()} />
+                      <ImportPanel modelName={modelName} />
                     </CardContent>
                   </Card>
 
@@ -444,7 +447,7 @@ export default async function RedesPage({
                         </div>
                       ))}
                       <TrackerForm />
-                      {isGeminiConfigured() && pendingModel ? <ReclassifyButton pending={pendingModel} /> : null}
+                      {modelName && pendingModel ? <ReclassifyButton pending={pendingModel} /> : null}
                     </CardContent>
                   </Card>
                 </>

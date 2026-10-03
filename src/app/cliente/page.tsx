@@ -180,7 +180,7 @@ export default async function ClienteDashboard() {
         />
         <Link href="/cliente/redes" className="block transition-transform hover:-translate-y-0.5">
           <StatCard
-            label="Humor en redes (7 días)"
+            label="Radar de conversación (7 días)"
             value={social ? `${social.mood > 0 ? "+" : ""}${Math.round(social.mood)}` : "—"}
             icon={<Radar className="size-4" />}
             tone={socialLabel?.tone === "success" ? "success" : "warning"}

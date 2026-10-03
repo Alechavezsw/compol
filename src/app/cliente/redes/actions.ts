@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
+import { isTypesafeConfigured } from "@/lib/ai/typesafe";
 import { classifyPosts, fetchRss, normalizeNetwork, parseCsv, parsePasted, type RawPost } from "@/lib/social/ingest";
 import { classifyText } from "@/lib/social/lexicon";
 import type { SocialPost, SocialTracker } from "@/lib/types";
@@ -74,7 +75,11 @@ export async function importSocialAction(_prev: SocialActionState, formData: For
   }
 
   revalidatePath("/cliente/redes");
-  const by = fresh.some((p) => p.classified_by === "gemini") ? "Gemini" : "el léxico local";
+  const by = fresh.some((p) => p.classified_by === "typesafe")
+    ? "TypeSafe"
+    : fresh.some((p) => p.classified_by === "gemini")
+      ? "Gemini"
+      : "el léxico local";
   const dupes = classified.length - fresh.length;
   return {
     ok: `${fresh.length} publicaciones nuevas clasificadas con ${by}${dupes ? ` · ${dupes} duplicadas omitidas` : ""}${skipped ? ` · ${skipped} filas vacías` : ""}.`,
@@ -125,10 +130,12 @@ export async function deleteTrackerAction(formData: FormData) {
   revalidatePath("/cliente/redes");
 }
 
-/** Vuelve a clasificar con Gemini lo que entró con el léxico. */
+/** Vuelve a clasificar con TypeSafe o Gemini lo que entró con el léxico. */
 export async function reclassifyAction(_prev: SocialActionState, _formData: FormData): Promise<SocialActionState> {
   const { organization } = await requireOrganization(["org_admin"]);
-  if (!isGeminiConfigured()) return { error: "Hace falta GEMINI_API_KEY para reclasificar con el modelo." };
+  if (!isGeminiConfigured() && !isTypesafeConfigured()) {
+    return { error: "Hace falta GEMINI_API_KEY o TYPESAFE_API_KEY para reclasificar con un modelo." };
+  }
 
   const supabase = await createClient();
   const { data } = await supabase
@@ -148,13 +155,13 @@ export async function reclassifyAction(_prev: SocialActionState, _formData: Form
   );
   let changed = 0;
   for (const [i, r] of result.entries()) {
-    if (r.classified_by !== "gemini") continue;
+    if (r.classified_by === "lexico") continue;
     await supabase
       .from("social_posts")
-      .update({ sentiment: r.sentiment, label: r.label, emotion: r.emotion, topics: r.topics, classified_by: "gemini" })
+      .update({ sentiment: r.sentiment, label: r.label, emotion: r.emotion, topics: r.topics, classified_by: r.classified_by })
       .eq("id", posts[i].id);
     changed += 1;
   }
   revalidatePath("/cliente/redes");
-  return { ok: `${changed} publicaciones reclasificadas con Gemini.` };
+  return { ok: `${changed} publicaciones reclasificadas con IA.` };
 }

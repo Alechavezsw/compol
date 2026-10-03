@@ -1,8 +1,9 @@
 import "server-only";
 import { createHash } from "node:crypto";
 import { classifySocialBatch, isGeminiConfigured } from "@/lib/ai/gemini";
+import { classifySocialBatchTypesafe, isTypesafeConfigured } from "@/lib/ai/typesafe";
 import { DEFAULT_TOPICS, classifyText } from "@/lib/social/lexicon";
-import type { Emotion, SocialNetwork, SocialPost, SocialTracker } from "@/lib/types";
+import type { Emotion, SentimentLabel, SocialNetwork, SocialPost, SocialTracker } from "@/lib/types";
 
 export type RawPost = {
   network: SocialNetwork;
@@ -187,16 +188,34 @@ export function externalId(p: RawPost) {
   return p.external_id ?? p.url ?? createHash("sha256").update(`${p.network}|${p.published_at.slice(0, 16)}|${p.text}`).digest("hex").slice(0, 32);
 }
 
+type ClassifiedPost = Omit<SocialPost, "id" | "organization_id" | "created_at">;
+
+/** Aplica una fila de un clasificador externo, uniendo temas con lo que ya tenía el léxico. */
+function applyExternalRow(
+  target: ClassifiedPost,
+  r: { sentiment: number; label: SentimentLabel; emotion: Emotion | null; topics: string[] },
+  source: string,
+) {
+  target.sentiment = Math.round(r.sentiment * 1000) / 1000;
+  target.label = r.label;
+  target.emotion = r.emotion;
+  // El modelo puede no ver un tema que el tracker sí marca por palabra clave: se unen.
+  target.topics = [...new Set([...r.topics, ...target.topics])];
+  target.classified_by = source;
+}
+
 /**
- * Clasifica con Gemini si hay clave (en lotes de 40) y cae al léxico ante
- * cualquier falla. Cada fila queda marcada con quién la clasificó.
+ * Clasifica con TypeSafe si hay clave (Choice/Noul, una llamada por
+ * publicación); si falla o no está configurado, con Gemini (lotes de 40); si
+ * tampoco, se queda con el léxico. Cada fila queda marcada con quién la
+ * clasificó.
  */
 export async function classifyPosts(
   posts: RawPost[],
   trackers: Pick<SocialTracker, "name" | "keywords" | "exclude">[],
-): Promise<Omit<SocialPost, "id" | "organization_id" | "created_at">[]> {
+): Promise<ClassifiedPost[]> {
   const topicNames = [...new Set([...DEFAULT_TOPICS.map((t) => t.name), ...trackers.map((t) => t.name)])];
-  const out = posts.map((p) => {
+  const out: ClassifiedPost[] = posts.map((p) => {
     const local = classifyText(p.text, trackers);
     return {
       network: p.network,
@@ -214,21 +233,30 @@ export async function classifyPosts(
     };
   });
 
+  if (isTypesafeConfigured()) {
+    try {
+      const rows = await classifySocialBatchTypesafe(out.map((p) => p.text), topicNames);
+      rows.forEach((r, i) => {
+        if (r) applyExternalRow(out[i], r, "typesafe");
+      });
+    } catch {
+      // Falló la corrida completa: las filas que no se pudieron tocar quedan con el léxico.
+    }
+  }
+
   if (!isGeminiConfigured()) return out;
 
-  for (let start = 0; start < out.length; start += 40) {
-    const batch = out.slice(start, start + 40);
+  // Solo lo que TypeSafe no pudo clasificar pasa por Gemini.
+  const pending = out.map((p, i) => i).filter((i) => out[i].classified_by === "lexico");
+  for (let start = 0; start < pending.length; start += 40) {
+    const idxBatch = pending.slice(start, start + 40);
+    const batch = idxBatch.map((i) => out[i]);
     try {
       const rows = await classifySocialBatch(batch.map((p) => p.text), topicNames);
       for (const r of rows) {
         const target = batch[r.index];
         if (!target) continue;
-        target.sentiment = Math.round(r.sentiment * 1000) / 1000;
-        target.label = r.label;
-        target.emotion = r.emotion as Emotion | null;
-        // El modelo puede no ver un tema que el tracker sí marca por palabra clave: se unen.
-        target.topics = [...new Set([...r.topics, ...target.topics])];
-        target.classified_by = "gemini";
+        applyExternalRow(target, { ...r, emotion: r.emotion as Emotion | null }, "gemini");
       }
     } catch {
       // El lote queda con la clasificación del léxico.

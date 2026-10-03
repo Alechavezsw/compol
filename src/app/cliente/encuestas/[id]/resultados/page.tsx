@@ -28,9 +28,12 @@ import { DistributionBars, NetBar, ScaleColumns } from "@/components/results/dis
 import { CrosstabTable } from "@/components/results/crosstab-table";
 import { CrosstabPicker, FilterBar } from "@/components/results/controls";
 import { AskBox } from "@/components/results/ask-box";
+import { FieldMap } from "@/components/results/field-map";
+import { LiveRefresh } from "@/components/results/live-refresh";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
 import {
+  applyFilters,
   computeAnalytics,
   computeCrosstab,
   isCrossable,
@@ -125,13 +128,34 @@ export default async function ResultadosPage({
 
   const paceInfo = PACE[pace.status];
 
+  const geoPoints = applyFilters(data, data.responses, filters)
+    .filter(
+      (r): r is typeof r & { latitude: number; longitude: number } =>
+        r.status === "completada" && r.latitude !== null && r.longitude !== null,
+    )
+    .map((r) => ({
+      id: r.id,
+      lat: r.latitude,
+      lng: r.longitude,
+      zone: r.zone,
+      channel: (r.channel ?? "campo") as "campo" | "web",
+      submittedAt: r.submitted_at,
+    }));
+
   return (
     <div className="space-y-6">
+      {survey.status === "activa" ? <LiveRefresh /> : null}
       <PageHeader
         eyebrow={
           <div className="flex flex-wrap items-center gap-2">
             <SurveyStatusBadge status={survey.status} />
             <Badge tone="neutral">{survey.geography ?? "Sin ámbito"}</Badge>
+            {survey.status === "activa" ? (
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--success-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--success)]">
+                <span className="size-1.5 rounded-full bg-current animate-pulse-soft" />
+                En vivo
+              </span>
+            ) : null}
           </div>
         }
         title={survey.title}
@@ -334,6 +358,25 @@ export default async function ResultadosPage({
               </CardContent>
             </Card>
           </div>
+
+          {geoPoints.length ? (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <MapPin className="size-4 text-[var(--muted)]" />
+                  <CardTitle>Mapa de campo</CardTitle>
+                </div>
+                <span className="text-xs text-[var(--muted)]">n = {formatNumber(geoPoints.length)}</span>
+              </CardHeader>
+              <CardContent className="pt-4">
+                <FieldMap points={geoPoints} />
+                <p className="mt-3 text-xs text-[var(--muted)]">
+                  Ubicación aproximada por zona, no la dirección exacta de cada entrevista. Los
+                  puntos se marcan en el orden en que se cargaron los casos.
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
 
           <AskBox surveyId={id} filters={filters} suggestions={suggestions} withModel={isGeminiConfigured()} />
 

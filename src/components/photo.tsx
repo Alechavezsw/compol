@@ -40,7 +40,7 @@ export function Polaroid({
   return (
     <figure
       className={cn(
-        "bg-[#fffdf8] p-2 pb-7 shadow-[0_18px_40px_-22px_rgba(20,12,40,.55)] ring-1 ring-black/5 dark:bg-[#1a1730] dark:ring-white/10",
+        "bg-[#fffdf8] p-2 pb-7 shadow-[0_18px_40px_-22px_rgba(20,12,40,.55)] ring-1 ring-black/5 transition-transform duration-300 ease-out hover:-translate-y-2 hover:shadow-[0_28px_54px_-24px_rgba(20,12,40,.6)] dark:bg-[#1a1730] dark:ring-white/10",
         className,
       )}
     >

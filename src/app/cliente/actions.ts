@@ -22,6 +22,7 @@ import type {
   QuestionType,
   QuestionWithOptions,
   ReportKind,
+  ServiceLine,
   SurveyStatus,
   WebSettings,
   WidgetMode,
@@ -42,6 +43,18 @@ const QUESTION_TYPES: QuestionType[] = [
 ];
 const REPORT_KINDS: ReportKind[] = ["ejecutivo", "tecnico", "comunicacional", "comparativo"];
 const NEEDS_OPTIONS: QuestionType[] = ["opcion_unica", "opcion_multiple"];
+const SERVICE_LINES: ServiceLine[] = [
+  "opinion_publica",
+  "tracking",
+  "monitor_gestion",
+  "inteligencia_territorial",
+  "banco_dirigentes",
+  "cualitativo",
+  "laboratorio_opinion",
+  "radar_conversacion",
+  "estudios_tematicos",
+  "flash",
+];
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -92,6 +105,44 @@ function logicProblems(questions: QuestionWithOptions[]) {
 }
 
 // ---------------------------------------------------------------------------
+// Proyectos
+// ---------------------------------------------------------------------------
+
+export async function createProjectAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const { organization, profile } = await requireOrganization([...MANAGERS]);
+
+  const name = String(formData.get("name") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim() || null;
+  const serviceLine = String(formData.get("service_line") ?? "opinion_publica") as ServiceLine;
+  const color = String(formData.get("color") ?? "").trim() || null;
+
+  if (name.length < 3) return { error: "El nombre del proyecto es demasiado corto." };
+  if (!SERVICE_LINES.includes(serviceLine)) return { error: "Línea de servicio inválida." };
+  if (color && !/^#[0-9a-f]{6}$/i.test(color)) {
+    return { error: "El color tiene que estar en formato #RRGGBB." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("projects").insert({
+    organization_id: organization.id,
+    name,
+    description,
+    service_line: serviceLine,
+    color,
+    created_by: profile.id,
+  });
+
+  if (error) return { error: `No se pudo crear el proyecto: ${error.message}` };
+
+  revalidatePath("/cliente/proyectos");
+  revalidatePath("/cliente/encuestas/nueva");
+  redirect("/cliente/proyectos");
+}
+
+// ---------------------------------------------------------------------------
 // Encuestas
 // ---------------------------------------------------------------------------
 
@@ -106,6 +157,7 @@ export async function createSurveyAction(_prev: ActionState, formData: FormData)
   const startsAt = String(formData.get("starts_at") ?? "") || null;
   const endsAt = String(formData.get("ends_at") ?? "") || null;
   const copyFrom = String(formData.get("copy_from") ?? "") || null;
+  const projectId = String(formData.get("project_id") ?? "") || null;
   const web = formData.get("web_enabled") === "on";
 
   if (title.length < 5) return { error: "El título es demasiado corto." };
@@ -121,11 +173,21 @@ export async function createSurveyAction(_prev: ActionState, formData: FormData)
   if (copyFrom && !(await ownedSurvey(supabase, copyFrom, organization.id))) {
     return { error: "La encuesta de origen para copiar el cuestionario no existe." };
   }
+  if (projectId) {
+    const { data: project } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("id", projectId)
+      .eq("organization_id", organization.id)
+      .maybeSingle();
+    if (!project) return { error: "El proyecto elegido no existe." };
+  }
 
   const { data, error } = await supabase
     .from("surveys")
     .insert({
       organization_id: organization.id,
+      project_id: projectId,
       title,
       description,
       geography,
@@ -597,6 +659,111 @@ export async function regenerateTokenAction(formData: FormData) {
   // Cambiar el token invalida los links y widgets ya publicados: se usa si se filtró.
   await supabase.from("surveys").update({ public_token: newPublicToken(survey.title) }).eq("id", surveyId);
   flash(surveyId, "token-nuevo");
+}
+
+// ---------------------------------------------------------------------------
+// Banco de dirigentes
+// ---------------------------------------------------------------------------
+
+async function ownedDirigente(supabase: Supabase, dirigenteId: string, organizationId: string) {
+  if (!dirigenteId) return null;
+  const { data } = await supabase
+    .from("dirigentes")
+    .select("*")
+    .eq("id", dirigenteId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  return data;
+}
+
+export async function createDirigenteAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const { organization, profile } = await requireOrganization([...MANAGERS]);
+
+  const name = String(formData.get("name") ?? "").trim();
+  const role = String(formData.get("role") ?? "").trim() || null;
+  const affiliation = String(formData.get("affiliation") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  if (name.length < 3) return { error: "Ingresá el nombre del dirigente." };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("dirigentes")
+    .insert({
+      organization_id: organization.id,
+      name,
+      role,
+      affiliation,
+      notes,
+      created_by: profile.id,
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) return { error: `No se pudo crear la ficha: ${error?.message}` };
+
+  revalidatePath("/cliente/dirigentes");
+  redirect(`/cliente/dirigentes/${data.id}`);
+}
+
+export async function createMedicionAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const { organization, profile } = await requireOrganization([...MANAGERS]);
+
+  const dirigenteId = String(formData.get("dirigente_id") ?? "");
+  const projectId = String(formData.get("project_id") ?? "") || null;
+  const conocimiento = readNumber(formData, "conocimiento");
+  const imagenPositiva = readNumber(formData, "imagen_positiva");
+  const imagenNegativa = readNumber(formData, "imagen_negativa");
+  const segmento = String(formData.get("segmento") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+  const measuredAt = String(formData.get("measured_at") ?? "") || null;
+
+  for (const [label, v] of [
+    ["Conocimiento", conocimiento],
+    ["Imagen positiva", imagenPositiva],
+    ["Imagen negativa", imagenNegativa],
+  ] as const) {
+    if (v !== null && (Number.isNaN(v) || v < 0 || v > 100)) {
+      return { error: `${label} tiene que ser un porcentaje entre 0 y 100.` };
+    }
+  }
+
+  const supabase = await createClient();
+  const dirigente = await ownedDirigente(supabase, dirigenteId, organization.id);
+  if (!dirigente) return { error: "No se encontró el dirigente." };
+
+  if (projectId) {
+    const { data: project } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("id", projectId)
+      .eq("organization_id", organization.id)
+      .maybeSingle();
+    if (!project) return { error: "El proyecto elegido no existe." };
+  }
+
+  const { error } = await supabase.from("dirigente_mediciones").insert({
+    dirigente_id: dirigenteId,
+    project_id: projectId,
+    conocimiento,
+    imagen_positiva: imagenPositiva,
+    imagen_negativa: imagenNegativa,
+    segmento,
+    notes,
+    measured_at: measuredAt ? new Date(measuredAt).toISOString() : new Date().toISOString(),
+    created_by: profile.id,
+  });
+
+  if (error) return { error: `No se pudo cargar la medición: ${error.message}` };
+
+  revalidatePath(`/cliente/dirigentes/${dirigenteId}`);
+  return { ok: "Medición cargada." };
 }
 
 // ---------------------------------------------------------------------------

@@ -2,20 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { LoginForm } from "./login-form";
-import { DemoLogin } from "./demo-login";
 import { Logo } from "@/components/logo";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { isSupabaseConfigured } from "@/lib/auth";
-import { isDemoMode } from "@/lib/demo/mode";
-import { DEMO_USERS } from "@/lib/demo/dataset";
 
 export const metadata: Metadata = { title: "Ingresar" };
-
-const DEMO = [
-  ["admin@encuestadora.app", "Administración central"],
-  ["direccion@sanrafael.gob.ar", "Panel del cliente"],
-  ["campo1@encuestadora.app", "Encuestador"],
-];
 
 export default async function LoginPage({
   searchParams,
@@ -24,7 +15,6 @@ export default async function LoginPage({
 }) {
   const { next } = await searchParams;
   const configured = isSupabaseConfigured();
-  const demo = isDemoMode();
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
@@ -87,51 +77,24 @@ export default async function LoginPage({
           </Link>
 
           <h1 className="display text-[34px] leading-tight text-[var(--foreground)]">
-            {demo ? "Entrar a la demo" : "Ingresar a la plataforma"}
+            Ingresar a la plataforma
           </h1>
           <p className="mt-2 mb-8 text-sm leading-relaxed text-[var(--muted)]">
-            {demo
-              ? "Elegí desde qué rol querés recorrer la plataforma. Cada uno ve un área distinta."
-              : "Usá las credenciales que te entregó tu organización."}
+            Usá las credenciales que te entregó tu organización.
           </p>
 
           <div className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_88%,transparent)] p-5 shadow-[var(--shadow-card)] backdrop-blur-sm">
-            {demo ? <DemoLogin users={DEMO_USERS} /> : <LoginForm next={next} />}
+            <LoginForm next={next} />
           </div>
 
-          {demo ? (
-            <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4 text-xs leading-relaxed text-[var(--muted)]">
-              <strong className="font-semibold text-[var(--foreground)]">Modo demo activo.</strong>{" "}
-              Los datos son simulados y viven en memoria del servidor: podés crear encuestas y
-              cargar entrevistas, pero todo vuelve a cero al reiniciar. Para conectar una base real,
-              cargá las claves de Supabase en <code className="font-mono">.env.local</code>.
-            </div>
-          ) : !configured ? (
+          {!configured ? (
             <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--warning-soft)] p-4 text-xs leading-relaxed text-[var(--warning)]">
               <strong className="font-semibold">Falta configurar Supabase.</strong> Copiá{" "}
               <code className="font-mono">.env.example</code> a{" "}
               <code className="font-mono">.env.local</code> y cargá la URL y la anon key de tu
               proyecto.
             </div>
-          ) : (
-            <div className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
-              <p className="text-xs font-semibold text-[var(--foreground)]">
-                Usuarios de demostración
-              </p>
-              <ul className="mt-2 space-y-1">
-                {DEMO.map(([mail, role]) => (
-                  <li key={mail} className="flex justify-between gap-3 text-xs text-[var(--muted)]">
-                    <span className="truncate font-mono">{mail}</span>
-                    <span className="shrink-0">{role}</span>
-                  </li>
-                ))}
-              </ul>
-              <p className="mt-2 text-xs text-[var(--muted)]">
-                Contraseña: <code className="font-mono">Demo1234!</code> — se crean con{" "}
-                <code className="font-mono">supabase/seed.sql</code>.
-              </p>
-            </div>
-          )}
+          ) : null}
 
           <div className="mt-8 hidden justify-center lg:flex">
             <ThemeToggle />

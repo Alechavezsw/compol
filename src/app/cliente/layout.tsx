@@ -13,9 +13,11 @@ export const metadata: Metadata = {
 
 const NAV: NavItem[] = [
   { href: "/cliente", label: "Resumen", icon: "dashboard", exact: true },
+  { href: "/cliente/proyectos", label: "Proyectos", icon: "projects" },
   { href: "/cliente/encuestas", label: "Encuestas", icon: "surveys" },
+  { href: "/cliente/dirigentes", label: "Banco de dirigentes", icon: "leaders" },
   { href: "/cliente/informes", label: "Informes IA", icon: "ai" },
-  { href: "/cliente/redes", label: "Humor en redes", icon: "social" },
+  { href: "/cliente/redes", label: "Radar de conversación", icon: "social" },
   { href: "/cliente/equipo", label: "Equipo", icon: "users" },
 ];
 

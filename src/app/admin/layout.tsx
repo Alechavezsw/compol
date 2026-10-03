@@ -14,7 +14,10 @@ const NAV: NavItem[] = [
   { href: "/admin/organizaciones", label: "Organizaciones", icon: "orgs" },
   { href: "/admin/usuarios", label: "Usuarios", icon: "users" },
   { href: "/admin/encuestadores", label: "Encuestadores", icon: "field" },
+  { href: "/admin/proyectos", label: "Proyectos", icon: "projects" },
   { href: "/admin/encuestas", label: "Encuestas", icon: "surveys" },
+  { href: "/admin/facturacion", label: "Facturación", icon: "billing" },
+  { href: "/admin/contabilidad", label: "Contabilidad", icon: "accounting" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

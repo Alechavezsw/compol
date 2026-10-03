@@ -1,6 +1,9 @@
 import type {
   AiReport,
   Answer,
+  Dirigente,
+  DirigenteMedicion,
+  Invoice,
   Organization,
   Profile,
   Project,
@@ -70,7 +73,7 @@ export function demoNow() {
   return DEMO_NOW;
 }
 
-export const ORG_MUNI = "org-san-rafael";
+export const ORG_MUNI = "org-san-juan";
 export const ORG_UNI = "org-unl";
 export const SURVEY_ACTIVE = "enc-percepcion-ola3";
 export const SURVEY_DRAFT = "enc-percepcion-ola4";
@@ -86,7 +89,7 @@ export const DEMO_USERS = [
   },
   {
     id: "usr-direccion",
-    email: "direccion@sanrafael.gob.ar",
+    email: "direccion@sanjuan.gob.ar",
     full_name: "Martín Robledo",
     role: "org_admin" as const,
     organization_id: ORG_MUNI,
@@ -94,7 +97,7 @@ export const DEMO_USERS = [
   },
   {
     id: "usr-analista",
-    email: "analista@sanrafael.gob.ar",
+    email: "analista@sanjuan.gob.ar",
     full_name: "Sofía Paredes",
     role: "org_analyst" as const,
     organization_id: ORG_MUNI,
@@ -132,7 +135,7 @@ const QUESTION_SEEDS: QuestionSeed[] = [
   {
     id: "q-reside",
     type: "si_no",
-    text: "¿Reside actualmente en el municipio de San Rafael?",
+    text: "¿Reside actualmente en el municipio de San Juan?",
     section: "Filtro",
     help_text: "Si responde que no, se agradece y la entrevista termina.",
     logic: { end_if: ["no"] },
@@ -246,7 +249,7 @@ const WEB_SEEDS: QuestionSeed[] = [
   {
     id: "w-vive",
     type: "si_no",
-    text: "¿Vivís en el departamento de San Rafael?",
+    text: "¿Vivís en el municipio de San Juan?",
     section: "Filtro",
     logic: { end_if: ["no"] },
   },
@@ -337,6 +340,34 @@ const ZONAS = [
   { name: "Este", weight: 17, surveyor: "usr-campo-3", mood: 0 },
 ] as const;
 
+/**
+ * Centro aproximado de cada zona de San Juan, Argentina. Sirven para dispersar
+ * los casos en el mapa de campo: no son coordenadas reales de cada entrevista
+ * (nunca se registró eso), son un centro de zona + ruido para dar una lectura
+ * territorial verosímil.
+ */
+const ZONE_COORDS: Record<string, [number, number]> = {
+  Centro: [-31.5375, -68.5364],
+  Norte: [-31.502, -68.535],
+  Sur: [-31.572, -68.545],
+  Oeste: [-31.537, -68.575],
+  Este: [-31.535, -68.505],
+  Rural: [-31.6, -68.62],
+};
+
+/** Dispersa un punto alrededor del centro de zona (grados, ~n km de spread). */
+function jitterZone(random: () => number, zoneName: string, spreadKm = 1.8) {
+  const [lat, lng] = ZONE_COORDS[zoneName] ?? ZONE_COORDS.Centro;
+  const kmPerDegLat = 111.32;
+  const kmPerDegLng = 111.32 * Math.cos((lat * Math.PI) / 180);
+  return {
+    latitude: Number((lat + (gaussian(random) * spreadKm) / kmPerDegLat).toFixed(6)),
+    longitude: Number((lng + (gaussian(random) * spreadKm) / kmPerDegLng).toFixed(6)),
+  };
+}
+
+const BARRIO_ZONE = ["Centro", "Norte", "Sur", "Este", "Oeste", "Rural"] as const;
+
 export type DemoTables = {
   organizations: Organization[];
   profiles: Profile[];
@@ -350,6 +381,9 @@ export type DemoTables = {
   ai_reports: AiReport[];
   social_trackers: SocialTracker[];
   social_posts: SocialPost[];
+  invoices: Invoice[];
+  dirigentes: Dirigente[];
+  dirigente_mediciones: DirigenteMedicion[];
 };
 
 export function buildDemoData(): DemoTables {
@@ -360,14 +394,14 @@ export function buildDemoData(): DemoTables {
   const organizations: Organization[] = [
     {
       id: ORG_MUNI,
-      name: "Municipalidad de San Rafael",
-      slug: "san-rafael",
+      name: "Municipalidad de San Juan",
+      slug: "san-juan",
       type: "gobierno",
       status: "activa",
-      contact_email: "direccion@sanrafael.gob.ar",
-      contact_phone: "+54 260 442 0000",
+      contact_email: "direccion@sanjuan.gob.ar",
+      contact_phone: "+54 264 422 0000",
       country: "Argentina",
-      region: "Mendoza",
+      region: "San Juan",
       logo_url: null,
       brand_color: "#1e40af",
       notes: "Convenio anual. Monitor trimestral de opinión pública.",
@@ -443,8 +477,29 @@ export function buildDemoData(): DemoTables {
       name: "Monitor de Opinión Pública 2026",
       description: "Serie trimestral de medición de percepción ciudadana.",
       color: "#0ea5a4",
+      service_line: "tracking",
       created_by: "usr-direccion",
       created_at: daysAgo(200),
+    },
+    {
+      id: "proj-presupuesto-participativo",
+      organization_id: ORG_MUNI,
+      name: "Presupuesto Participativo 2027",
+      description: "Consulta vecinal online para priorizar obras del año próximo.",
+      color: "#7c3aed",
+      service_line: "monitor_gestion",
+      created_by: "usr-direccion",
+      created_at: daysAgo(14),
+    },
+    {
+      id: "proj-clima-unl",
+      organization_id: ORG_UNI,
+      name: "Clima institucional — Piloto",
+      description: "Prueba de la plataforma con una muestra reducida de docentes.",
+      color: "#0d9488",
+      service_line: "opinion_publica",
+      created_by: "usr-unl-admin",
+      created_at: daysAgo(30),
     },
   ];
 
@@ -461,7 +516,7 @@ export function buildDemoData(): DemoTables {
       target_responses: 600,
       starts_at: daysAgo(20),
       ends_at: daysAgo(-10),
-      geography: "San Rafael, Mendoza",
+      geography: "San Juan, Argentina",
       methodology: "Presencial cara a cara, muestreo por cuotas",
       web_enabled: false,
       public_token: null,
@@ -480,7 +535,7 @@ export function buildDemoData(): DemoTables {
       target_responses: 600,
       starts_at: null,
       ends_at: null,
-      geography: "San Rafael, Mendoza",
+      geography: "San Juan, Argentina",
       methodology: "Presencial cara a cara, muestreo por cuotas",
       web_enabled: false,
       public_token: null,
@@ -492,7 +547,7 @@ export function buildDemoData(): DemoTables {
     {
       id: "enc-clima-unl",
       organization_id: ORG_UNI,
-      project_id: null,
+      project_id: "proj-clima-unl",
       title: "Clima institucional — Piloto",
       description: "Prueba de la plataforma con una muestra reducida de docentes.",
       status: "borrador",
@@ -630,8 +685,7 @@ export function buildDemoData(): DemoTables {
       source_url: null,
       respondent_hash: null,
       zone: zone.name,
-      latitude: null,
-      longitude: null,
+      ...jitterZone(random, zone.name),
       duration_seconds: resides ? duration : 40 + Math.floor(random() * 40),
       started_at: submitted,
       submitted_at: submitted,
@@ -752,8 +806,7 @@ export function buildDemoData(): DemoTables {
       source_url: null,
       respondent_hash: null,
       zone: zone.name,
-      latitude: null,
-      longitude: null,
+      ...jitterZone(random, zone.name),
       duration_seconds: null,
       started_at: daysAgo(0, 11 + i),
       submitted_at: null,
@@ -768,14 +821,14 @@ export function buildDemoData(): DemoTables {
   surveys.push({
     id: SURVEY_WEB,
     organization_id: ORG_MUNI,
-    project_id: null,
+    project_id: "proj-presupuesto-participativo",
     title: "Presupuesto Participativo 2027 — Consulta vecinal online",
     description: "Consulta abierta para priorizar las obras del presupuesto participativo del año próximo.",
     status: "activa",
     target_responses: 500,
     starts_at: daysAgo(12),
     ends_at: daysAgo(-18),
-    geography: "San Rafael, Mendoza",
+    geography: "San Juan, Argentina",
     methodology: "Autoadministrada online (widget en sitio web y redes). Muestra no probabilística.",
     web_enabled: true,
     public_token: WEB_TOKEN,
@@ -823,11 +876,11 @@ export function buildDemoData(): DemoTables {
   });
 
   const SOURCES = [
-    ["https://www.sanrafael.gov.ar/presupuesto-participativo", 46],
-    ["https://www.sanrafael.gov.ar/", 18],
+    ["https://www.sanjuan.gob.ar/presupuesto-participativo", 46],
+    ["https://www.sanjuan.gob.ar/", 18],
     ["https://www.instagram.com/", 20],
     ["https://www.facebook.com/", 10],
-    ["https://diariosanrafael.com.ar/politica/", 6],
+    ["https://diariodecuyo.com.ar/politica/", 6],
   ] as const;
 
   const WEB_TOTAL = 212;
@@ -858,8 +911,7 @@ export function buildDemoData(): DemoTables {
       source_url: pickWeighted(random, SOURCES),
       respondent_hash: `demo-${id}`,
       zone: null,
-      latitude: null,
-      longitude: null,
+      ...jitterZone(random, BARRIO_ZONE[barrio - 1], 1.2),
       duration_seconds: local ? Math.round(clamp(95 + gaussian(random) * 35, 35, 260)) : 12,
       started_at: submitted,
       submitted_at: submitted,
@@ -906,6 +958,211 @@ export function buildDemoData(): DemoTables {
 
   const social = buildDemoSocial(ORG_MUNI, random, () => gaussian(random), DEMO_NOW);
 
+  // ------------------------------------------------------------- facturación
+  const invoices: Invoice[] = [
+    {
+      id: "fac-2026-0001",
+      organization_id: ORG_MUNI,
+      number: "FC-0001-00000001",
+      concept: "Monitor de Opinión Pública 2026 — Ola 1",
+      amount: 850000,
+      currency: "ARS",
+      status: "pagada",
+      issued_at: daysAgo(200),
+      due_at: daysAgo(170),
+      paid_at: daysAgo(175),
+      notes: null,
+      created_by: "usr-admin",
+      created_at: daysAgo(200),
+      updated_at: daysAgo(175),
+    },
+    {
+      id: "fac-2026-0002",
+      organization_id: ORG_MUNI,
+      number: "FC-0001-00000002",
+      concept: "Monitor de Opinión Pública 2026 — Ola 2",
+      amount: 850000,
+      currency: "ARS",
+      status: "pagada",
+      issued_at: daysAgo(110),
+      due_at: daysAgo(80),
+      paid_at: daysAgo(85),
+      notes: null,
+      created_by: "usr-admin",
+      created_at: daysAgo(110),
+      updated_at: daysAgo(85),
+    },
+    {
+      id: "fac-2026-0003",
+      organization_id: ORG_MUNI,
+      number: "FC-0001-00000003",
+      concept: "Encuestadores adicionales — refuerzo zona Este",
+      amount: 150000,
+      currency: "ARS",
+      status: "vencida",
+      issued_at: daysAgo(65),
+      due_at: daysAgo(35),
+      paid_at: null,
+      notes: "Reclamar por mail a la dirección de administración.",
+      created_by: "usr-admin",
+      created_at: daysAgo(65),
+      updated_at: daysAgo(65),
+    },
+    {
+      id: "fac-2026-0004",
+      organization_id: ORG_MUNI,
+      number: "FC-0001-00000004",
+      concept: "Monitor de Opinión Pública 2026 — Ola 3 (Agosto 2026)",
+      amount: 920000,
+      currency: "ARS",
+      status: "pendiente",
+      issued_at: daysAgo(20),
+      due_at: daysAgo(-10),
+      paid_at: null,
+      notes: null,
+      created_by: "usr-admin",
+      created_at: daysAgo(20),
+      updated_at: daysAgo(20),
+    },
+    {
+      id: "fac-2026-0005",
+      organization_id: ORG_UNI,
+      number: "FC-0002-00000001",
+      concept: "Piloto clima institucional — activación",
+      amount: 180000,
+      currency: "ARS",
+      status: "pendiente",
+      issued_at: daysAgo(30),
+      due_at: daysAgo(0),
+      paid_at: null,
+      notes: "Primera factura del piloto: incluye alta y capacitación.",
+      created_by: "usr-admin",
+      created_at: daysAgo(30),
+      updated_at: daysAgo(30),
+    },
+  ];
+
+  // ------------------------------------------------------- banco de dirigentes
+  const dirigentes: Dirigente[] = [
+    {
+      id: "dir-intendente",
+      organization_id: ORG_MUNI,
+      name: "Ricardo Salvatierra",
+      role: "Intendente",
+      affiliation: "Frente Vecinal",
+      photo_url: null,
+      notes: "Referente principal de la gestión municipal.",
+      created_by: "usr-direccion",
+      created_at: daysAgo(200),
+      updated_at: daysAgo(20),
+    },
+    {
+      id: "dir-concejal-oposicion",
+      organization_id: ORG_MUNI,
+      name: "Marina Quiroga",
+      role: "Concejala",
+      affiliation: "Unión Departamental",
+      photo_url: null,
+      notes: "Principal referente de la oposición en el Concejo.",
+      created_by: "usr-direccion",
+      created_at: daysAgo(200),
+      updated_at: daysAgo(20),
+    },
+    {
+      id: "dir-secretario-obras",
+      organization_id: ORG_MUNI,
+      name: "Hugo Pereyra",
+      role: "Secretario de Obras Públicas",
+      affiliation: "Frente Vecinal",
+      photo_url: null,
+      notes: null,
+      created_by: "usr-direccion",
+      created_at: daysAgo(150),
+      updated_at: daysAgo(20),
+    },
+  ];
+
+  const dirigente_mediciones: DirigenteMedicion[] = [
+    {
+      id: "dmed-intendente-1",
+      dirigente_id: "dir-intendente",
+      project_id: "proj-monitor",
+      conocimiento: 88,
+      imagen_positiva: 41,
+      imagen_negativa: 33,
+      segmento: "Total municipio",
+      notes: null,
+      measured_at: daysAgo(200),
+      created_by: "usr-direccion",
+      created_at: daysAgo(200),
+    },
+    {
+      id: "dmed-intendente-2",
+      dirigente_id: "dir-intendente",
+      project_id: "proj-monitor",
+      conocimiento: 91,
+      imagen_positiva: 38,
+      imagen_negativa: 37,
+      segmento: "Total municipio",
+      notes: "Cae imagen positiva tras el aumento de tasas.",
+      measured_at: daysAgo(110),
+      created_by: "usr-direccion",
+      created_at: daysAgo(110),
+    },
+    {
+      id: "dmed-intendente-3",
+      dirigente_id: "dir-intendente",
+      project_id: "proj-monitor",
+      conocimiento: 93,
+      imagen_positiva: 44,
+      imagen_negativa: 31,
+      segmento: "Total municipio",
+      notes: "Recupera imagen con el anuncio de obras en Zona Sur.",
+      measured_at: daysAgo(20),
+      created_by: "usr-direccion",
+      created_at: daysAgo(20),
+    },
+    {
+      id: "dmed-oposicion-1",
+      dirigente_id: "dir-concejal-oposicion",
+      project_id: "proj-monitor",
+      conocimiento: 46,
+      imagen_positiva: 22,
+      imagen_negativa: 19,
+      segmento: "Total municipio",
+      notes: null,
+      measured_at: daysAgo(200),
+      created_by: "usr-direccion",
+      created_at: daysAgo(200),
+    },
+    {
+      id: "dmed-oposicion-2",
+      dirigente_id: "dir-concejal-oposicion",
+      project_id: "proj-monitor",
+      conocimiento: 52,
+      imagen_positiva: 27,
+      imagen_negativa: 21,
+      segmento: "Total municipio",
+      notes: "Sube conocimiento tras su exposición en el debate de tasas.",
+      measured_at: daysAgo(20),
+      created_by: "usr-direccion",
+      created_at: daysAgo(20),
+    },
+    {
+      id: "dmed-obras-1",
+      dirigente_id: "dir-secretario-obras",
+      project_id: "proj-monitor",
+      conocimiento: 34,
+      imagen_positiva: 18,
+      imagen_negativa: 12,
+      segmento: "Total municipio",
+      notes: "Bajo conocimiento: perfil técnico, poca exposición pública.",
+      measured_at: daysAgo(110),
+      created_by: "usr-direccion",
+      created_at: daysAgo(110),
+    },
+  ];
+
   return {
     organizations,
     profiles,
@@ -919,5 +1176,8 @@ export function buildDemoData(): DemoTables {
     ai_reports,
     social_trackers: social.trackers,
     social_posts: social.posts,
+    invoices,
+    dirigentes,
+    dirigente_mediciones,
   };
 }

@@ -24,9 +24,13 @@ const EMBEDS: Record<string, { fk: string; target: TableName }> = {
   "responses.surveys": { fk: "survey_id", target: "surveys" },
   "ai_reports.surveys": { fk: "survey_id", target: "surveys" },
   "answers.questions": { fk: "question_id", target: "questions" },
+  "invoices.organizations": { fk: "organization_id", target: "organizations" },
+  "dirigentes.organizations": { fk: "organization_id", target: "organizations" },
+  "dirigente_mediciones.dirigentes": { fk: "dirigente_id", target: "dirigentes" },
+  "dirigente_mediciones.projects": { fk: "project_id", target: "projects" },
 };
 
-const HAS_UPDATED_AT: TableName[] = ["organizations", "profiles", "surveys"];
+const HAS_UPDATED_AT: TableName[] = ["organizations", "profiles", "surveys", "invoices", "dirigentes"];
 
 /** Equivalente de los ON DELETE CASCADE del esquema. */
 const CASCADES: Partial<Record<TableName, { table: TableName; fk: string }[]>> = {
@@ -37,6 +41,7 @@ const CASCADES: Partial<Record<TableName, { table: TableName; fk: string }[]>> =
     { table: "ai_reports", fk: "organization_id" },
     { table: "social_trackers", fk: "organization_id" },
     { table: "social_posts", fk: "organization_id" },
+    { table: "dirigentes", fk: "organization_id" },
   ],
   surveys: [
     { table: "questions", fk: "survey_id" },
@@ -49,6 +54,7 @@ const CASCADES: Partial<Record<TableName, { table: TableName; fk: string }[]>> =
     { table: "answers", fk: "question_id" },
   ],
   responses: [{ table: "answers", fk: "response_id" }],
+  dirigentes: [{ table: "dirigente_mediciones", fk: "dirigente_id" }],
 };
 
 function cascadeDelete(table: TableName, removedIds: unknown[]) {
@@ -80,6 +86,7 @@ function withDefaults(table: TableName, row: Row): Row {
   const perTable: Partial<Record<TableName, Row>> = {
     organizations: { type: "gobierno", status: "prueba", country: "Argentina", brand_color: "#1e40af" },
     profiles: { role: "surveyor", is_active: true, full_name: "" },
+    projects: { service_line: "opinion_publica", color: null, description: null },
     surveys: { status: "borrador", target_responses: 400, web_enabled: false, public_token: null, web_settings: {} },
     questions: { position: 0, is_required: true, type: "opcion_unica", logic: null },
     question_options: { position: 0, is_exclusive: false },
@@ -89,6 +96,17 @@ function withDefaults(table: TableName, row: Row): Row {
     ai_reports: { status: "generando", kind: "ejecutivo", highlights: [] },
     social_trackers: { is_active: true, keywords: [], exclude: [] },
     social_posts: { engagement: 0, sentiment: 0, label: "neutral", topics: [], classified_by: "lexico", emotion: null },
+    invoices: { currency: "ARS", status: "pendiente", concept: "Servicio de encuestas", issued_at: now, due_at: null, paid_at: null, notes: null },
+    dirigentes: { role: null, affiliation: null, photo_url: null, notes: null },
+    dirigente_mediciones: {
+      project_id: null,
+      conocimiento: null,
+      imagen_positiva: null,
+      imagen_negativa: null,
+      segmento: null,
+      notes: null,
+      measured_at: now,
+    },
   };
 
   for (const [key, value] of Object.entries(perTable[table] ?? {})) {
@@ -159,7 +177,18 @@ function visibleRows(table: TableName, viewer: Profile | null, tables: DemoTable
     case "ai_reports":
     case "social_trackers":
     case "social_posts":
+    case "dirigentes":
       return all.filter((r) => r.organization_id === org);
+    case "dirigente_mediciones": {
+      const ownDirigenteIds = new Set(
+        tables.dirigentes.filter((d) => d.organization_id === org).map((d) => d.id),
+      );
+      return all.filter((r) => ownDirigenteIds.has(r.dirigente_id as string));
+    }
+    case "invoices":
+      // La facturación es interna de la consultora: solo la ve super_admin
+      // (ya resuelto arriba), ningún otro rol tiene acceso.
+      return [];
   }
 }
 
