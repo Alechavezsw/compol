@@ -72,9 +72,9 @@ export function DownloadPdfButton({ payload }: { payload: Payload }) {
       paintBg();
       pdf.addImage(cover, "JPEG", 0, 0, PAGE_W, 92, undefined, "FAST");
       pdf.setFillColor(18, 14, 12);
-      pdf.setGState(new pdf.GState({ opacity: 0.42 }));
+      pdf.setGState(pdf.GState({ opacity: 0.42 }));
       pdf.rect(0, 0, PAGE_W, 92, "F");
-      pdf.setGState(new pdf.GState({ opacity: 1 }));
+      pdf.setGState(pdf.GState({ opacity: 1 }));
 
       pdf.setTextColor(255, 255, 255);
       pdf.setFont("helvetica", "bold");
@@ -142,9 +142,9 @@ export function DownloadPdfButton({ payload }: { payload: Payload }) {
       ensure(42);
       pdf.addImage(mid, "JPEG", MARGIN, y, CONTENT, 28, undefined, "FAST");
       pdf.setFillColor(18, 14, 12);
-      pdf.setGState(new pdf.GState({ opacity: 0.28 }));
+      pdf.setGState(pdf.GState({ opacity: 0.28 }));
       pdf.rect(MARGIN, y + 20, CONTENT, 8, "F");
-      pdf.setGState(new pdf.GState({ opacity: 1 }));
+      pdf.setGState(pdf.GState({ opacity: 1 }));
       pdf.setTextColor(255, 255, 255);
       pdf.setFontSize(8);
       pdf.text("San Juan", MARGIN + 3, y + 25);
@@ -214,9 +214,9 @@ export function DownloadPdfButton({ payload }: { payload: Payload }) {
       ensure(46);
       pdf.addImage(close, "JPEG", 0, y, PAGE_W, 40, undefined, "FAST");
       pdf.setFillColor(18, 14, 12);
-      pdf.setGState(new pdf.GState({ opacity: 0.4 }));
+      pdf.setGState(pdf.GState({ opacity: 0.4 }));
       pdf.rect(0, y, PAGE_W, 40, "F");
-      pdf.setGState(new pdf.GState({ opacity: 1 }));
+      pdf.setGState(pdf.GState({ opacity: 1 }));
       pdf.setTextColor(255, 255, 255);
       pdf.setFont("helvetica", "normal");
       pdf.setFontSize(8);
