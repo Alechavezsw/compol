@@ -41,6 +41,8 @@ const CASCADES: Partial<Record<TableName, { table: TableName; fk: string }[]>> =
     { table: "ai_reports", fk: "organization_id" },
     { table: "social_trackers", fk: "organization_id" },
     { table: "social_posts", fk: "organization_id" },
+    { table: "social_sources", fk: "organization_id" },
+    { table: "social_imports", fk: "organization_id" },
     { table: "dirigentes", fk: "organization_id" },
   ],
   surveys: [
@@ -96,6 +98,8 @@ function withDefaults(table: TableName, row: Row): Row {
     ai_reports: { status: "generando", kind: "ejecutivo", highlights: [] },
     social_trackers: { is_active: true, keywords: [], exclude: [] },
     social_posts: { engagement: 0, sentiment: 0, label: "neutral", topics: [], classified_by: "lexico", emotion: null },
+    social_sources: { is_active: true, kind: "noticias", query: null, url: null, last_fetched_at: null, last_error: null },
+    social_imports: { status: "ok", inserted: 0, duplicates: 0, source_id: null, error_message: null },
     invoices: { currency: "ARS", status: "pendiente", concept: "Servicio de encuestas", issued_at: now, due_at: null, paid_at: null, notes: null },
     dirigentes: { role: null, affiliation: null, photo_url: null, notes: null },
     dirigente_mediciones: {
@@ -177,6 +181,8 @@ function visibleRows(table: TableName, viewer: Profile | null, tables: DemoTable
     case "ai_reports":
     case "social_trackers":
     case "social_posts":
+    case "social_sources":
+    case "social_imports":
     case "dirigentes":
       return all.filter((r) => r.organization_id === org);
     case "dirigente_mediciones": {

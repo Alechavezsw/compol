@@ -12,7 +12,9 @@ import type {
   Survey,
   SurveyAssignment,
   SurveyResponse,
+  SocialImport,
   SocialPost,
+  SocialSource,
   SocialTracker,
 } from "@/lib/types";
 import { buildDemoSocial } from "@/lib/demo/social";
@@ -381,6 +383,8 @@ export type DemoTables = {
   ai_reports: AiReport[];
   social_trackers: SocialTracker[];
   social_posts: SocialPost[];
+  social_sources: SocialSource[];
+  social_imports: SocialImport[];
   invoices: Invoice[];
   dirigentes: Dirigente[];
   dirigente_mediciones: DirigenteMedicion[];
@@ -1176,6 +1180,8 @@ export function buildDemoData(): DemoTables {
     ai_reports,
     social_trackers: social.trackers,
     social_posts: social.posts,
+    social_sources: [],
+    social_imports: [],
     invoices,
     dirigentes,
     dirigente_mediciones,

@@ -66,9 +66,8 @@ export function ReportForm({
     <form action={formAction} className="space-y-5">
       {writer === "missing" ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--warning)]">
-          <strong className="font-semibold">Falta la clave de Gemini.</strong> Cargá{" "}
-          <code className="font-mono">GEMINI_API_KEY</code> en{" "}
-          <code className="font-mono">.env.local</code> para habilitar la generación.
+          <strong className="font-semibold">Falta la clave de Gemini.</strong> Cargala como secreto
+          de la función <code className="font-mono">ai</code> en Supabase.
         </div>
       ) : null}
 
@@ -122,6 +121,10 @@ export function ReportForm({
       </Field>
 
       {state.error ? <FormMessage>{state.error}</FormMessage> : null}
+
+      <p className="text-xs leading-relaxed text-[var(--muted)]">
+        El documento incluye tapa fotográfica, gráficos de los agregados y descarga en PDF.
+      </p>
 
       <GenerateButton disabled={writer === "missing" || eligible.length === 0} />
 

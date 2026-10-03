@@ -4,16 +4,19 @@ import { z } from "zod";
 import type { CrosstabFinding, SurveyAnalytics } from "@/lib/analytics";
 import { analyticsToBriefing } from "@/lib/analytics";
 import type { ReportKind, ReportHighlight } from "@/lib/types";
+import { askViaGateway, generateReportViaGateway, isAiGatewayConfigured } from "@/lib/ai/gateway";
 
 export const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-pro";
 /** Modelo de respaldo cuando el principal está saturado o sin cuota. */
 export const FALLBACK_MODEL = process.env.GEMINI_FALLBACK_MODEL || "gemini-2.5-flash";
 
-export function isGeminiConfigured() {
+export function hasLocalGeminiKey() {
   const key = process.env.GEMINI_API_KEY;
-  // El valor de ejemplo de .env.example no cuenta como clave: si lo diéramos
-  // por válido, la app intentaría llamar a la API y fallaría con un 400.
   return Boolean(key && key.length >= 20 && !key.includes("..."));
+}
+
+export function isGeminiConfigured() {
+  return isAiGatewayConfigured() || hasLocalGeminiKey();
 }
 
 function client() {
@@ -177,7 +180,7 @@ function toMarkdown(raw: RawReport, organizationName: string, model: string) {
   const parts: string[] = [];
   parts.push(`# ${raw.titulo}`);
   parts.push(
-    `_${organizationName} · generado con ${model} el ${new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" })}_`,
+    `_${organizationName} · ${new Date().toLocaleDateString("es-AR", { day: "2-digit", month: "long", year: "numeric" })}_`,
   );
   parts.push("\n## Resumen ejecutivo\n");
   parts.push(raw.resumen_ejecutivo);
@@ -217,8 +220,26 @@ export async function generateSurveyReport(params: {
   audience?: string | null;
   focus?: string | null;
   model?: string;
+  organizationId?: string;
 }): Promise<GeneratedReport> {
   const { analytics, findings = [], socialSummary, organizationName, kind, audience, focus } = params;
+  const briefing = analyticsToBriefing(analytics, findings);
+
+  if (isAiGatewayConfigured()) {
+    try {
+      return await generateReportViaGateway({
+        briefing,
+        organizationName,
+        kind,
+        audience,
+        focus,
+        socialSummary,
+        organizationId: params.organizationId,
+      });
+    } catch (error) {
+      if (!hasLocalGeminiKey()) throw error;
+    }
+  }
 
   const prompt = [
     KIND_BRIEF[kind],
@@ -230,7 +251,7 @@ export async function generateSurveyReport(params: {
     "A continuación, los resultados agregados del relevamiento. Es la única fuente válida:",
     "",
     "-----",
-    analyticsToBriefing(analytics, findings),
+    briefing,
     "-----",
     socialSummary
       ? [
@@ -344,12 +365,27 @@ export async function askAboutSurvey(params: {
   findings?: CrosstabFinding[];
   question: string;
   model?: string;
+  organizationId?: string;
 }): Promise<{ answer: string; model: string }> {
+  const briefing = analyticsToBriefing(params.analytics, params.findings);
+
+  if (isAiGatewayConfigured()) {
+    try {
+      return await askViaGateway({
+        briefing,
+        question: params.question,
+        organizationId: params.organizationId,
+      });
+    } catch (error) {
+      if (!hasLocalGeminiKey()) throw error;
+    }
+  }
+
   const { text, model } = await generateWithFallback(params.model || FALLBACK_MODEL, {
     contents: [
       "Datos agregados del relevamiento:",
       "-----",
-      analyticsToBriefing(params.analytics, params.findings),
+      briefing,
       "-----",
       "",
       `Pregunta: ${params.question}`,

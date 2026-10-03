@@ -1,12 +1,16 @@
 import "server-only";
 import type { Emotion, SentimentLabel } from "@/lib/types";
+import { isAiGatewayConfigured } from "@/lib/ai/gateway";
 
 export const DEFAULT_TYPESAFE_MODEL = process.env.TYPESAFE_MODEL || "jev-latest";
 
-export function isTypesafeConfigured() {
+export function hasLocalTypesafeKey() {
   const key = process.env.TYPESAFE_API_KEY;
-  // El valor de ejemplo de .env.example no cuenta como clave real.
   return Boolean(key && key.length >= 20 && !key.includes("..."));
+}
+
+export function isTypesafeConfigured() {
+  return isAiGatewayConfigured() || hasLocalTypesafeKey();
 }
 
 const SENTIMENT_CRITERIA = {
@@ -70,6 +74,7 @@ export type TypesafeRow = {
   label: SentimentLabel;
   emotion: Emotion | null;
   topics: string[];
+  provider?: "jev" | "gemini" | "typesafe";
 };
 
 /**

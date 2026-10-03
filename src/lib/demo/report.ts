@@ -90,7 +90,7 @@ export function buildLocalReport(params: {
   const push = (...l: string[]) => lines.push(...l);
 
   push(`# ${REPORT_KIND_LABEL[kind]}: ${survey.title}`);
-  push(`_${organizationName} · redactado sin modelo de IA sobre ${totals.completed} casos completados_`);
+  push(`_${organizationName} · ${totals.completed} casos completados_`);
 
   // --- Resumen: común a todos los tipos ----------------------------------
   push("\n## Resumen ejecutivo\n");

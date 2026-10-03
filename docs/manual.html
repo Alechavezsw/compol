@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manual de Consulta</title>
+<style>
+:root{
+  --bg:#f6f5fb; --surface:#ffffff; --surface2:#efedf9; --fg:#14112b; --muted:#625f7a; --border:#e1def0;
+  --primary:#5b4bf0; --primary-soft:#e9e6ff; --teal:#0f9d8f; --teal-soft:#d9f5f1;
+  --amber:#b7791f; --amber-soft:#fdf0d2; --rose:#d1365a; --rose-soft:#fde0e7; --green:#1f9d55; --green-soft:#d9f4e4;
+  --shadow:0 10px 30px -12px rgba(60,40,160,.25);
+  --code:#1b1740; --codefg:#e8e6ff;
+}
+:root[data-theme="dark"]{
+  --bg:#0c0a16; --surface:#151226; --surface2:#1d1935; --fg:#f1efff; --muted:#a09cc0; --border:#2b2650;
+  --primary:#8b7dff; --primary-soft:#2a2457; --teal:#2dd4bf; --teal-soft:#0f3b38;
+  --amber:#f5b942; --amber-soft:#3a2d10; --rose:#ff6b8b; --rose-soft:#3d1522; --green:#4ade80; --green-soft:#0f3320;
+  --shadow:0 10px 30px -12px rgba(0,0,0,.6);
+  --code:#0a0818; --codefg:#e8e6ff;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c0a16; --surface:#151226; --surface2:#1d1935; --fg:#f1efff; --muted:#a09cc0; --border:#2b2650;
+    --primary:#8b7dff; --primary-soft:#2a2457; --teal:#2dd4bf; --teal-soft:#0f3b38;
+    --amber:#f5b942; --amber-soft:#3a2d10; --rose:#ff6b8b; --rose-soft:#3d1522; --green:#4ade80; --green-soft:#0f3320;
+    --shadow:0 10px 30px -12px rgba(0,0,0,.6); --code:#0a0818; --codefg:#e8e6ff;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:84px}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--primary)}
+h1,h2,h3,h4{line-height:1.15;margin:0}
+code{background:var(--surface2);border:1px solid var(--border);padding:1px 6px;border-radius:6px;font-size:.88em;font-family:ui-monospace,Menlo,Consolas,monospace}
+pre{background:var(--code);color:var(--codefg);padding:16px 18px;border-radius:14px;overflow:auto;font-size:.85rem;line-height:1.6;margin:14px 0}
+pre code{background:none;border:0;padding:0;color:inherit}
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px clamp(16px,4vw,32px);background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(14px);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:-.02em}
+.brand i{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--primary),var(--teal));color:#fff;font-style:normal;font-size:15px}
+.topbar .right{display:flex;gap:8px;align-items:center}
+.btn{border:1px solid var(--border);background:var(--surface);color:var(--fg);border-radius:10px;padding:7px 12px;font:inherit;font-size:.85rem;cursor:pointer}
+.btn:hover{border-color:var(--primary)}
+.menu-btn{display:none}
+.progress{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--primary),var(--teal));width:0;z-index:60}
+
+.hero{position:relative;overflow:hidden;background:#0c0a16;color:#fff;padding:clamp(56px,9vw,110px) clamp(16px,4vw,32px) clamp(48px,7vw,80px)}
+.hero:before,.hero:after{content:"";position:absolute;border-radius:50%;filter:blur(70px);opacity:.45}
+.hero:before{width:420px;height:420px;background:#6d5cff;top:-120px;left:-80px}
+.hero:after{width:380px;height:380px;background:#2dd4bf;right:-80px;bottom:-140px;opacity:.3}
+.hero-in{position:relative;max-width:1080px;margin:0 auto}
+.eyebrow{display:inline-block;font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;font-weight:700;color:#bdb6ff;border:1px solid rgba(255,255,255,.18);padding:6px 12px;border-radius:99px;background:rgba(255,255,255,.06)}
+.hero h1{font-size:clamp(2.4rem,6.5vw,4.6rem);letter-spacing:-.035em;margin:18px 0 16px;font-weight:850}
+.hero h1 em{font-style:normal;background:linear-gradient(90deg,#a89dff,#5eead4);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.lead{max-width:640px;font-size:clamp(1.05rem,2vw,1.25rem);color:rgba(255,255,255,.78);margin:0 0 28px}
+.hero-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-top:34px}
+.hero-cards a{display:block;text-decoration:none;color:#fff;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);border-radius:16px;padding:16px;backdrop-filter:blur(8px);transition:.2s}
+.hero-cards a:hover{transform:translateY(-3px);background:rgba(255,255,255,.12)}
+.hero-cards b{display:block;font-size:1.05rem;margin:4px 0}
+.hero-cards span{font-size:.85rem;color:rgba(255,255,255,.65);line-height:1.4;display:block}
+.hero-cards .emo{font-size:1.6rem}
+
+.layout{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:260px minmax(0,1fr);gap:40px;padding:36px clamp(16px,4vw,32px) 80px}
+.toc{position:sticky;top:82px;align-self:start;max-height:calc(100dvh - 100px);overflow:auto;padding-right:6px;font-size:.88rem}
+.toc h4{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px}
+.toc a{display:block;text-decoration:none;color:var(--muted);padding:5px 10px;border-radius:8px;border-left:2px solid transparent}
+.toc a:hover{color:var(--fg);background:var(--surface2)}
+.toc a.on{color:var(--primary);background:var(--primary-soft);border-left-color:var(--primary);font-weight:600}
+main{min-width:0}
+section{margin-bottom:68px}
+.sec-num{display:inline-grid;place-items:center;min-width:34px;height:34px;padding:0 8px;border-radius:10px;background:var(--primary-soft);color:var(--primary);font-weight:800;font-size:.85rem;margin-bottom:12px}
+h2{font-size:clamp(1.7rem,3.6vw,2.4rem);letter-spacing:-.025em;margin-bottom:10px}
+h3{font-size:1.25rem;margin:34px 0 8px;letter-spacing:-.01em}
+h4{font-size:1rem;margin:20px 0 4px}
+p{margin:10px 0}
+.sub{color:var(--muted);font-size:1.05rem;max-width:720px}
+ul,ol{padding-left:22px}
+li{margin:5px 0}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:18px;padding:20px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:14px;margin:16px 0}
+.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+.mini{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px}
+.mini .ic{font-size:1.5rem}
+.mini b{display:block;margin:4px 0 2px}
+.mini p{margin:0;color:var(--muted);font-size:.92rem}
+.callout{display:flex;gap:12px;padding:14px 16px;border-radius:14px;margin:16px 0;border:1px solid;font-size:.95rem}
+.callout .ci{font-size:1.25rem;line-height:1.4}
+.callout p{margin:0}
+.callout.tip{background:var(--teal-soft);border-color:color-mix(in oklab,var(--teal) 40%,transparent)}
+.callout.warn{background:var(--amber-soft);border-color:color-mix(in oklab,var(--amber) 45%,transparent)}
+.callout.danger{background:var(--rose-soft);border-color:color-mix(in oklab,var(--rose) 45%,transparent)}
+.callout.info{background:var(--primary-soft);border-color:color-mix(in oklab,var(--primary) 40%,transparent)}
+.pill{display:inline-block;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:99px;letter-spacing:.02em;vertical-align:middle}
+.p-primary{background:var(--primary-soft);color:var(--primary)}
+.p-teal{background:var(--teal-soft);color:var(--teal)}
+.p-amber{background:var(--amber-soft);color:var(--amber)}
+.p-rose{background:var(--rose-soft);color:var(--rose)}
+.p-green{background:var(--green-soft);color:var(--green)}
+.p-gray{background:var(--surface2);color:var(--muted)}
+
+/* roles */
+.role{position:relative;overflow:hidden}
+.role:before{content:"";position:absolute;inset:0 0 auto 0;height:5px;background:var(--c,var(--primary))}
+.role .who{font-size:2rem}
+.role h4{margin:6px 0 2px;font-size:1.1rem}
+.role .where{font-family:ui-monospace,Consolas,monospace;font-size:.8rem;color:var(--muted)}
+.role ul{margin:10px 0 0;padding-left:18px;font-size:.92rem}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:18px 0 0}
+.tabs button{border:1px solid var(--border);background:var(--surface);color:var(--muted);padding:9px 16px;border-radius:99px;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer}
+.tabs button.on{background:var(--primary);border-color:var(--primary);color:#fff}
+.tabpane{display:none;margin-top:14px}
+.tabpane.on{display:block}
+
+/* flow */
+.flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin:20px 0}
+.flow .node{flex:1 1 150px;background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:14px;text-align:center;position:relative}
+.flow .node b{display:block;font-size:.95rem}
+.flow .node small{color:var(--muted);display:block;line-height:1.35;margin-top:3px}
+.flow .node .e{font-size:1.6rem}
+.flow .arr{align-self:center;font-size:1.4rem;color:var(--primary);padding:0 6px}
+@media(max-width:700px){.flow{flex-direction:column}.flow .arr{transform:rotate(90deg);padding:6px 0;align-self:center}}
+
+/* steps */
+.steps{counter-reset:s;list-style:none;padding:0;margin:16px 0}
+.steps>li{counter-increment:s;position:relative;padding:4px 0 18px 54px;margin:0}
+.steps>li:before{content:counter(s);position:absolute;left:0;top:0;width:36px;height:36px;border-radius:12px;background:linear-gradient(135deg,var(--primary),var(--teal));color:#fff;font-weight:800;display:grid;place-items:center}
+.steps>li:after{content:"";position:absolute;left:17px;top:42px;bottom:4px;width:2px;background:var(--border)}
+.steps>li:last-child:after{display:none}
+.steps b{display:block}
+
+/* state machine */
+.states{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:16px 0}
+.st{padding:10px 18px;border-radius:12px;font-weight:700;border:1px solid var(--border);background:var(--surface)}
+.st small{display:block;font-weight:500;color:var(--muted);font-size:.75rem}
+.st.b{border-color:var(--muted)}.st.a{border-color:var(--green);color:var(--green)}.st.p{border-color:var(--amber);color:var(--amber)}.st.c{border-color:var(--primary);color:var(--primary)}
+.ar{color:var(--muted);font-size:.8rem;text-align:center}
+
+/* mock UI */
+.mock{border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--surface);box-shadow:var(--shadow);margin:16px 0}
+.mock-bar{display:flex;gap:6px;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border);align-items:center}
+.mock-bar i{width:10px;height:10px;border-radius:50%;background:var(--border)}
+.mock-bar span{margin-left:8px;font-size:.75rem;color:var(--muted);font-family:ui-monospace,monospace}
+.mock-body{padding:18px}
+.bar{height:12px;border-radius:99px;background:var(--surface2);overflow:hidden}
+.bar>div{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--primary),var(--teal))}
+.row{display:flex;justify-content:space-between;gap:10px;font-size:.88rem;margin:10px 0 4px}
+.tbl{width:100%;border-collapse:collapse;font-size:.9rem;margin:12px 0}
+.tbl th,.tbl td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+.tbl th{font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.tblwrap{overflow:auto;border:1px solid var(--border);border-radius:14px;background:var(--surface)}
+.tblwrap .tbl{margin:0}
+.heat{display:grid;grid-template-columns:90px repeat(3,1fr);gap:4px;font-size:.78rem;text-align:center}
+.heat div{padding:8px 4px;border-radius:6px}
+.mood{display:flex;gap:6px;align-items:flex-end;height:90px}
+.mood i{flex:1;border-radius:6px 6px 0 0;background:var(--teal)}
+.mood i.n{background:var(--rose)}
+
+details{background:var(--surface);border:1px solid var(--border);border-radius:14px;margin:10px 0;overflow:hidden}
+summary{cursor:pointer;padding:14px 18px;font-weight:650;list-style:none;display:flex;justify-content:space-between;gap:12px;align-items:center}
+summary::-webkit-details-marker{display:none}
+summary:after{content:"+";font-size:1.3rem;color:var(--primary);transition:.2s}
+details[open] summary:after{transform:rotate(45deg)}
+details .in{padding:0 18px 16px;color:var(--muted)}
+details .in p:first-child{margin-top:0}
+.kbd{display:inline-block;border:1px solid var(--border);border-bottom-width:3px;background:var(--surface);border-radius:7px;padding:1px 8px;font:600 .82rem ui-monospace,monospace}
+dl.gl{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:0;margin:16px 0;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface)}
+dl.gl dt,dl.gl dd{margin:0;padding:12px 16px;border-bottom:1px solid var(--border)}
+dl.gl dt{font-weight:700;background:var(--surface2)}
+dl.gl dt:last-of-type,dl.gl dd:last-of-type{border-bottom:0}
+footer{border-top:1px solid var(--border);padding:30px;text-align:center;color:var(--muted);font-size:.9rem}
+
+@media(max-width:960px){
+  .layout{grid-template-columns:1fr}
+  .toc{position:fixed;inset:57px 0 0 0;z-index:40;background:var(--bg);max-height:none;padding:16px;display:none}
+  .toc.open{display:block}
+  .menu-btn{display:inline-block}
+  dl.gl{grid-template-columns:1fr}
+  dl.gl dt{border-bottom:0;padding-bottom:2px}
+}
+@page{size:A4;margin:14mm 12mm}
+@media print{
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  html{scroll-padding-top:0}
+  body{font-size:14px}
+  .topbar,.toc,.progress{display:none}
+  .layout{display:block;padding:20px 0 0;max-width:none}
+  .hero{padding:50px 28px 40px;break-after:page}
+  .hero-cards{display:none}
+  section{margin-bottom:34px}
+  h2,h3,h4{break-after:avoid}
+  .card,.mini,.callout,.mock,.node,details,.steps>li,.tblwrap,pre,.flow{break-inside:avoid}
+  .card,.mock,.mini{box-shadow:none}
+  details .in{display:block}
+  .tabpane{display:block}
+  .tabs{display:none}
+  .layout,main{padding-left:12px;padding-right:12px}
+}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+
+<header class="topbar">
+  <div class="brand"><i>C</i> Consulta <span class="pill p-primary">Manual</span></div>
+  <div class="right">
+    <button class="btn" id="theme" type="button">🌙 Modo oscuro</button>
+    <button class="btn menu-btn" id="menu" type="button">☰ Índice</button>
+  </div>
+</header>
+
+<div class="hero">
+  <div class="hero-in">
+    <span class="eyebrow">Manual de uso · Versión 2026</span>
+    <h1>Todo lo que necesitás saber de <em>Consulta</em>, sin vueltas.</h1>
+    <p class="lead">Consulta es la plataforma donde una encuestadora diseña encuestas, las manda a campo, mira los resultados en vivo y le entrega a su cliente un informe redactado con IA. Este manual te lleva de la mano, paso a paso.</p>
+    <div class="hero-cards">
+      <a href="#roles"><span class="emo">🧭</span><b>No sé por dónde empezar</b><span>Mirá quién es quién y a qué parte de la app entra cada uno.</span></a>
+      <a href="#cliente"><span class="emo">📊</span><b>Soy del cliente</b><span>Crear encuestas, ver resultados, redes e informes.</span></a>
+      <a href="#campo"><span class="emo">📱</span><b>Soy encuestador</b><span>Cargar entrevistas desde el celular, aunque se corte la señal.</span></a>
+      <a href="#admin"><span class="emo">🛠️</span><b>Soy administración</b><span>Clientes, usuarios, equipo de campo y facturación.</span></a>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="toc" id="toc" aria-label="Índice">
+  <h4>Para entender</h4>
+  <a href="#que-es">1 · Qué es Consulta</a>
+  <a href="#roles">2 · Quién es quién</a>
+  <a href="#empezar">3 · Primeros pasos</a>
+  <h4>Guías por rol</h4>
+  <a href="#admin">4 · Administración central</a>
+  <a href="#cliente">5 · Panel del cliente</a>
+  <a href="#campo">6 · Trabajo de campo</a>
+  <a href="#web">7 · Encuestas web y widget</a>
+  <h4>Análisis</h4>
+  <a href="#resultados">8 · Resultados</a>
+  <a href="#redes">9 · Radar de redes</a>
+  <a href="#informes">10 · Informes con IA</a>
+  <h4>Referencia</h4>
+  <a href="#recorrido">11 · Recorrido completo</a>
+  <a href="#seguridad">12 · Seguridad y privacidad</a>
+  <a href="#faq">13 · Preguntas y problemas</a>
+  <a href="#glosario">14 · Glosario</a>
+  <a href="#instalar">15 · Para quien instala</a>
+</nav>
+
+<main>
+
+<!-- 1 -->
+<section id="que-es">
+  <span class="sec-num">1</span>
+  <h2>Qué es Consulta</h2>
+  <p class="sub">Imaginá una encuestadora entera metida en una web: el que arma el cuestionario, el que sale a la calle, el analista que mira los números y el que redacta el informe. Consulta junta a todos en un solo lugar.</p>
+
+  <div class="grid g3">
+    <div class="mini"><div class="ic">📝</div><b>1. Diseñás</b><p>Armás el cuestionario con preguntas, saltos y filtros.</p></div>
+    <div class="mini"><div class="ic">🚶</div><b>2. Relevás</b><p>Encuestadores en la calle con el celular, y/o gente respondiendo por internet.</p></div>
+    <div class="mini"><div class="ic">📈</div><b>3. Analizás</b><p>Tablero en vivo con margen de error, cruces y alertas de calidad.</p></div>
+    <div class="mini"><div class="ic">✨</div><b>4. Informás</b><p>La IA redacta el informe sobre los datos reales y lo bajás en PDF.</p></div>
+    <div class="mini"><div class="ic">📡</div><b>5. Escuchás</b><p>El radar mide el humor de la conversación en redes y portales.</p></div>
+    <div class="mini"><div class="ic">💼</div><b>6. Administrás</b><p>Clientes, equipo de campo, facturación y contabilidad.</p></div>
+  </div>
+
+  <div class="callout info"><span class="ci">💡</span><p><b>Idea clave:</b> cada cliente (un municipio, un ministerio, una ONG…) es una <b>organización</b> y solo ve lo suyo. La encuestadora —la administración central— ve todo y es la única que maneja al equipo de encuestadores.</p></div>
+
+  <h3>Cómo se ve el mapa de la app</h3>
+  <div class="flow">
+    <div class="node"><div class="e">🏛️</div><b>Administración</b><small>Da de alta clientes, usuarios y encuestadores</small></div>
+    <div class="arr">→</div>
+    <div class="node"><div class="e">🗂️</div><b>Cliente</b><small>Crea la encuesta y arma el cuestionario</small></div>
+    <div class="arr">→</div>
+    <div class="node"><div class="e">📱</div><b>Campo + Web</b><small>Entrevistas cara a cara y respuestas online</small></div>
+    <div class="arr">→</div>
+    <div class="node"><div class="e">📊</div><b>Resultados</b><small>Tablero, cruces, calidad, informe IA</small></div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section id="roles">
+  <span class="sec-num">2</span>
+  <h2>Quién es quién: los 4 roles</h2>
+  <p class="sub">Al ingresar, Consulta te lleva sola a tu área según tu rol. No hay que elegir nada.</p>
+
+  <div class="grid g2">
+    <div class="card role" style="--c:#5b4bf0">
+      <div class="who">🏛️</div><h4>Administración central</h4><div class="where">/admin · rol super_admin</div>
+      <ul>
+        <li>Da de alta organizaciones (clientes) y usuarios.</li>
+        <li><b>Único rol</b> que maneja encuestadores: alta, bloqueo, asignaciones, cuotas y zonas.</li>
+        <li>Ve todas las encuestas y proyectos de todos los clientes.</li>
+        <li>Emite facturas y mira la contabilidad.</li>
+      </ul>
+    </div>
+    <div class="card role" style="--c:#0f9d8f">
+      <div class="who">🧑‍💼</div><h4>Administrador de cliente</h4><div class="where">/cliente · rol org_admin</div>
+      <ul>
+        <li>Crea proyectos y encuestas; arma el cuestionario.</li>
+        <li>Pasa la encuesta a campo, la pausa o la cierra.</li>
+        <li>Publica el canal web, importa redes, genera informes.</li>
+        <li>Ve el avance del equipo de campo, pero no lo modifica.</li>
+      </ul>
+    </div>
+    <div class="card role" style="--c:#b7791f">
+      <div class="who">🔎</div><h4>Analista</h4><div class="where">/cliente · rol org_analyst</div>
+      <ul>
+        <li>Solo lectura: panel, resultados, redes e informes de su organización.</li>
+        <li>Ideal para quien interpreta datos pero no debe tocar el cuestionario.</li>
+      </ul>
+    </div>
+    <div class="card role" style="--c:#d1365a">
+      <div class="who">📱</div><h4>Encuestador</h4><div class="where">/campo · rol surveyor</div>
+      <ul>
+        <li>Ve únicamente las encuestas que le asignaron.</li>
+        <li>Carga entrevistas y mira su propia cuota.</li>
+        <li>No ve resultados ni datos de otros encuestadores.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>¿Puede…?</th><th>Admin</th><th>Cliente admin</th><th>Analista</th><th>Encuestador</th></tr>
+    <tr><td>Crear clientes y usuarios</td><td>✅</td><td>—</td><td>—</td><td>—</td></tr>
+    <tr><td>Gestionar encuestadores y cuotas</td><td>✅</td><td>👁️ solo ver</td><td>—</td><td>—</td></tr>
+    <tr><td>Crear/editar encuestas y cuestionarios</td><td>👁️</td><td>✅</td><td>—</td><td>—</td></tr>
+    <tr><td>Cargar entrevistas en campo</td><td>—</td><td>—</td><td>—</td><td>✅ (sus asignaciones)</td></tr>
+    <tr><td>Ver resultados y exportar CSV</td><td>👁️</td><td>✅</td><td>✅</td><td>—</td></tr>
+    <tr><td>Generar informes IA y radar</td><td>—</td><td>✅</td><td>👁️</td><td>—</td></tr>
+    <tr><td>Facturación y contabilidad</td><td>✅</td><td>—</td><td>—</td><td>—</td></tr>
+  </table></div>
+
+  <div class="callout danger"><span class="ci">🔒</span><p>Estas reglas no son solo “botones escondidos”: las hace cumplir la <b>base de datos</b> (RLS). Aunque alguien escribiera una URL a mano, no podría ver ni tocar lo que no le corresponde.</p></div>
+</section>
+
+<!-- 3 -->
+<section id="empezar">
+  <span class="sec-num">3</span>
+  <h2>Primeros pasos</h2>
+
+  <h3>Ingresar</h3>
+  <ol class="steps">
+    <li><b>Entrá a la web y tocá “Ingresar”</b>Está arriba a la derecha de la portada. Si ya tenés sesión, el botón dice “Ir a mi panel”.</li>
+    <li><b>Escribí tu correo y contraseña</b>Te las da la administración central cuando te crea el usuario.</li>
+    <li><b>Listo: aterrizás en tu área</b>Administración → <code>/admin</code>, clientes → <code>/cliente</code>, encuestadores → <code>/campo</code>.</li>
+  </ol>
+  <div class="callout warn"><span class="ci">⚠️</span><p>Si entrás a una zona que no es tuya verás la pantalla <b>“Acceso denegado”</b>. No rompiste nada: volvé a tu panel desde el botón.</p></div>
+
+  <h3>Recorriendo la pantalla</h3>
+  <div class="mock"><div class="mock-bar"><i></i><i></i><i></i><span>Así se organiza cualquier pantalla</span></div>
+  <div class="mock-body" style="display:grid;grid-template-columns:150px 1fr;gap:16px">
+    <div style="background:var(--surface2);border-radius:12px;padding:12px;font-size:.82rem">
+      <b style="color:var(--primary)">Consulta</b>
+      <div style="margin:10px 0;padding:8px;border-radius:8px;background:var(--surface)"><small style="color:var(--muted)">PANEL DEL CLIENTE</small><br><b>Municipalidad</b></div>
+      <div>▪ Resumen</div><div>▪ Proyectos</div><div>▪ Encuestas</div><div>▪ Informes IA</div>
+      <div style="margin-top:12px;color:var(--muted)">👤 Tu usuario · 🌙 · Salir</div>
+    </div>
+    <div>
+      <b style="font-size:1.1rem">Título de la página</b>
+      <div style="color:var(--muted);font-size:.85rem;margin-bottom:10px">Una línea que explica qué estás viendo + botones de acción a la derecha</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"><div class="mini">📈<br><b>Tarjetas</b></div><div class="mini">🎯<br><b>Con cifras</b></div><div class="mini">✅<br><b>Clave</b></div></div>
+    </div>
+  </div></div>
+  <ul>
+    <li><b>Menú lateral</b> (a la izquierda): las secciones de tu rol. En el celular se abre con el botón ☰.</li>
+    <li><b>Tarjeta de arriba del menú</b>: te dice en qué área estás y, si sos de un cliente, el nombre de tu organización.</li>
+    <li><b>Modo claro/oscuro</b>: el botón de la lunita/sol. Se acuerda de tu elección.</li>
+    <li><b>Pantallas de carga</b>: al cambiar de sección verás un “esqueleto” gris mientras llegan los datos. Es normal.</li>
+    <li><b>Salir</b>: abajo en el menú.</li>
+  </ul>
+</section>
+
+<!-- 4 -->
+<section id="admin">
+  <span class="sec-num">4</span>
+  <h2>Guía de la Administración central</h2>
+  <p class="sub">Tu menú: Panel general · Organizaciones · Usuarios · Encuestadores · Proyectos · Encuestas · Facturación · Contabilidad.</p>
+
+  <h3>📋 Panel general</h3>
+  <p>Cuatro tarjetas de un vistazo: <b>organizaciones</b> dadas de alta, <b>usuarios</b> totales, <b>encuestas</b> (históricas y en curso) y <b>casos completados</b>. Debajo, las últimas organizaciones creadas y las encuestas con más movimiento.</p>
+
+  <h3>🏢 Organizaciones (tus clientes)</h3>
+  <ol class="steps">
+    <li><b>Organizaciones → “Nueva organización”</b></li>
+    <li><b>Completá los datos</b>Nombre, tipo (<span class="pill p-gray">gobierno</span> <span class="pill p-gray">institución</span> <span class="pill p-gray">ONG</span> <span class="pill p-gray">privado</span>), contacto y región.</li>
+    <li><b>Elegí el estado</b><span class="pill p-green">activa</span> <span class="pill p-amber">prueba</span> <span class="pill p-rose">suspendida</span></li>
+  </ol>
+  <div class="callout tip"><span class="ci">💡</span><p>Creá siempre la organización <b>antes</b> que sus usuarios: cada usuario de cliente o encuestador tiene que pertenecer a una.</p></div>
+
+  <h3>👥 Usuarios</h3>
+  <ol class="steps">
+    <li><b>Usuarios → “Nuevo usuario”</b></li>
+    <li><b>Cargá nombre, correo y contraseña inicial</b></li>
+    <li><b>Elegí el rol y la organización</b>Administrador de cliente, Analista o Encuestador (el rol decide a qué área entra).</li>
+    <li><b>Pasale las credenciales</b>Todavía no hay recuperación de contraseña por mail: lo gestionás vos.</li>
+  </ol>
+
+  <h3>🧑‍🤝‍🧑 Encuestadores: tu zona exclusiva</h3>
+  <p>Acá se maneja todo el equipo de campo. Es la única pantalla del sistema donde se asignan encuestas a encuestadores.</p>
+  <div class="grid g2">
+    <div class="mini"><div class="ic">➕</div><b>Asignar</b><p>Elegí encuestador + encuesta, y definí su <b>cuota</b> (cuántas entrevistas debe cargar) y su <b>zona</b> (barrio, departamento…).</p></div>
+    <div class="mini"><div class="ic">📏</div><b>Seguir el avance</b><p>Barra de progreso contra la cuota, casos cargados hoy y días desde la última carga.</p></div>
+    <div class="mini"><div class="ic">🚦</div><b>Alertas de calidad</b><p>Marca entrevistas “exprés” (demasiado rápidas) y encuestadores que dejaron de cargar.</p></div>
+    <div class="mini"><div class="ic">⛔</div><b>Bloquear / habilitar</b><p>Un encuestador bloqueado no puede entrar. No se borra su historial.</p></div>
+  </div>
+
+  <h3>🗂️ Proyectos y Encuestas (vista global)</h3>
+  <p>Solo lectura transversal: ves los proyectos y encuestas de todos los clientes, útil para auditar o dar soporte. Para editar un cuestionario se entra con el cliente.</p>
+
+  <h3>🧾 Facturación</h3>
+  <ol class="steps">
+    <li><b>Facturación → “Nueva factura”</b>Elegís la organización, el monto y el concepto.</li>
+    <li><b>Seguí el estado</b><span class="pill p-amber">pendiente</span> → <span class="pill p-green">pagada</span>, o <span class="pill p-rose">vencida</span> / <span class="pill p-gray">anulada</span>. Se cambia desde la lista.</li>
+  </ol>
+  <p>Arriba ves cuatro totales: <b>Facturado</b> (sin anuladas), <b>Cobrado</b>, <b>Pendiente</b> y <b>Vencido</b>.</p>
+
+  <h3>🏦 Contabilidad</h3>
+  <p>El mismo dinero, pero resumido por cliente: cuánto facturaste a cada organización, cuánto cobraste, cuánto debe y qué porcentaje está cobrado (barra de progreso). Solo muestra clientes con facturación.</p>
+</section>
+
+<!-- 5 -->
+<section id="cliente">
+  <span class="sec-num">5</span>
+  <h2>Guía del Panel del cliente</h2>
+  <p class="sub">Tu menú: Resumen · Proyectos · Encuestas · Banco de dirigentes · Informes IA · Radar de conversación · Equipo.</p>
+
+  <h3>🏠 Resumen: lo primero que abrís cada mañana</h3>
+  <p>Está pensado para responder una sola pregunta: <b>“¿qué necesito atender hoy?”</b></p>
+  <ul>
+    <li><b>Tarjetas</b>: encuestas en campo, casos completados vs. meta, informes y pulso de redes.</li>
+    <li><b>Gráfico de 14 días</b>: cuántos casos entraron cada día (hora argentina).</li>
+    <li><b>“Qué requiere atención”</b>: avisos con link directo, por ejemplo:
+      <ul>
+        <li>🔴 <i>«Encuesta X» viene atrasada</i> — te dice cuántos casos por día hacen falta vs. el ritmo actual.</li>
+        <li>🟠 <i>Sin cargas en 7 días</i> — está en campo pero no entra nada.</li>
+        <li>🟠 Entrevistas exprés detectadas, o picos de críticas en redes.</li>
+      </ul>
+    </li>
+  </ul>
+
+  <h3>📁 Proyectos</h3>
+  <p>Un proyecto agrupa varias encuestas que forman una misma línea de trabajo (por ejemplo las olas trimestrales de un tracking). Al crearlo elegís una <b>línea de servicio</b>:</p>
+  <div class="grid g4">
+    <div class="mini"><b>Opinión pública</b></div><div class="mini"><b>Tracking político</b></div><div class="mini"><b>Monitor de gestión</b></div><div class="mini"><b>Inteligencia territorial</b></div>
+    <div class="mini"><b>Banco de dirigentes</b></div><div class="mini"><b>Investigación cualitativa</b></div><div class="mini"><b>Laboratorio de opinión</b></div><div class="mini"><b>Radar de conversación</b></div>
+    <div class="mini"><b>Estudios temáticos</b></div><div class="mini"><b>Estudios Flash</b></div>
+  </div>
+  <p>También podés ponerle un color (formato <code>#0ea5a4</code>) y una descripción. Los proyectos son solo una forma de ordenar; no cambian cómo funciona la encuesta.</p>
+
+  <h3>📝 Encuestas: crear y gestionar</h3>
+  <ol class="steps">
+    <li><b>Encuestas → “Nueva encuesta”</b>Título, descripción, proyecto, <b>meta de respuestas</b>, fechas, zona geográfica y metodología.</li>
+    <li><b>Armá el cuestionario</b>Agregás preguntas una por una (ver abajo).</li>
+    <li><b>Revisá la lista de chequeo</b>El sistema te avisa si falta algo antes de salir.</li>
+    <li><b>“Salir a campo”</b>Desde ese momento los encuestadores asignados (y el canal web, si lo activaste) pueden cargar.</li>
+  </ol>
+
+  <h4>Los estados de una encuesta</h4>
+  <div class="states">
+    <div class="st b">Borrador<small>Armándose</small></div><span class="ar">Salir a campo →</span>
+    <div class="st a">Activa<small>Recibe respuestas</small></div><span class="ar">Pausar ⇄ Reanudar</span>
+    <div class="st p">Pausada<small>Nadie carga</small></div><span class="ar">Cerrar →</span>
+    <div class="st c">Cerrada<small>Solo resultados e informes</small></div>
+  </div>
+  <p>Una cerrada se puede <b>Reabrir</b>. El sistema solo ofrece los cambios válidos y el servidor los vuelve a verificar.</p>
+
+  <h4>Tipos de pregunta</h4>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>Tipo</th><th>Para qué sirve</th><th>Detalles</th></tr>
+    <tr><td><b>Opción única</b></td><td>Elegir una respuesta</td><td>Mínimo 2 opciones</td></tr>
+    <tr><td><b>Opción múltiple</b></td><td>Marcar varias</td><td>Podés fijar un <b>tope de marcas</b> y opciones <b>excluyentes</b> (“No sabe”, “Ninguno”: si se marcan, anulan las demás)</td></tr>
+    <tr><td><b>Escala</b></td><td>Valorar de 1 a N</td><td>Se define el rango; los resultados muestran valoración alta/baja</td></tr>
+    <tr><td><b>Número</b></td><td>Edad, cantidad…</td><td>Con rango mínimo y máximo válido</td></tr>
+    <tr><td><b>Sí / No</b></td><td>Respuestas binarias</td><td>Se puede usar en saltos y filtros</td></tr>
+    <tr><td><b>Texto corto / largo</b></td><td>Respuestas abiertas</td><td>El análisis arma “términos frecuentes”</td></tr>
+    <tr><td><b>Fecha</b></td><td>Cuándo ocurrió algo</td><td>—</td></tr>
+  </table></div>
+  <p>Cada pregunta puede ser <b>obligatoria</b>, tener <b>texto de ayuda</b> y pertenecer a una <b>sección</b> para ordenar el cuestionario.</p>
+
+  <h4>Saltos y filtros (la lógica)</h4>
+  <div class="grid g2">
+    <div class="card"><span class="pill p-teal">Salto</span><h4>“Mostrar solo si…”</h4><p>Ejemplo: <i>P5 “¿Por qué la evalúa mal?”</i> se muestra solo si en <i>P4</i> respondió <b>Mala</b> o <b>Muy mala</b>. Si no, se saltea sola.</p></div>
+    <div class="card"><span class="pill p-rose">Filtro</span><h4>“Terminar la entrevista si…”</h4><p>Ejemplo: en <i>“¿Vive en la ciudad?”</i>, si responde <b>No</b>, la entrevista termina. Queda como <b>descartada</b>: cuenta para la incidencia, no para los resultados.</p></div>
+  </div>
+  <div class="callout warn"><span class="ci">⚠️</span><p>Un salto solo puede apuntar a una pregunta <b>anterior</b>. Por eso, si intentás mover una pregunta y rompería un salto, el sistema no te deja y avisa.</p></div>
+
+  <h4>Cosas que el sistema te protege de hacer</h4>
+  <ul>
+    <li><b>No podés borrar</b> una pregunta que ya tiene respuestas (borrarla eliminaría datos de campo). Si ya no va, cerrá la encuesta y armá una <b>nueva ola</b>.</li>
+    <li><b>No podés borrar</b> una pregunta de la que depende otro salto: primero quitás esa condición.</li>
+    <li><b>No podés salir a campo</b> sin preguntas, con preguntas de opción de menos de 2 opciones, o con saltos rotos.</li>
+    <li>Al borrar una pregunta, el cuestionario se <b>renumera</b> solo.</li>
+  </ul>
+
+  <h4>Atajos que ahorran horas</h4>
+  <div class="grid g2">
+    <div class="mini"><div class="ic">📑</div><b>Copiar cuestionario</b><p>Copia preguntas, opciones y saltos desde otra encuesta. Solo funciona sobre una encuesta <b>vacía</b>.</p></div>
+    <div class="mini"><div class="ic">🌊</div><b>Nueva ola</b><p>Duplica la encuesta completa como borrador con el mismo cuestionario. Ideal para trackings que se repiten.</p></div>
+  </div>
+
+  <h3>🪪 Banco de dirigentes</h3>
+  <p>Una ficha por cada dirigente que seguís. En cada <b>ola</b> cargás una <b>medición</b> (conocimiento, imagen…) y la ficha muestra la última cifra, para ver <b>quién sube, quién baja y por qué</b>. Solo el administrador crea fichas y mediciones; el analista las consulta.</p>
+
+  <h3>👥 Equipo</h3>
+  <p>Lista de las personas de tu organización y su rol. Es informativa: las altas y bajas de usuarios las hace la administración central.</p>
+</section>
+
+<!-- 6 -->
+<section id="campo">
+  <span class="sec-num">6</span>
+  <h2>Guía del Trabajo de campo</h2>
+  <p class="sub">Para encuestadores. Pensada para usar con una mano, en la calle, desde el celular.</p>
+
+  <h3>Mis asignaciones</h3>
+  <p>Al entrar ves “Hola, <i>tu nombre</i>” y tres tarjetas: <b>cargadas hoy</b>, <b>total cargadas</b> y <b>cuota total</b>. Abajo, tus encuestas separadas en <span class="pill p-green">activas</span> (se puede cargar) y las demás (pausadas/cerradas, solo se ven). Cada una muestra tu barra de avance contra tu cuota y tu zona.</p>
+
+  <h3>Hacer una entrevista</h3>
+  <ol class="steps">
+    <li><b>Tocá la encuesta activa</b>Se abre el cuestionario.</li>
+    <li><b>Preguntá y marcá</b>Una pregunta por pantalla. En las de un solo toque (opción única, sí/no) <b>avanza sola</b>.</li>
+    <li><b>Seguí las reglas</b>Las preguntas obligatorias no te dejan avanzar vacías. Los saltos aparecen y se esconden solos.</li>
+    <li><b>Revisá</b>Una pantalla final muestra todo lo respondido para corregir antes de enviar.</li>
+    <li><b>Enviá</b>Se guarda con la zona y el tiempo que tardó la entrevista. Queda lista para la siguiente.</li>
+  </ol>
+
+  <div class="callout tip"><span class="ci">⌨️</span><p><b>Atajos de teclado</b> (si usás compu o tablet con teclado): <span class="kbd">1</span>–<span class="kbd">9</span> eligen la opción, <span class="kbd">Enter</span> avanza, <span class="kbd">Esc</span> vuelve atrás.</p></div>
+
+  <div class="grid g2">
+    <div class="mini"><div class="ic">💾</div><b>Se corta la señal o se recarga</b><p>Tu entrevista queda como <b>borrador en el teléfono</b> y la retomás donde quedó. Ojo: para <i>enviar</i> sí hace falta conexión.</p></div>
+    <div class="mini"><div class="ic">🛑</div><b>Entrevista filtrada</b><p>Si el entrevistado no cumple un filtro, la entrevista se cierra sola como “descartada”. No es un error.</p></div>
+    <div class="mini"><div class="ic">⏱️</div><b>Calidad</b><p>Si hacés entrevistas demasiado rápidas (menos del 40% de lo normal) el sistema las marca como “exprés” para que se revisen.</p></div>
+    <div class="mini"><div class="ic">🔁</div><b>Validación doble</b><p>El servidor vuelve a verificar todo con las mismas reglas: no hay forma de guardar una entrevista inválida.</p></div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section id="web">
+  <span class="sec-num">7</span>
+  <h2>Encuestas web y widget</h2>
+  <p class="sub">Además del cara a cara, la misma encuesta se puede responder por internet, <b>sin encuestador y sin cuenta</b>.</p>
+
+  <h3>Cómo activarlo</h3>
+  <ol class="steps">
+    <li><b>Entrá a la encuesta → tarjeta “Canal web”</b></li>
+    <li><b>Activá el canal</b>Se genera un <b>token</b> único (un código en el link).</li>
+    <li><b>Personalizá</b>Color, título y texto de bienvenida, mensaje de agradecimiento, texto del botón, y si permite una sola respuesta por dispositivo.</li>
+    <li><b>Copiá lo que necesites</b>Link, widget o iframe (abajo).</li>
+  </ol>
+
+  <h3>Tres formas de publicarla</h3>
+  <div class="tabs" id="webtabs">
+    <button class="on" data-t="t1">🔗 Link directo</button>
+    <button data-t="t2">🧩 Widget</button>
+    <button data-t="t3">🖼️ Iframe</button>
+  </div>
+  <div class="tabpane on" id="t1">
+    <p>La más simple: mandás el link por WhatsApp, mail o redes. Se abre una página limpia con la encuesta.</p>
+    <pre><code>https://TU-PLATAFORMA/e/TOKEN</code></pre>
+  </div>
+  <div class="tabpane" id="t2">
+    <p>Pegás una línea en el sitio del cliente y aparece la encuesta. Tres modos con <code>data-modo</code>:</p>
+    <pre><code>&lt;script src="https://TU-PLATAFORMA/widget.js"
+        data-encuesta="TOKEN"
+        data-modo="flotante" async&gt;&lt;/script&gt;</code></pre>
+    <div class="tblwrap"><table class="tbl">
+      <tr><th>Modo</th><th>Qué hace</th></tr>
+      <tr><td><code>flotante</code></td><td>Botón en una esquina que abre la encuesta.</td></tr>
+      <tr><td><code>emergente</code></td><td>Se abre sola a los <code>data-demora</code> segundos, una vez por visita.</td></tr>
+      <tr><td><code>inline</code></td><td>Se dibuja dentro de un elemento (<code>data-contenedor</code>).</td></tr>
+    </table></div>
+    <p>Opciones extra: <code>data-color</code>, <code>data-texto</code>, <code>data-posicion</code>.</p>
+  </div>
+  <div class="tabpane" id="t3">
+    <p>Si el sitio no deja ejecutar JavaScript, usá un iframe común:</p>
+    <pre><code>&lt;iframe src="https://TU-PLATAFORMA/e/TOKEN?embed=1"
+        width="100%" height="640" style="border:0"&gt;&lt;/iframe&gt;</code></pre>
+  </div>
+
+  <div class="callout tip"><span class="ci">🧪</span><p><b>Probalo antes:</b> <code>/e/TOKEN/prueba</code> muestra un sitio de ejemplo con el widget funcionando, ideal para enseñárselo al cliente.</p></div>
+
+  <h3>Cómo se protege de abusos</h3>
+  <ul>
+    <li>Una respuesta por dispositivo (huella anónima, sin datos personales).</li>
+    <li>Límite de envíos por IP.</li>
+    <li>Campo “trampa” invisible para bots y tiempo mínimo para completar.</li>
+    <li>Validación completa del cuestionario en el servidor.</li>
+  </ul>
+  <div class="callout warn"><span class="ci">🔑</span><p><b>“Generar link nuevo”</b> invalida el anterior: todos los links y widgets ya publicados dejan de funcionar. Usalo solo si el link se filtró o se usó mal.</p></div>
+</section>
+
+<!-- 8 -->
+<section id="resultados">
+  <span class="sec-num">8</span>
+  <h2>Resultados: cómo leer el tablero</h2>
+  <p class="sub">Ruta: <b>Encuestas → tu encuesta → Resultados</b>. Se actualiza en vivo mientras entran respuestas.</p>
+
+  <h3>Filtros</h3>
+  <p>Arriba filtrás por <b>canal</b> (campo/web), <b>zona</b>, <b>encuestador</b>, <b>fechas</b> y <b>segmento</b>. Los filtros viven en la URL: <b>copiás el link y el otro ve exactamente lo mismo</b>. La exportación a CSV también los respeta.</p>
+
+  <h3>Una pregunta, explicada</h3>
+  <div class="mock"><div class="mock-bar"><i></i><i></i><i></i><span>P4 · ¿Cómo evalúa la gestión?</span></div>
+  <div class="mock-body">
+    <div class="row"><span>Buena / Muy buena</span><b>41,2% <small style="color:var(--muted)">±4,8</small></b></div><div class="bar"><div style="width:41%"></div></div>
+    <div class="row"><span>Regular</span><b>27,5%</b></div><div class="bar"><div style="width:27%"></div></div>
+    <div class="row"><span>Mala / Muy mala</span><b>31,3%</b></div><div class="bar"><div style="width:31%;background:var(--rose)"></div></div>
+    <p style="margin:12px 0 0;font-size:.85rem;color:var(--muted)">Saldo neto: <b>+9,9</b> · Base: 412 casos</p>
+  </div></div>
+  <ul>
+    <li><b>Porcentaje + margen de error</b>: pasá el cursor y ves el intervalo. “41% ± 4,8” significa que el valor real está probablemente entre 36% y 46%.</li>
+    <li><b>Saldo neto</b>: positivos menos negativos. Más de 0, la gente evalúa bien en balance.</li>
+    <li><b>Valoración alta/baja</b> en escalas, <b>promedio</b> en numéricas y <b>términos frecuentes</b> en abiertas.</li>
+    <li><b>Base</b>: cuántos casos respondieron esa pregunta (menos si hay saltos).</li>
+  </ul>
+
+  <h3>Hallazgos automáticos</h3>
+  <p>El sistema revisa los cruces y te lista, en castellano, las diferencias que <b>no son casualidad</b> (estadísticamente significativas). Ejemplo: <i>“En el Sur la evaluación de gestión es 18 puntos peor que en el Norte”</i>.</p>
+
+  <h3>Explorador de cruces</h3>
+  <p>Elegí dos preguntas y se arma una tabla de contraste. Cómo leerla:</p>
+  <div class="mock"><div class="mock-body">
+    <div class="heat">
+      <div></div><div><b>Joven</b></div><div><b>Adulto</b></div><div><b>Mayor</b></div>
+      <div style="text-align:left"><b>Empleo</b></div><div style="background:color-mix(in oklab,var(--primary) 70%,transparent);color:#fff">58%</div><div style="background:color-mix(in oklab,var(--primary) 35%,transparent)">34%</div><div style="background:color-mix(in oklab,var(--primary) 15%,transparent)">19%</div>
+      <div style="text-align:left"><b>Salud</b></div><div style="background:color-mix(in oklab,var(--primary) 15%,transparent)">12%</div><div style="background:color-mix(in oklab,var(--primary) 40%,transparent)">36%</div><div style="background:color-mix(in oklab,var(--primary) 75%,transparent);color:#fff">61%</div>
+    </div>
+  </div></div>
+  <ul>
+    <li><b>Cuanto más oscura la celda, más fuerte el porcentaje</b> (mapa de calor).</li>
+    <li>Las celdas marcadas son diferencias <b>significativas</b> respecto del total.</li>
+    <li>Abajo aparece el <b>chi-cuadrado</b> (¿hay relación o es azar?) y la <b>V de Cramér</b> (¿qué tan fuerte es? 0 = nada, 1 = total).</li>
+  </ul>
+
+  <h3>Proyección y avance</h3>
+  <p>Con el ritmo de los <b>últimos 7 días</b> te dice: la <b>fecha estimada</b> en la que alcanzás la meta, o si venís atrasado, <b>cuántos casos por día</b> necesitás para llegar.</p>
+
+  <h3>Control de calidad</h3>
+  <div class="grid g3">
+    <div class="mini"><b>⚡ Exprés</b><p>Entrevistas de menos del 40% de la duración mediana: sospechosas de “llenar por llenar”.</p></div>
+    <div class="mini"><b>🤷 NS/NC por encuestador</b><p>Quien tiene muchos más “No sabe / No contesta” que el resto puede no estar preguntando bien.</p></div>
+    <div class="mini"><b>📅 Días sin carga</b><p>Detecta pausas en el trabajo de campo.</p></div>
+  </div>
+  <p>También hay un <b>mapa</b> con la ubicación de las entrevistas de campo.</p>
+
+  <h3>“Preguntale a los datos”</h3>
+  <p>Una caja donde escribís en lenguaje normal (“¿qué prioriza la gente joven?”) y recibís una respuesta basada en los números de esta encuesta. Usa Gemini si está configurado; si no, una lectura local más simple (y lo avisa).</p>
+
+  <h3>Exportar a Excel</h3>
+  <p>Botón <b>Exportar CSV</b>: una fila por entrevista, separado por <code>;</code> y con tildes correctas en Excel. Las preguntas de opción múltiple se abren en una <b>columna 1/0 por opción</b>, listas para tabular.</p>
+</section>
+
+<!-- 9 -->
+<section id="redes">
+  <span class="sec-num">9</span>
+  <h2>Radar de conversación (redes y portales)</h2>
+  <p class="sub">Mide el <b>humor</b> de lo que se dice públicamente sobre tu organización. Importante: es un termómetro de la conversación, <b>no una muestra representativa</b> de la población como una encuesta.</p>
+
+  <h3>1 · Traer publicaciones</h3>
+  <div class="grid g3">
+    <div class="mini"><div class="ic">📄</div><b>Archivo CSV</b><p>Exportación de tu herramienta de monitoreo o de Meta Business Suite.</p></div>
+    <div class="mini"><div class="ic">📋</div><b>Texto pegado</b><p>Copiás comentarios o posteos y los pegás.</p></div>
+    <div class="mini"><div class="ic">📰</div><b>Feeds RSS</b><p>Portales de noticias o Google Alertas. Quedan guardados como <b>fuentes</b> para volver a actualizar. Se evitan los duplicados.</p></div>
+  </div>
+  <p>Cada importación queda registrada (cuántas entraron, cuántas eran repetidas y si hubo error).</p>
+
+  <h3>2 · El sistema las clasifica</h3>
+  <p>A cada publicación le asigna <b>sentimiento</b> (positivo/neutro/negativo), <b>emoción</b> y <b>temas</b>. Usa, por orden de prioridad:</p>
+  <ol>
+    <li><b>TypeSafe (JEV)</b>, si está configurado.</li>
+    <li><b>Gemini</b>, en lotes.</li>
+    <li><b>Léxico local en español</b> (entiende negaciones como “no está bien” e intensificadores como “muy malo”).</li>
+  </ol>
+
+  <h3>3 · Qué vas a ver</h3>
+  <div class="mock"><div class="mock-bar"><i></i><i></i><i></i><span>Evolución del humor (ejemplo)</span></div><div class="mock-body">
+    <div class="mood"><i style="height:55%"></i><i style="height:60%"></i><i style="height:58%"></i><i class="n" style="height:30%"></i><i class="n" style="height:18%"></i><i class="n" style="height:25%"></i><i style="height:48%"></i><i style="height:70%"></i><i style="height:78%"></i></div>
+    <p style="font-size:.85rem;color:var(--muted);margin:8px 0 0">Una caída fuerte aparece como alerta: algo pasó ese día.</p>
+  </div></div>
+  <ul>
+    <li><b>Índice de humor</b> de −100 (todo negativo) a +100 (todo positivo), ponderado por interacciones.</li>
+    <li><b>Evolución diaria</b>, <b>temas con tendencia</b>, <b>redes</b>, <b>emociones</b>, <b>palabras frecuentes</b> y las <b>publicaciones con más eco</b>.</li>
+    <li><b>Alertas</b>: picos de críticas (fuera de lo habitual, más de 2,5 desvíos), temas emergentes y caídas de humor.</li>
+    <li><b>Agenda de la encuesta vs. agenda en redes</b>: ¿de lo que habla la gente en redes es lo mismo que le preocupa en la encuesta?</li>
+    <li><b>Temas propios</b>: definís tus palabras clave y exclusiones para medir lo que te importa.</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section id="informes">
+  <span class="sec-num">10</span>
+  <h2>Informes con IA</h2>
+  <p class="sub">Un informe completo y redactado, listo para entregar, en menos de un minuto.</p>
+
+  <h3>Generar un informe</h3>
+  <ol class="steps">
+    <li><b>Informes IA → elegí la encuesta</b></li>
+    <li><b>Elegí el tipo</b>
+      <div class="grid g4" style="margin-top:8px">
+        <div class="mini"><b>Ejecutivo</b><p>Corto, para decidir.</p></div>
+        <div class="mini"><b>Técnico</b><p>Con metodología y márgenes.</p></div>
+        <div class="mini"><b>Comunicacional</b><p>Mensajes y públicos.</p></div>
+        <div class="mini"><b>Comparativo</b><p>Contra olas anteriores.</p></div>
+      </div></li>
+    <li><b>Generar</b>Estado: <span class="pill p-amber">generando</span> → <span class="pill p-green">listo</span> (o <span class="pill p-rose">error</span>, y reintentás).</li>
+    <li><b>Leelo, imprimilo o bajalo en PDF</b>Hay una hoja limpia para imprimir y un botón de descarga PDF.</li>
+  </ol>
+
+  <h3>La IA no inventa números</h3>
+  <div class="callout info"><span class="ci">🛡️</span><p><b>No se le mandan las respuestas crudas a la IA.</b> Primero Consulta calcula ella misma las distribuciones, márgenes, saldos, proyección, calidad y cruces significativos; recién ese <b>resumen de agregados reales</b> se le pasa a Gemini. La IA solo <i>redacta</i> sobre cifras que ya están calculadas, y cada cifra cita su base.</p></div>
+  <div class="flow">
+    <div class="node"><div class="e">🗃️</div><b>Datos reales</b><small>Se leen todos, sin cortes</small></div><div class="arr">→</div>
+    <div class="node"><div class="e">🧮</div><b>Consulta calcula</b><small>Márgenes, saldos, cruces</small></div><div class="arr">→</div>
+    <div class="node"><div class="e">✨</div><b>La IA redacta</b><small>Formato fijo y validado</small></div><div class="arr">→</div>
+    <div class="node"><div class="e">📄</div><b>Informe</b><small>Imprimible / PDF</small></div>
+  </div>
+  <ul>
+    <li>Si el modelo principal está saturado, <b>reintenta</b> y cae a un modelo de respaldo.</li>
+    <li>Si la organización mide redes, se suman como <b>contexto no representativo</b>, aclarándolo.</li>
+    <li>Sin IA configurada, un <b>redactor local</b> arma un informe base (y lo indica).</li>
+  </ul>
+  <div class="callout warn"><span class="ci">👀</span><p>Siempre leé el informe antes de entregarlo. La IA redacta bien pero es el analista quien valida las conclusiones.</p></div>
+</section>
+
+<!-- 11 -->
+<section id="recorrido">
+  <span class="sec-num">11</span>
+  <h2>Recorrido completo: una encuesta de principio a fin</h2>
+  <p class="sub">Un ejemplo real: la Municipalidad quiere medir cómo evalúa la gente su gestión.</p>
+
+  <ol class="steps">
+    <li><b>🏛️ Administración</b> crea la organización “Municipalidad” y el usuario del intendente (Administrador de cliente), el de su analista y los de dos encuestadores.</li>
+    <li><b>🧑‍💼 Cliente</b> crea el proyecto “Monitor de gestión 2027” y la encuesta “Ola 1”, con meta de 400 casos.</li>
+    <li><b>🧑‍💼 Cliente</b> arma el cuestionario: 12 preguntas, un filtro de residencia, un salto “¿por qué la evalúa mal?”.</li>
+    <li><b>🏛️ Administración</b> asigna a cada encuestador 200 casos y una zona (Norte / Sur).</li>
+    <li><b>🧑‍💼 Cliente</b> toca <b>“Salir a campo”</b>. También activa el canal web y pega el widget en el sitio municipal.</li>
+    <li><b>📱 Encuestadores</b> salen a la calle y cargan entrevistas; la gente responde además por la web.</li>
+    <li><b>📊 Cliente</b> mira cada día el Resumen: ritmo, atrasos, entrevistas exprés. Corrige con administración si hace falta.</li>
+    <li><b>🧑‍💼 Cliente</b> llega a la meta y <b>cierra</b> la encuesta.</li>
+    <li><b>✨ Cliente</b> explora cruces, importa redes y genera el <b>informe ejecutivo</b>. Lo baja en PDF y lo entrega.</li>
+    <li><b>🌊 Tres meses después:</b> “Nueva ola” duplica todo en un clic y se repite el ciclo, comparando con la ola anterior.</li>
+  </ol>
+</section>
+
+<!-- 12 -->
+<section id="seguridad">
+  <span class="sec-num">12</span>
+  <h2>Seguridad y privacidad</h2>
+  <div class="grid g2">
+    <div class="mini"><div class="ic">🧱</div><b>Aislamiento por fila (RLS)</b><p>Cada consulta a la base filtra por organización. Un cliente no puede leer datos de otro, ni forzando URLs.</p></div>
+    <div class="mini"><div class="ic">🔑</div><b>Claves en el servidor</b><p>Las claves de IA viven en secretos del servidor (Edge Function), nunca en el navegador.</p></div>
+    <div class="mini"><div class="ic">🕶️</div><b>Anonimato en la web</b><p>Las respuestas web no guardan datos personales; la “huella” del dispositivo es un hash anónimo.</p></div>
+    <div class="mini"><div class="ic">📜</div><b>Auditoría de IA</b><p>Cada llamada a la IA queda registrada (acción, modelo, resultado) sin guardar los textos.</p></div>
+  </div>
+</section>
+
+<!-- 13 -->
+<section id="faq">
+  <span class="sec-num">13</span>
+  <h2>Preguntas frecuentes y problemas comunes</h2>
+
+  <details><summary>No puedo salir a campo, me dice que falta algo</summary><div class="in"><p>Revisá la lista de chequeo: tiene que haber <b>al menos una pregunta</b>, todas las de opción con <b>2 o más opciones</b>, y los saltos deben apuntar a preguntas <b>existentes y anteriores</b>.</p></div></details>
+  <details><summary>No puedo borrar una pregunta</summary><div class="in"><p>Dos motivos posibles: (1) ya tiene respuestas cargadas —para no perder datos de campo—, o (2) otra pregunta depende de ella por un salto. Cerrá la encuesta y armá una <b>nueva ola</b> con el cuestionario corregido, o quitá primero la condición.</p></div></details>
+  <details><summary>Un encuestador dice que no le aparece la encuesta</summary><div class="in"><p>Verificá: ① que la administración se la haya <b>asignado</b>, ② que la encuesta esté <b>Activa</b> (no borrador, pausada o cerrada) y ③ que su usuario no esté <b>bloqueado</b>.</p></div></details>
+  <details><summary>El encuestador perdió señal en medio de una entrevista</summary><div class="in"><p>No pasa nada: queda un <b>borrador en su teléfono</b>. Cuando vuelva la señal, retoma y envía. Si cambia de teléfono o borra datos del navegador, el borrador se pierde.</p></div></details>
+  <details><summary>Varias entrevistas quedaron como “descartadas”</summary><div class="in"><p>Es normal: son personas que no cumplían un <b>filtro</b> (ej. no viven en la ciudad). Se cuentan para la incidencia, pero no entran en los resultados.</p></div></details>
+  <details><summary>El widget no aparece en el sitio del cliente</summary><div class="in"><p>Revisá que el <b>token</b> sea el actual (si generaste un link nuevo, el viejo ya no funciona), que el canal web esté activo y la encuesta en estado Activa. Si el sitio bloquea scripts, usá el <b>iframe</b>.</p></div></details>
+  <details><summary>Alguien no puede volver a responder por la web</summary><div class="in"><p>Está activada “una respuesta por dispositivo”. Es a propósito, para que nadie infle los resultados.</p></div></details>
+  <details><summary>El informe falló o dice “error”</summary><div class="in"><p>Suele ser saturación temporal del modelo de IA. Generalo de nuevo; el sistema ya reintenta y usa un modelo de respaldo. Si persiste, avisá a administración para revisar la configuración de la clave de IA.</p></div></details>
+  <details><summary>¿Los datos de redes son representativos?</summary><div class="in"><p><b>No.</b> Reflejan a quienes opinan públicamente, que no es toda la población. Usalos para detectar temas y cambios de clima, no para proyectar porcentajes. Los informes lo aclaran.</p></div></details>
+  <details><summary>Olvidé mi contraseña</summary><div class="in"><p>Todavía no hay recuperación automática. Pedile a la administración central que te la restablezca.</p></div></details>
+  <details><summary>Mi margen de error es muy grande</summary><div class="in"><p>Pasa cuando hay pocos casos o cuando mirás un subgrupo chico (por ejemplo, “mayores del Sur”). Con más casos baja. No saques conclusiones de celdas con pocas respuestas.</p></div></details>
+</section>
+
+<!-- 14 -->
+<section id="glosario">
+  <span class="sec-num">14</span>
+  <h2>Glosario</h2>
+  <dl class="gl">
+    <dt>Organización</dt><dd>Un cliente de la encuestadora (municipio, ministerio, ONG, empresa). Es la unidad que aísla los datos.</dd>
+    <dt>Proyecto</dt><dd>Carpeta que agrupa encuestas de una misma línea de servicio.</dd>
+    <dt>Ola</dt><dd>Cada repetición de una misma medición en el tiempo (Ola 1, Ola 2…). Permite comparar.</dd>
+    <dt>Meta muestral</dt><dd>Cantidad de entrevistas completas que se quiere lograr.</dd>
+    <dt>Cuota</dt><dd>Cantidad de entrevistas que debe cargar cada encuestador.</dd>
+    <dt>Caso / Respuesta</dt><dd>Una entrevista completa de una persona.</dd>
+    <dt>Descartada</dt><dd>Entrevista cortada por un filtro. No entra en resultados.</dd>
+    <dt>Canal</dt><dd>Por dónde llegó la respuesta: <i>campo</i> (encuestador) o <i>web</i>.</dd>
+    <dt>Salto</dt><dd>Regla que muestra una pregunta solo si se cumple una condición anterior.</dd>
+    <dt>Filtro</dt><dd>Regla que termina la entrevista si la respuesta no califica.</dd>
+    <dt>Base</dt><dd>Cantidad de personas sobre las que se calcula un porcentaje.</dd>
+    <dt>Margen de error</dt><dd>El “más/menos” que rodea a un porcentaje por trabajar con una muestra y no con toda la población.</dd>
+    <dt>Saldo neto</dt><dd>Positivos menos negativos en una pregunta de evaluación.</dd>
+    <dt>Cruce</dt><dd>Tabla que combina dos preguntas (ej. evaluación según edad).</dd>
+    <dt>Significativo</dt><dd>Una diferencia demasiado grande para ser casualidad.</dd>
+    <dt>Chi-cuadrado / V de Cramér</dt><dd>Pruebas que dicen si dos preguntas están relacionadas y con qué fuerza (0 a 1).</dd>
+    <dt>Exprés</dt><dd>Entrevista sospechosamente rápida (menos del 40% de la mediana).</dd>
+    <dt>NS/NC</dt><dd>“No sabe / No contesta”.</dd>
+    <dt>Incidencia</dt><dd>Qué proporción de la gente contactada cumple los filtros para ser encuestada.</dd>
+    <dt>Índice de humor</dt><dd>Número de −100 a +100 que resume si la conversación en redes es positiva o negativa.</dd>
+    <dt>Token</dt><dd>Código único del link público de una encuesta web.</dd>
+    <dt>Widget</dt><dd>Mini-encuesta que se incrusta en la web de un tercero con una línea de código.</dd>
+    <dt>RLS</dt><dd>Seguridad por fila de la base de datos: la regla que impide ver datos ajenos.</dd>
+  </dl>
+</section>
+
+<!-- 15 -->
+<section id="instalar">
+  <span class="sec-num">15</span>
+  <h2>Para quien instala (técnico)</h2>
+  <p class="sub">Si solo usás la app podés saltear esta parte.</p>
+  <p><b>Stack:</b> Next.js 16 · TypeScript · Tailwind v4 · Supabase (Postgres, Auth, RLS) · Recharts · Gemini · zod.</p>
+
+  <h4>1 · Arrancar en local</h4>
+  <pre><code>npm install
+cp .env.example .env.local   # completar variables
+npm run dev                  # http://localhost:3000</code></pre>
+
+  <h4>2 · Migraciones en Supabase (SQL Editor, en orden)</h4>
+  <ol>
+    <li><code>…0001_schema</code> — tablas, tipos y triggers</li>
+    <li><code>…0002_rls</code> — políticas de acceso</li>
+    <li><code>…0003_logica_cuestionario</code> — saltos y filtros</li>
+    <li><code>…0004_canal_web</code> — encuestas web y widget</li>
+    <li><code>…0005_encuestadores_central</code> — equipo de campo solo para admin</li>
+    <li><code>…0006_humor_en_redes</code> — escucha social</li>
+    <li><code>…0007_facturacion</code>, <code>…0008_proyectos_estructura</code>, <code>…0009_banco_dirigentes</code></li>
+    <li><code>…0010_ai_layer</code> — registro de llamadas de IA</li>
+    <li><code>…0011_social_sources</code> — fuentes e historial de importación de redes</li>
+  </ol>
+  <div class="callout danger"><span class="ci">🚫</span><p><code>supabase/seed.sql</code> trae usuarios de ejemplo con contraseña conocida. <b>Nunca</b> lo corras en producción.</p></div>
+
+  <h4>3 · Variables de entorno</h4>
+  <div class="tblwrap"><table class="tbl">
+    <tr><th>Variable</th><th>Para qué</th></tr>
+    <tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code> / <code>…ANON_KEY</code></td><td>Conexión pública a Supabase</td></tr>
+    <tr><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>Solo servidor. Altas de usuarios y canal web. <b>Nunca</b> con prefijo NEXT_PUBLIC</td></tr>
+    <tr><td><code>GEMINI_API_KEY</code>, <code>GEMINI_MODEL</code>, <code>GEMINI_FALLBACK_MODEL</code></td><td>IA de informes, consultas y clasificación (pro + respaldo flash)</td></tr>
+    <tr><td><code>TYPESAFE_API_KEY</code>, <code>TYPESAFE_MODEL</code></td><td>Opcional: clasificador JEV para el radar</td></tr>
+    <tr><td><code>NEXT_PUBLIC_DEMO_MODE</code></td><td><code>false</code> = datos reales (producción); <code>true</code> = datos simulados</td></tr>
+    <tr><td><code>NEXT_PUBLIC_SITE_URL</code></td><td>URL pública (para links y widget)</td></tr>
+    <tr><td><code>NEXT_PUBLIC_TIME_ZONE</code></td><td>Por defecto Buenos Aires; agrupa series por día</td></tr>
+  </table></div>
+  <p>En producción las claves de IA se guardan como <b>secretos de la Edge Function <code>ai</code></b> de Supabase; las variables locales son solo respaldo para desarrollo.</p>
+
+  <h4>Qué todavía no está</h4>
+  <ul>
+    <li>Recuperación de contraseña e invitaciones por correo.</li>
+    <li>Ponderación muestral y cuotas por variable (hoy son por encuestador).</li>
+    <li>Modo offline completo en campo (el borrador sobrevive, el envío necesita señal).</li>
+    <li>Límite de frecuencia del canal web compartido entre instancias.</li>
+    <li>Conectores directos a APIs de redes (hoy: CSV, texto pegado o RSS).</li>
+  </ul>
+</section>
+
+</main>
+</div>
+
+<footer>Manual de Consulta · plataforma de encuestas para gobiernos e instituciones</footer>
+
+<script>
+(function(){
+  var root=document.documentElement, btn=document.getElementById('theme');
+  function dark(){return root.dataset.theme==='dark'||(!root.dataset.theme&&matchMedia('(prefers-color-scheme: dark)').matches)}
+  function label(){btn.textContent=dark()?'☀️ Modo claro':'🌙 Modo oscuro'}
+  try{var s=localStorage.getItem('manual-theme');if(s)root.dataset.theme=s}catch(e){}
+  label();
+  btn.onclick=function(){var n=dark()?'light':'dark';root.dataset.theme=n;try{localStorage.setItem('manual-theme',n)}catch(e){};label()};
+
+  var toc=document.getElementById('toc');
+  document.getElementById('menu').onclick=function(){toc.classList.toggle('open')};
+  toc.addEventListener('click',function(e){if(e.target.tagName==='A')toc.classList.remove('open')});
+
+  var links=[].slice.call(toc.querySelectorAll('a')), secs=links.map(function(a){return document.querySelector(a.getAttribute('href'))});
+  var bar=document.getElementById('progress');
+  function onScroll(){
+    var h=document.documentElement; bar.style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+    var cur=0; secs.forEach(function(s,i){if(s&&s.getBoundingClientRect().top<140)cur=i});
+    links.forEach(function(a,i){a.classList.toggle('on',i===cur)});
+  }
+  addEventListener('scroll',onScroll,{passive:true}); onScroll();
+
+  function openAll(){document.querySelectorAll('details').forEach(function(d){d.open=true})}
+  addEventListener('beforeprint',openAll);
+  if(location.search.indexOf('print')>-1)openAll();
+
+  var tabs=document.getElementById('webtabs');
+  tabs.addEventListener('click',function(e){
+    var b=e.target.closest('button'); if(!b)return;
+    [].forEach.call(tabs.children,function(x){x.classList.toggle('on',x===b)});
+    document.querySelectorAll('#web .tabpane').forEach(function(p){p.classList.toggle('on',p.id===b.dataset.t)});
+  });
+})();
+</script>
+</body>
+</html>

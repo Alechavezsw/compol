@@ -1,14 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, BarChart3 } from "lucide-react";
-import { PrintButton } from "./print-button";
-import { Card, CardContent } from "@/components/ui/card";
+import { DownloadPdfButton } from "./download-pdf";
+import { ReportDocument } from "./report-document";
 import { ButtonLink } from "@/components/ui/button";
-import { Badge, ReportStatusBadge } from "@/components/ui/badge";
-import { Markdown } from "@/components/markdown";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
-import { formatDateTime } from "@/lib/utils";
+import { computeAnalytics, loadSurveyData } from "@/lib/analytics";
+import { formatDate } from "@/lib/utils";
+import { pickReportCharts } from "@/lib/reports/visual";
 import { REPORT_KIND_LABEL, type AiReport } from "@/lib/types";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -25,16 +25,33 @@ export default async function InformePage({ params }: { params: Promise<{ id: st
 
   const { data } = await supabase
     .from("ai_reports")
-    .select("*, surveys(id, title)")
+    .select("*, surveys(id, title, geography)")
     .eq("id", id)
     .eq("organization_id", organization.id)
     .maybeSingle();
 
   if (!data) notFound();
-  const report = data as AiReport & { surveys: { id: string; title: string } | null };
+  const report = data as AiReport & { surveys: { id: string; title: string; geography: string | null } | null };
+
+  let charts = [] as ReturnType<typeof pickReportCharts>;
+  let completed = 0;
+  let geography = report.surveys?.geography ?? null;
+
+  if (report.surveys && report.status === "listo") {
+    const surveyData = await loadSurveyData(supabase, report.surveys.id);
+    if (surveyData) {
+      const analytics = computeAnalytics(surveyData);
+      charts = pickReportCharts(analytics);
+      completed = analytics.totals.completed;
+      geography = analytics.survey.geography;
+    }
+  }
+
+  const kindLabel = REPORT_KIND_LABEL[report.kind];
+  const dateLabel = formatDate(report.created_at);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-[880px] space-y-6">
       <div className="print-hidden flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/cliente/informes"
@@ -54,55 +71,48 @@ export default async function InformePage({ params }: { params: Promise<{ id: st
               Ver los datos
             </ButtonLink>
           ) : null}
-          {report.status === "listo" ? <PrintButton /> : null}
+          {report.status === "listo" ? (
+            <DownloadPdfButton
+              payload={{
+                title: report.title,
+                kindLabel,
+                organizationName: organization.name,
+                dateLabel,
+                audience: report.audience,
+                geography,
+                completed,
+                highlights: report.highlights ?? [],
+                charts,
+                markdown: report.content ?? "",
+              }}
+            />
+          ) : null}
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <ReportStatusBadge status={report.status} />
-        <Badge tone="accent">{REPORT_KIND_LABEL[report.kind]}</Badge>
-        {report.model ? <Badge tone="neutral">{report.model}</Badge> : null}
-        <span className="text-xs text-[var(--muted)]">{formatDateTime(report.created_at)}</span>
-      </div>
-
-      {report.highlights?.length ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {report.highlights.map((h, i) => (
-            <Card key={i} className="border-l-2 border-l-[var(--primary)]">
-              <CardContent className="p-4">
-                {h.metrica ? (
-                  <p className="text-lg font-semibold tabular-nums text-[var(--primary)]">
-                    {h.metrica}
-                  </p>
-                ) : null}
-                <p className="mt-1 text-sm font-medium text-[var(--foreground)]">{h.titulo}</p>
-                <p className="mt-1.5 text-sm leading-relaxed text-[var(--muted)]">{h.detalle}</p>
-              </CardContent>
-            </Card>
-          ))}
+      {report.status === "error" ? (
+        <div className="rounded-xl bg-[var(--danger-soft)] p-4 text-sm text-[var(--danger)]">
+          <p className="font-semibold">No se pudo generar el informe.</p>
+          <p className="mt-1">{report.error_message ?? "Error desconocido."}</p>
         </div>
-      ) : null}
-
-      <Card>
-        <CardContent className="p-6 sm:p-9">
-          {report.status === "error" ? (
-            <div className="rounded-xl bg-[var(--danger-soft)] p-4 text-sm text-[var(--danger)]">
-              <p className="font-semibold">No se pudo generar el informe.</p>
-              <p className="mt-1">{report.error_message ?? "Error desconocido."}</p>
-            </div>
-          ) : report.status === "generando" ? (
-            <p className="py-10 text-center text-sm text-[var(--muted)]">
-              El informe se está generando. Recargá la página en unos segundos.
-            </p>
-          ) : (
-            <Markdown>{report.content ?? ""}</Markdown>
-          )}
-        </CardContent>
-      </Card>
-
-      <p className="print-hidden pb-4 text-center text-xs text-[var(--muted)]">
-        «Imprimir / PDF» genera un documento limpio, sin menús ni fondos, listo para enviar.
-      </p>
+      ) : report.status === "generando" ? (
+        <p className="py-16 text-center text-sm text-[var(--muted)]">
+          El informe se está generando. Recargá la página en unos segundos.
+        </p>
+      ) : (
+        <ReportDocument
+          title={report.title}
+          kindLabel={kindLabel}
+          organizationName={organization.name}
+          createdAt={report.created_at}
+          audience={report.audience}
+          geography={geography}
+          completed={completed}
+          highlights={report.highlights ?? []}
+          charts={charts}
+          markdown={report.content ?? ""}
+        />
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
@@ -27,7 +28,7 @@ export function homePathFor(role: UserRole) {
   }
 }
 
-export async function getSessionProfile(): Promise<SessionProfile | null> {
+export const getSessionProfile = cache(async function getSessionProfile(): Promise<SessionProfile | null> {
   if (isDemoMode()) {
     const profile = await getDemoProfile();
     if (!profile) return null;
@@ -58,26 +59,21 @@ export async function getSessionProfile(): Promise<SessionProfile | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile } = await supabase
+  const { data } = await supabase
     .from("profiles")
-    .select("*")
+    .select("*, organizations(*)")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile) return null;
+  if (!data) return null;
 
-  let organization: Organization | null = null;
-  if (profile.organization_id) {
-    const { data } = await supabase
-      .from("organizations")
-      .select("*")
-      .eq("id", profile.organization_id)
-      .maybeSingle();
-    organization = data ?? null;
-  }
+  const { organizations, ...profile } = data as Profile & {
+    organizations: Organization | Organization[] | null;
+  };
+  const organization = Array.isArray(organizations) ? organizations[0] ?? null : organizations;
 
   return { user, profile, organization };
-}
+});
 
 /** Exige sesion valida; si no hay, manda al login. */
 export async function requireProfile(): Promise<SessionProfile> {

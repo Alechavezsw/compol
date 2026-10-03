@@ -250,7 +250,7 @@ export function formatDayKey(key: string) {
 // --- Valencia de opciones -------------------------------------------------
 
 const POSITIVE = /^(muy bueno|muy buena|bueno|buena|excelente|positiv|muy de acuerdo|de acuerdo|muy satisfech|satisfech|mejor|aprueb|muy probable|probable|s[ií]$)/i;
-const NEGATIVE = /^(muy malo|muy mala|malo|mala|p[eé]sim|negativ|muy en desacuerdo|en desacuerdo|muy insatisfech|insatisfech|peor|desaprueb|nada probable|poco probable|no$)/i;
+const NEGATIVE = /^(muy malo|muy mala|mal[ií]simo|malo|mala|p[eé]sim|negativ|muy en desacuerdo|en desacuerdo|muy insatisfech|insatisfech|peor|desaprueb|nada probable|poco probable|no$)/i;
 
 /**
  * Detecta si una opción es positiva o negativa para calcular un saldo neto

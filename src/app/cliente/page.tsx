@@ -12,7 +12,7 @@ import {
   Target,
   Timer,
 } from "lucide-react";
-import { EmptyState, PageHeader, Progress } from "@/components/ui/misc";
+import { EmptyState, Progress } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import { ButtonLink } from "@/components/ui/button";
@@ -20,12 +20,10 @@ import { Badge, SurveyStatusBadge } from "@/components/ui/badge";
 import { FieldTrend } from "@/components/charts/charts";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
-import { computeAnalytics, loadSurveyData, type SurveyAnalytics } from "@/lib/analytics";
-import { fetchAll } from "@/lib/supabase/fetch-all";
-import { computeSocial, moodLabel } from "@/lib/social/analytics";
-import { addDays, dayKey, formatDayKey, todayKey } from "@/lib/stats";
+import { loadDashboard } from "@/lib/dashboard";
+import { moodLabel } from "@/lib/social/analytics";
+import { formatDayKey, todayKey } from "@/lib/stats";
 import { cn, formatDate, formatNumber, formatPercent } from "@/lib/utils";
-import type { SocialPost, Survey } from "@/lib/types";
 
 type Attention = { tone: "danger" | "warning" | "primary"; icon: React.ReactNode; title: string; detail: string; href: string };
 
@@ -33,110 +31,70 @@ export default async function ClienteDashboard() {
   const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
   const supabase = await createClient();
   const today = todayKey();
+  const firstName = profile.full_name.split(" ")[0] || "equipo";
 
-  const [{ data: surveyRows }, completedRows, { data: reportRows }, socialPosts] = await Promise.all([
-    supabase.from("surveys").select("*").eq("organization_id", organization.id).order("updated_at", { ascending: false }),
-    fetchAll<{ survey_id: string; submitted_at: string | null }>((from, to) =>
-      supabase
-        .from("responses")
-        .select("survey_id, submitted_at")
-        .eq("organization_id", organization.id)
-        .eq("status", "completada")
-        .order("id")
-        .range(from, to),
-    ),
-    supabase
-      .from("ai_reports")
-      .select("id, title, created_at, survey_id, kind")
-      .eq("organization_id", organization.id)
-      .order("created_at", { ascending: false })
-      .limit(4),
-    fetchAll<SocialPost>((from, to) =>
-      supabase
-        .from("social_posts")
-        .select("*")
-        .eq("organization_id", organization.id)
-        .gte("published_at", new Date(`${addDays(today, -14)}T00:00:00-03:00`).toISOString())
-        .order("id")
-        .range(from, to),
-    ),
-  ]);
-
-  const surveys = (surveyRows ?? []) as Survey[];
-  const active = surveys.filter((s) => s.status === "activa");
-
-  const countBySurvey = new Map<string, number>();
-  for (const r of completedRows) countBySurvey.set(r.survey_id, (countBySurvey.get(r.survey_id) ?? 0) + 1);
-
-  // Analítica completa solo de lo que está en campo: es lo que puede requerir acción hoy.
-  const activeAnalytics = (
-    await Promise.all(active.map(async (s) => {
-      const data = await loadSurveyData(supabase, s.id);
-      return data ? computeAnalytics(data) : null;
-    }))
-  ).filter((a): a is SurveyAnalytics => Boolean(a));
-  const paceBySurvey = new Map(activeAnalytics.map((a) => [a.survey.id, a]));
+  const {
+    surveys,
+    active,
+    completed,
+    countBySurvey,
+    days,
+    paceBySurvey,
+    expressBySurvey,
+    staleBySurvey,
+    reports,
+    social,
+  } = await loadDashboard(supabase, organization.id, today);
 
   const totalTarget = active.reduce((sum, s) => sum + s.target_responses, 0);
   const activeDone = active.reduce((sum, s) => sum + (countBySurvey.get(s.id) ?? 0), 0);
-  const social = socialPosts.length ? computeSocial(socialPosts, { days: 7 }, today) : null;
+  const todayCount = days.at(-1)?.value ?? 0;
+  const last14 = days.reduce((s, d) => s + d.value, 0);
+  const socialLabel = social.total ? moodLabel(social.mood) : null;
 
-  // --- Serie de 14 días en hora argentina -------------------------------------
-  const byDay = new Map<string, number>();
-  for (const r of completedRows) {
-    if (!r.submitted_at) continue;
-    const key = dayKey(r.submitted_at);
-    byDay.set(key, (byDay.get(key) ?? 0) + 1);
-  }
-  const days = Array.from({ length: 14 }, (_, i) => addDays(today, i - 13)).reduce<
-    { key: string; name: string; value: number; cumulative: number }[]
-  >((acc, key) => {
-    const value = byDay.get(key) ?? 0;
-    return [...acc, { key, name: formatDayKey(key), value, cumulative: (acc.at(-1)?.cumulative ?? 0) + value }];
-  }, []);
-
-  // --- Qué requiere atención --------------------------------------------------
   const attention: Attention[] = [];
-  for (const a of activeAnalytics) {
-    const href = `/cliente/encuestas/${a.survey.id}/resultados`;
-    if (a.pace.status === "atrasada" && a.pace.requiredPerDay) {
+  for (const s of active) {
+    const href = `/cliente/encuestas/${s.id}/resultados`;
+    const pace = paceBySurvey.get(s.id);
+    if (pace?.status === "atrasada" && pace.requiredPerDay) {
       attention.push({
         tone: "danger",
         icon: <CalendarClock className="size-4" />,
-        title: `«${a.survey.title}» viene atrasada`,
-        detail: `Hacen falta ${Math.ceil(a.pace.requiredPerDay)} casos por día; el ritmo actual es ${a.pace.perDayLast7.toFixed(1).replace(".", ",")}.`,
+        title: `«${s.title}» viene atrasada`,
+        detail: `Hacen falta ${Math.ceil(pace.requiredPerDay)} casos por día; el ritmo actual es ${pace.perDayLast7.toFixed(1).replace(".", ",")}.`,
         href,
       });
-    } else if (a.pace.status === "sin_ritmo") {
+    } else if (pace?.status === "sin_ritmo") {
       attention.push({
         tone: "warning",
         icon: <CalendarClock className="size-4" />,
-        title: `«${a.survey.title}» sin cargas en 7 días`,
+        title: `«${s.title}» sin cargas en 7 días`,
         detail: "El operativo está en campo pero no entra ningún caso.",
         href,
       });
     }
-    if (a.quality.expressCount) {
+    const express = expressBySurvey.get(s.id) ?? 0;
+    if (express) {
       attention.push({
         tone: "warning",
         icon: <Timer className="size-4" />,
-        title: `${a.quality.expressCount} entrevistas exprés en «${a.survey.title}»`,
+        title: `${express} entrevistas exprés en «${s.title}»`,
         detail: "Duraron menos del 40% de la mediana. Conviene auditarlas antes del cierre.",
         href: `${href}#equipo`,
       });
     }
-    const stale = a.bySurveyor.filter((s) => s.daysSinceLast !== null && s.daysSinceLast >= 2);
+    const stale = staleBySurvey.get(s.id) ?? [];
     if (stale.length) {
       attention.push({
         tone: "primary",
         icon: <AlertTriangle className="size-4" />,
-        title: `${stale.map((s) => s.name).join(", ")} sin cargar hace ${Math.min(...stale.map((s) => s.daysSinceLast ?? 0))}+ días`,
+        title: `${stale.map((x) => x.name).join(", ")} sin cargar hace ${Math.min(...stale.map((x) => x.daysSinceLast ?? 0))}+ días`,
         detail: "El equipo de campo lo gestiona la administración central: avisale para reasignar o reforzar.",
         href: `${href}#equipo`,
       });
     }
   }
-  for (const al of social?.alerts.filter((x) => x.kind !== "tema_emergente").slice(0, 2) ?? []) {
+  for (const al of social.alerts.slice(0, 2)) {
     attention.push({
       tone: "danger",
       icon: <Radar className="size-4" />,
@@ -146,16 +104,42 @@ export default async function ClienteDashboard() {
     });
   }
 
-  const socialLabel = social ? moodLabel(social.mood) : null;
-
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow={<span className="text-sm font-medium text-[var(--muted)]">Hola, {profile.full_name.split(" ")[0] || "equipo"}</span>}
-        title={organization.name}
-        description="Estado de tus relevamientos, el humor en redes y lo que necesita atención hoy."
-        actions={profile.role === "org_admin" ? <ButtonLink href="/cliente/encuestas/nueva">Nueva encuesta</ButtonLink> : null}
-      />
+      <section className="relative overflow-hidden rounded-[28px] bg-[#0b1020] px-6 py-7 text-slate-100 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.55)] sm:px-8 sm:py-8">
+        <div className="pointer-events-none absolute -left-16 -top-20 size-64 rounded-full bg-violet-500/25 blur-3xl" />
+        <div className="pointer-events-none absolute -right-10 bottom-0 size-56 rounded-full bg-teal-400/20 blur-3xl" />
+        <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(148,163,184,0.35)_1px,transparent_1px)] [background-size:22px_22px]" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[12px] font-semibold tracking-[0.18em] text-cyan-200/80 uppercase">Hola, {firstName}</p>
+            <h1 className="display mt-2 text-[34px] leading-none text-white sm:text-[42px]">{organization.name}</h1>
+            <p className="mt-3 max-w-xl text-sm text-slate-400">
+              Estado de tus relevamientos, el humor en redes y lo que necesita atención hoy.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-slate-200">
+                <span className="size-1.5 animate-pulse rounded-full bg-emerald-300" />
+                {formatNumber(todayCount)} casos hoy
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-slate-200">
+                {formatNumber(active.length)} en campo
+              </span>
+              <Link
+                href="/cliente/redes"
+                className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1.5 text-[12px] text-cyan-100 hover:bg-cyan-400/15"
+              >
+                Radar {social.total ? `${social.mood > 0 ? "+" : ""}${Math.round(social.mood)}` : "en espera"}
+              </Link>
+            </div>
+          </div>
+          {profile.role === "org_admin" ? (
+            <ButtonLink href="/cliente/encuestas/nueva" className="h-12 bg-cyan-300 text-slate-950 hover:bg-cyan-200">
+              Nueva encuesta
+            </ButtonLink>
+          ) : null}
+        </div>
+      </section>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -167,9 +151,9 @@ export default async function ClienteDashboard() {
         />
         <StatCard
           label="Casos completados"
-          value={formatNumber(completedRows.length)}
+          value={formatNumber(completed.length)}
           icon={<ClipboardList className="size-4" />}
-          hint={`${formatNumber(days.at(-1)?.value ?? 0)} hoy · ${formatNumber(days.reduce((s, d) => s + d.value, 0))} en 14 días`}
+          hint={`${formatNumber(todayCount)} hoy · ${formatNumber(last14)} en 14 días`}
         />
         <StatCard
           label="Avance de lo que está en campo"
@@ -181,10 +165,10 @@ export default async function ClienteDashboard() {
         <Link href="/cliente/redes" className="block transition-transform hover:-translate-y-0.5">
           <StatCard
             label="Radar de conversación (7 días)"
-            value={social ? `${social.mood > 0 ? "+" : ""}${Math.round(social.mood)}` : "—"}
+            value={social.total ? `${social.mood > 0 ? "+" : ""}${Math.round(social.mood)}` : "—"}
             icon={<Radar className="size-4" />}
             tone={socialLabel?.tone === "success" ? "success" : "warning"}
-            hint={social && socialLabel ? `${socialLabel.text} · ${formatNumber(social.total)} publicaciones` : "Sin publicaciones importadas"}
+            hint={social.total && socialLabel ? `${socialLabel.text} · ${formatNumber(social.total)} publicaciones` : "Sin publicaciones importadas"}
             className="h-full"
           />
         </Link>
@@ -268,7 +252,7 @@ export default async function ClienteDashboard() {
               <div className="grid gap-3 md:grid-cols-2">
                 {surveys.slice(0, 6).map((s) => {
                   const done = countBySurvey.get(s.id) ?? 0;
-                  const a = paceBySurvey.get(s.id);
+                  const pace = paceBySurvey.get(s.id);
                   return (
                     <Link
                       key={s.id}
@@ -284,14 +268,14 @@ export default async function ClienteDashboard() {
                         {s.geography ?? "Sin ámbito"} · cierre {formatDate(s.ends_at)}
                       </p>
                       <div className="mt-4 flex items-center gap-3">
-                        <Progress value={done} max={s.target_responses} className="flex-1" tone={a?.pace.status === "atrasada" ? "accent" : "primary"} />
+                        <Progress value={done} max={s.target_responses} className="flex-1" tone={pace?.status === "atrasada" ? "accent" : "primary"} />
                         <span className="shrink-0 text-xs tabular-nums text-[var(--muted)]">
                           {formatNumber(done)}/{formatNumber(s.target_responses)}
                         </span>
                       </div>
-                      {a?.pace.eta && a.pace.status !== "cumplida" ? (
-                        <p className={cn("mt-2 text-[11px] font-medium", a.pace.status === "atrasada" ? "text-[var(--danger)]" : "text-[var(--success)]")}>
-                          {a.pace.status === "atrasada" ? "Atrasada" : "En ritmo"} · meta estimada el {formatDayKey(a.pace.eta)}
+                      {pace?.eta && pace.status !== "cumplida" ? (
+                        <p className={cn("mt-2 text-[11px] font-medium", pace.status === "atrasada" ? "text-[var(--danger)]" : "text-[var(--success)]")}>
+                          {pace.status === "atrasada" ? "Atrasada" : "En ritmo"} · meta estimada el {formatDayKey(pace.eta)}
                         </p>
                       ) : null}
                     </Link>
@@ -310,7 +294,7 @@ export default async function ClienteDashboard() {
             </Link>
           </CardHeader>
           <CardContent className="space-y-2 pt-4">
-            {(reportRows ?? []).length === 0 ? (
+            {reports.length === 0 ? (
               <div className="py-6 text-center">
                 <Sparkles className="mx-auto size-5 text-[var(--muted)]" />
                 <p className="mt-2 text-sm text-[var(--muted)]">Todavía no generaste informes con IA.</p>
@@ -319,7 +303,7 @@ export default async function ClienteDashboard() {
                 </ButtonLink>
               </div>
             ) : (
-              (reportRows ?? []).map((r) => (
+              reports.map((r) => (
                 <Link key={r.id} href={`/cliente/informes/${r.id}`} className="block rounded-xl border border-[var(--border)] p-3 transition-colors hover:bg-[var(--surface-2)]">
                   <p className="line-clamp-2 text-sm font-medium text-[var(--foreground)]">{r.title}</p>
                   <p className="mt-1 text-xs text-[var(--muted)]">{formatDate(r.created_at)}</p>

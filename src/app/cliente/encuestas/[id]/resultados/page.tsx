@@ -29,6 +29,7 @@ import { CrosstabTable } from "@/components/results/crosstab-table";
 import { CrosstabPicker, FilterBar } from "@/components/results/controls";
 import { AskBox } from "@/components/results/ask-box";
 import { FieldMap } from "@/components/results/field-map";
+import { caseForAnswers, pickEvaluationQuestion } from "@/lib/case-tone";
 import { LiveRefresh } from "@/components/results/live-refresh";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
@@ -128,19 +129,25 @@ export default async function ResultadosPage({
 
   const paceInfo = PACE[pace.status];
 
+  const evaluation = pickEvaluationQuestion(data.questions);
   const geoPoints = applyFilters(data, data.responses, filters)
     .filter(
       (r): r is typeof r & { latitude: number; longitude: number } =>
         r.status === "completada" && r.latitude !== null && r.longitude !== null,
     )
-    .map((r) => ({
-      id: r.id,
-      lat: r.latitude,
-      lng: r.longitude,
-      zone: r.zone,
-      channel: (r.channel ?? "campo") as "campo" | "web",
-      submittedAt: r.submitted_at,
-    }));
+    .map((r) => {
+      const tone = caseForAnswers(evaluation, data.values.get(r.id));
+      return {
+        id: r.id,
+        lat: r.latitude,
+        lng: r.longitude,
+        zone: r.zone,
+        channel: (r.channel ?? "campo") as "campo" | "web",
+        submittedAt: r.submitted_at,
+        tone: tone.tone,
+        toneLabel: tone.label,
+      };
+    });
 
   return (
     <div className="space-y-6">
@@ -371,8 +378,8 @@ export default async function ResultadosPage({
               <CardContent className="pt-4">
                 <FieldMap points={geoPoints} />
                 <p className="mt-3 text-xs text-[var(--muted)]">
-                  Ubicación aproximada por zona, no la dirección exacta de cada entrevista. Los
-                  puntos se marcan en el orden en que se cargaron los casos.
+                  Cada punto es un caso. El color es la evaluación de la gestión: muy buena, buena,
+                  regular, mala o muy mala. La ubicación es aproximada por zona.
                 </p>
               </CardContent>
             </Card>

@@ -780,7 +780,7 @@ export async function generateReportAction(_prev: ActionState, formData: FormDat
   if (!isGeminiConfigured() && !useLocalWriter) {
     return {
       error:
-        "Falta GEMINI_API_KEY en .env.local. Generá una clave en aistudio.google.com/apikey para habilitar los informes.",
+        "Falta GEMINI_API_KEY en los secretos de Supabase (función ai). Cargala en Project Settings → Edge Functions.",
     };
   }
 
@@ -850,6 +850,7 @@ export async function generateReportAction(_prev: ActionState, formData: FormDat
           kind,
           audience,
           focus,
+          organizationId: organization.id,
         });
 
     await supabase
@@ -905,7 +906,12 @@ export async function askSurveyAction(payload: {
   }
 
   try {
-    const { answer, model } = await askAboutSurvey({ analytics, findings, question });
+    const { answer, model } = await askAboutSurvey({
+      analytics,
+      findings,
+      question,
+      organizationId: organization.id,
+    });
     return { ok: true, answer, source: model };
   } catch (e) {
     // Si el modelo falla, la lectura local sigue siendo mejor que un error seco.

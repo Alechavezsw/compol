@@ -63,7 +63,7 @@ export default async function InformesPage({
     <div className="space-y-7">
       <PageHeader
         title="Informes con IA"
-        description="Gemini redacta el documento sobre los agregados reales del relevamiento: porcentajes, bases muestrales y textuales."
+        description="Un documento con lectura, gráficos y fotos del territorio, listo para descargar en PDF."
       />
 
       <div className="grid gap-4 xl:grid-cols-5">
@@ -103,7 +103,6 @@ export default async function InformesPage({
                     <div className="mb-2 flex flex-wrap items-center gap-2">
                       <ReportStatusBadge status={r.status} />
                       <Badge tone="accent">{REPORT_KIND_LABEL[r.kind]}</Badge>
-                      {r.model ? <Badge tone="neutral">{r.model}</Badge> : null}
                     </div>
                     <Link
                       href={`/cliente/informes/${r.id}`}

@@ -1,7 +1,10 @@
 import "server-only";
 import { createHash } from "node:crypto";
-import { classifySocialBatch, isGeminiConfigured } from "@/lib/ai/gemini";
-import { classifySocialBatchTypesafe, isTypesafeConfigured } from "@/lib/ai/typesafe";
+import { classifySocialBatch, hasLocalGeminiKey } from "@/lib/ai/gemini";
+import { classifySocialBatchTypesafe, hasLocalTypesafeKey } from "@/lib/ai/typesafe";
+import { classifyViaGateway, isAiGatewayConfigured } from "@/lib/ai/gateway";
+import { cleanHeadline } from "@/lib/social/headline";
+import { fetchMetaOEmbed, isMetaUrl } from "@/lib/social/meta";
 import { DEFAULT_TOPICS, classifyText } from "@/lib/social/lexicon";
 import type { Emotion, SentimentLabel, SocialNetwork, SocialPost, SocialTracker } from "@/lib/types";
 
@@ -139,13 +142,15 @@ function anonymizeAuthor(raw: string | undefined) {
 const decode = (s: string) =>
   s
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1")
-    .replace(/<[^>]+>/g, " ")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
     .replace(/&#39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
     .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/<[^>]+>/g, " ")
+    .replace(/https?:\/\/\S+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 
@@ -172,10 +177,9 @@ export async function fetchRss(url: string): Promise<RawPost[]> {
     const pick = (tag: string) => decode(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i").exec(item)?.[1] ?? "");
     const link = pick("link") || /<link[^>]*href="([^"]+)"/i.exec(item)?.[1] || null;
     const title = pick("title");
-    const summary = pick("description") || pick("summary") || pick("content");
     return {
       network: "noticias" as const,
-      text: [title, summary].filter(Boolean).join(". ").slice(0, 1200),
+      text: cleanHeadline(title),
       published_at: parseDate(pick("pubDate") || pick("published") || pick("updated")),
       author: decode(pick("source") || host),
       url: link ? safeUrl(link) : null,
@@ -188,7 +192,126 @@ export function externalId(p: RawPost) {
   return p.external_id ?? p.url ?? createHash("sha256").update(`${p.network}|${p.published_at.slice(0, 16)}|${p.text}`).digest("hex").slice(0, 32);
 }
 
+export function googleNewsRssUrl(query: string) {
+  const q = query.trim() || "San Juan";
+  return `https://news.google.com/rss/search?q=${encodeURIComponent(q)}&hl=es-419&gl=AR&ceid=AR:es-419`;
+}
+
+export function extractUrl(text: string) {
+  const match = /https?:\/\/[^\s<>"']+/i.exec(text.trim());
+  return match ? safeUrl(match[0].replace(/[),.]+$/, "")) : null;
+}
+
+export function networkFromHost(url: string): SocialNetwork {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, "");
+    if (/instagram/.test(host)) return "instagram";
+    if (/facebook|fb\.com/.test(host)) return "facebook";
+    if (/(^|\.)x\.com|twitter/.test(host)) return "x";
+    if (/tiktok/.test(host)) return "tiktok";
+    if (/youtube|youtu\.be/.test(host)) return "youtube";
+    return "noticias";
+  } catch {
+    return "otros";
+  }
+}
+
+/** Título y bajada públicos de una URL (og:tags). Sirve para links pegados. */
+export async function fetchPageMeta(url: string) {
+  const target = safeUrl(url);
+  if (!target) return null;
+  const host = new URL(target).hostname;
+  if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host)) return null;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 7000);
+  try {
+    const res = await fetch(target, {
+      signal: controller.signal,
+      headers: { "User-Agent": "ConsultaBot/1.0 (+escucha social)", Accept: "text/html" },
+      redirect: "follow",
+    });
+    if (!res.ok) return null;
+    const html = (await res.text()).slice(0, 350_000);
+    const attr = (prop: string) => {
+      const a = new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']+)["']`, "i").exec(html);
+      const b = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`, "i").exec(html);
+      return decode(a?.[1] ?? b?.[1] ?? "");
+    };
+    const title = attr("og:title") || decode(/<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1] ?? "");
+    const description = attr("og:description") || attr("description");
+    const site = attr("og:site_name") || host.replace(/^www\./, "");
+    if (!title || title.length < 4) return null;
+    return { title: title.slice(0, 240), description: description.slice(0, 420), site: site.slice(0, 80) };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Si el texto es un link, intenta leer el título público y guardarlo como publicación. */
+export async function enrichRawPosts(posts: RawPost[]): Promise<RawPost[]> {
+  return Promise.all(
+    posts.map(async (p) => {
+      const url = p.url ?? extractUrl(p.text);
+      if (!url) return p;
+      const looksLikeUrl = /^https?:\/\//i.test(p.text.trim()) || Boolean(p.url);
+      if (!looksLikeUrl) return { ...p, url: p.url ?? url };
+      const network = networkFromHost(url);
+      if (isMetaUrl(url)) {
+        const oembed = await fetchMetaOEmbed(url);
+        if (oembed) {
+          return {
+            ...p,
+            url,
+            text: oembed.title.slice(0, 1200),
+            author: p.author ?? oembed.author,
+            network,
+            external_id: p.external_id ?? url,
+          };
+        }
+        const onlyLink = /^https?:\/\/\S+$/i.test(p.text.trim());
+        if (onlyLink) return { ...p, url, network, text: "", external_id: p.external_id ?? url };
+      }
+      const meta = await fetchPageMeta(url);
+      if (!meta) return { ...p, url, network: p.network === "otros" ? network : p.network, external_id: p.external_id ?? url };
+      return {
+        ...p,
+        url,
+        text: [meta.title, meta.description].filter(Boolean).join(". ").slice(0, 1200),
+        author: p.author ?? meta.site,
+        network: p.network === "otros" || p.network === "facebook" ? networkFromHost(url) : p.network,
+        external_id: p.external_id ?? url,
+      };
+    }),
+  );
+}
+
 type ClassifiedPost = Omit<SocialPost, "id" | "organization_id" | "created_at">;
+
+export function classifyPostsLocal(
+  posts: RawPost[],
+  trackers: Pick<SocialTracker, "name" | "keywords" | "exclude">[],
+): ClassifiedPost[] {
+  return posts.map((p) => {
+    const local = classifyText(p.text, trackers);
+    return {
+      network: p.network,
+      external_id: externalId(p),
+      author: p.author ?? null,
+      url: p.url ?? null,
+      text: cleanHeadline(p.text),
+      published_at: p.published_at,
+      engagement: p.engagement ?? 0,
+      sentiment: local.sentiment,
+      label: local.label,
+      emotion: local.emotion,
+      topics: local.topics,
+      classified_by: "lexico",
+    };
+  });
+}
 
 /** Aplica una fila de un clasificador externo, uniendo temas con lo que ya tenía el léxico. */
 function applyExternalRow(
@@ -213,27 +336,26 @@ function applyExternalRow(
 export async function classifyPosts(
   posts: RawPost[],
   trackers: Pick<SocialTracker, "name" | "keywords" | "exclude">[],
+  organizationId?: string,
 ): Promise<ClassifiedPost[]> {
   const topicNames = [...new Set([...DEFAULT_TOPICS.map((t) => t.name), ...trackers.map((t) => t.name)])];
-  const out: ClassifiedPost[] = posts.map((p) => {
-    const local = classifyText(p.text, trackers);
-    return {
-      network: p.network,
-      external_id: externalId(p),
-      author: p.author ?? null,
-      url: p.url ?? null,
-      text: p.text,
-      published_at: p.published_at,
-      engagement: p.engagement ?? 0,
-      sentiment: local.sentiment,
-      label: local.label,
-      emotion: local.emotion,
-      topics: local.topics,
-      classified_by: "lexico",
-    };
-  });
+  const out = classifyPostsLocal(posts, trackers);
 
-  if (isTypesafeConfigured()) {
+  if (isAiGatewayConfigured()) {
+    try {
+      const rows = await classifyViaGateway(out.map((p) => p.text), topicNames, organizationId);
+      rows.forEach((r, i) => {
+        if (!r) return;
+        const source = r.provider === "gemini" ? "gemini" : "jev";
+        applyExternalRow(out[i], r, source);
+      });
+      return out;
+    } catch {
+      // Si la función Edge falla, caemos a las claves locales o al léxico.
+    }
+  }
+
+  if (hasLocalTypesafeKey()) {
     try {
       const rows = await classifySocialBatchTypesafe(out.map((p) => p.text), topicNames);
       rows.forEach((r, i) => {
@@ -244,7 +366,7 @@ export async function classifyPosts(
     }
   }
 
-  if (!isGeminiConfigured()) return out;
+  if (!hasLocalGeminiKey()) return out;
 
   // Solo lo que TypeSafe no pudo clasificar pasa por Gemini.
   const pending = out.map((p, i) => i).filter((i) => out[i].classified_by === "lexico");

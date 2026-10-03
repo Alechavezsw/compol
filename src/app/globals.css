@@ -277,6 +277,40 @@
   animation: marker-pop 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.field-map.leaflet-container {
+  background: #070b14;
+  font-family: inherit;
+}
+.field-map .leaflet-tile-pane {
+  filter: invert(0.92) hue-rotate(180deg) brightness(0.92) contrast(1.08) saturate(0.35);
+}
+.field-map .leaflet-control-zoom a {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(7, 11, 20, 0.92);
+  color: #e2e8f0;
+}
+.field-map .leaflet-control-zoom a:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.field-map .leaflet-control-attribution {
+  background: rgba(7, 11, 20, 0.7);
+  color: #94a3b8;
+}
+.field-map .leaflet-control-attribution a {
+  color: #cbd5e1;
+}
+.field-map-tip.leaflet-tooltip {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: #0b1220;
+  box-shadow: 0 12px 28px -16px rgba(0, 0, 0, 0.6);
+  color: #e2e8f0;
+  padding: 8px 10px;
+}
+.field-map-tip.leaflet-tooltip::before {
+  border-top-color: #0b1220;
+}
+
 .animate-rise {
   animation: rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -287,6 +321,97 @@
 
 .animate-pulse-soft {
   animation: pulse-soft 2.4s ease-in-out infinite;
+}
+
+@keyframes radar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes radar-ping {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(1.15);
+    opacity: 0;
+  }
+}
+
+@keyframes radar-blip {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(1.7);
+  }
+}
+
+.radar-spin {
+  animation: radar-spin 4s linear infinite;
+}
+
+.radar-spin-fast {
+  animation: radar-spin 1.15s linear infinite;
+}
+
+.radar-ping {
+  animation: radar-ping 2.4s ease-out infinite;
+}
+
+.radar-blip {
+  animation: radar-blip 1.8s ease-in-out infinite;
+}
+
+@keyframes radar-scanline {
+  0% {
+    transform: translateY(-20%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: translateY(380%);
+    opacity: 0;
+  }
+}
+
+@keyframes radar-headline-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.radar-scanline {
+  animation: radar-scanline 2.1s linear infinite;
+}
+
+.radar-headline-in {
+  animation: radar-headline-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes nav-progress {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
+.animate-nav-progress {
+  animation: nav-progress 1s ease-in-out infinite;
 }
 
 /* Impresión / PDF: solo el documento, sin la cáscara de la app ni fondos. */
@@ -317,13 +442,24 @@
   li {
     break-inside: avoid;
   }
+  #informe-documento {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-float,
   .animate-pulse-soft,
-  .field-map-marker-new {
+  .field-map-marker-new,
+  .radar-spin,
+  .radar-spin-fast,
+  .radar-ping,
+  .radar-blip,
+  .radar-scanline,
+  .radar-headline-in {
     animation: none;
   }
   * {

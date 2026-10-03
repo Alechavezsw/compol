@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
@@ -13,7 +14,7 @@ import { getDemoProfile } from "@/lib/demo/session";
  *
  * En modo demo devuelve el cliente en memoria, que respeta la misma firma.
  */
-export async function createClient() {
+export const createClient = cache(async function createClient() {
   if (isDemoMode()) {
     return createDemoClient(await getDemoProfile());
   }
@@ -40,7 +41,7 @@ export async function createClient() {
       },
     },
   );
-}
+});
 
 /**
  * Cliente con service role: ignora RLS. Solo para operaciones de la

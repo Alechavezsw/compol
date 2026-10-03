@@ -1,4 +1,5 @@
 import type { Emotion, SentimentLabel, SocialNetwork, SocialPost } from "@/lib/types";
+import { cleanHeadline } from "@/lib/social/headline";
 import { addDays, dayKey, formatDayKey, mean, stdDev } from "@/lib/stats";
 
 export type SocialFilters = {
@@ -249,6 +250,16 @@ export function computeSocial(all: SocialPost[], filters: SocialFilters, today: 
 
   const byImpact = (a: SocialPost, b: SocialPost) => b.engagement - a.engagement;
 
+  function uniqueHeadline(posts: SocialPost[]) {
+    const best = new Map<string, SocialPost>();
+    for (const p of posts) {
+      const key = cleanHeadline(p.text).toLowerCase();
+      const prev = best.get(key);
+      if (!prev || (!prev.url && p.url)) best.set(key, p);
+    }
+    return posts.filter((p) => best.get(cleanHeadline(p.text).toLowerCase())?.id === p.id);
+  }
+
   return {
     from,
     to: today,
@@ -263,9 +274,9 @@ export function computeSocial(all: SocialPost[], filters: SocialFilters, today: 
     topics,
     emotions,
     alerts: alerts.slice(0, 6),
-    topNegative: current.filter((p) => p.label === "negativo").sort(byImpact).slice(0, 6),
-    topPositive: current.filter((p) => p.label === "positivo").sort(byImpact).slice(0, 6),
-    recent: [...current].sort((a, b) => b.published_at.localeCompare(a.published_at)).slice(0, 12),
+    topNegative: uniqueHeadline(current.filter((p) => p.label === "negativo").sort(byImpact)).slice(0, 6),
+    topPositive: uniqueHeadline(current.filter((p) => p.label === "positivo").sort(byImpact)).slice(0, 6),
+    recent: uniqueHeadline([...current].sort((a, b) => b.published_at.localeCompare(a.published_at))).slice(0, 10),
     terms,
   };
 }

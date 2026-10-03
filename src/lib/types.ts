@@ -213,6 +213,18 @@ export type ReportHighlight = {
   metrica?: string | null;
 }
 
+export type AiCall = {
+  id: string;
+  organization_id: string | null;
+  action: "classify" | "report" | "ask" | "status";
+  provider: "gemini" | "jev" | "none";
+  model: string | null;
+  status: "ok" | "error";
+  error_message: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 // --- Humor en redes ----------------------------------------------------------
 
 export type SocialNetwork = "x" | "facebook" | "instagram" | "tiktok" | "youtube" | "noticias" | "otros";
@@ -246,6 +258,33 @@ export type SocialPost = {
   emotion: Emotion | null;
   topics: string[];
   classified_by: string;
+  created_at: string;
+};
+
+export type SocialSourceKind = "rss" | "noticias";
+
+export type SocialSource = {
+  id: string;
+  organization_id: string;
+  kind: SocialSourceKind;
+  name: string;
+  query: string | null;
+  url: string | null;
+  is_active: boolean;
+  last_fetched_at: string | null;
+  last_error: string | null;
+  created_at: string;
+};
+
+export type SocialImport = {
+  id: string;
+  organization_id: string;
+  source_id: string | null;
+  mode: string;
+  inserted: number;
+  duplicates: number;
+  status: "ok" | "error";
+  error_message: string | null;
   created_at: string;
 };
 
@@ -384,6 +423,11 @@ export type Database = {
       answers: TableDef<Answer, [FK<"response_id", "responses">, FK<"question_id", "questions">]>;
       social_trackers: TableDef<SocialTracker, [FK<"organization_id", "organizations">]>;
       social_posts: TableDef<SocialPost, [FK<"organization_id", "organizations">]>;
+      social_sources: TableDef<SocialSource, [FK<"organization_id", "organizations">]>;
+      social_imports: TableDef<
+        SocialImport,
+        [FK<"organization_id", "organizations">, FK<"source_id", "social_sources">]
+      >;
       ai_reports: TableDef<
         AiReport,
         [
@@ -391,6 +435,10 @@ export type Database = {
           FK<"organization_id", "organizations">,
           FK<"created_by", "profiles">,
         ]
+      >;
+      ai_calls: TableDef<
+        AiCall,
+        [FK<"organization_id", "organizations">, FK<"created_by", "profiles">]
       >;
       invoices: TableDef<
         Invoice,

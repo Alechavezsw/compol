@@ -92,6 +92,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -100,8 +101,14 @@ export function AppShell({
     };
   }, [open]);
 
-  const isActive = (item: NavItem) =>
-    item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(`${item.href}/`);
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  const isActive = (item: NavItem) => {
+    const current = pendingHref ?? pathname;
+    return item.exact ? current === item.href : current === item.href || current.startsWith(`${item.href}/`);
+  };
 
   const sidebar = (
     <div className="flex h-full flex-col gap-1 bg-[color-mix(in_oklab,var(--surface)_88%,transparent)] backdrop-blur-xl">
@@ -136,7 +143,11 @@ export function AppShell({
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => setOpen(false)}
+              prefetch
+              onClick={() => {
+                setPendingHref(item.href);
+                setOpen(false);
+              }}
               aria-current={active ? "page" : undefined}
               className={cn(
                 "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
@@ -181,6 +192,11 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh">
+      {pendingHref ? (
+        <div className="print-hidden pointer-events-none fixed top-0 right-0 left-0 z-50 h-0.5 overflow-hidden lg:left-[272px]">
+          <div className="h-full w-1/3 rounded-full bg-[var(--primary)] animate-nav-progress" />
+        </div>
+      ) : null}
       <aside className="print-hidden fixed inset-y-0 left-0 z-30 hidden w-[272px] border-r border-[var(--border)] lg:block">
         {sidebar}
       </aside>
