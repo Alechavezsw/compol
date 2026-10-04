@@ -93,6 +93,7 @@ function withDefaults(table: TableName, row: Row): Row {
     questions: { position: 0, is_required: true, type: "opcion_unica", logic: null },
     question_options: { position: 0, is_exclusive: false },
     survey_assignments: { quota: 50 },
+    survey_zone_quotas: { quota: 10 },
     responses: { status: "en_curso", started_at: now, channel: "campo", source_url: null, respondent_hash: null },
     answers: { option_ids: [] },
     ai_reports: { status: "generando", kind: "ejecutivo", highlights: [] },

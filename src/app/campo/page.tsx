@@ -5,47 +5,57 @@ import { StatCard } from "@/components/stat-card";
 import { ButtonLink } from "@/components/ui/button";
 import { SurveyStatusBadge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
-import { fetchAll } from "@/lib/supabase/fetch-all";
 import { requireRole } from "@/lib/auth";
 import { formatDate, formatNumber } from "@/lib/utils";
-import { dayKey, todayKey } from "@/lib/stats";
-import type { Survey } from "@/lib/types";
+import { dayBoundsIso, todayKey } from "@/lib/stats";
+import { foldZone } from "@/lib/san-juan-zones";
+import type { Survey, SurveyZoneQuota } from "@/lib/types";
 
 export default async function CampoPage() {
   const { profile } = await requireRole(["surveyor"]);
   const supabase = await createClient();
+  const today = todayKey();
+  const { start: todayStart, end: todayEnd } = dayBoundsIso(today);
 
-  const [{ data: assignmentRows }, { data: responseRows }] = await Promise.all([
+  const [{ data: assignmentRows }, todayRes, { data: zoneRows }, { data: quotaRows }] = await Promise.all([
     supabase
       .from("survey_assignments")
-      .select("*, surveys(*)")
+      .select("id, survey_id, quota, zone, surveys(id, title, status, ends_at)")
       .eq("surveyor_id", profile.id),
-    fetchAll<{ survey_id: string; surveyor_id: string | null; submitted_at: string | null }>((from, to) =>
-      supabase.from("responses")
-      .select("survey_id, submitted_at")
+    supabase
+      .from("responses")
+      .select("id", { count: "exact", head: true })
       .eq("surveyor_id", profile.id)
       .eq("status", "completada")
-      .order("id").range(from, to),
-    ).then((data) => ({ data })),
+      .gte("submitted_at", todayStart)
+      .lt("submitted_at", todayEnd),
+    supabase.from("responses").select("survey_id, zone").eq("surveyor_id", profile.id).eq("status", "completada"),
+    supabase.from("survey_zone_quotas").select("*"),
   ]);
 
-  // La encuesta puede venir nula si se borró; nos quedamos solo con las vivas.
   const assignments = (assignmentRows ?? []).flatMap((a) =>
     a.surveys ? [{ ...a, surveys: a.surveys as Survey }] : [],
   );
 
-  const doneBySurvey = new Map<string, number>();
-  for (const r of responseRows ?? []) {
-    doneBySurvey.set(r.survey_id, (doneBySurvey.get(r.survey_id) ?? 0) + 1);
+  const quotasByAssignment = new Map<string, SurveyZoneQuota[]>();
+  for (const q of (quotaRows ?? []) as SurveyZoneQuota[]) {
+    const list = quotasByAssignment.get(q.assignment_id) ?? [];
+    list.push(q);
+    quotasByAssignment.set(q.assignment_id, list);
   }
 
-  // "Hoy" en hora argentina: una carga a las 22 h no puede contar para mañana.
-  const today = todayKey();
-  const doneToday = (responseRows ?? []).filter((r) => r.submitted_at && dayKey(r.submitted_at) === today).length;
-
-  const totalDone = (responseRows ?? []).length;
+  const doneBySurvey = new Map<string, number>();
+  const doneByZone = new Map<string, number>();
+  for (const r of zoneRows ?? []) {
+    doneBySurvey.set(r.survey_id, (doneBySurvey.get(r.survey_id) ?? 0) + 1);
+    if (r.zone?.trim()) {
+      const key = `${r.survey_id}:${foldZone(r.zone)}`;
+      doneByZone.set(key, (doneByZone.get(key) ?? 0) + 1);
+    }
+  }
+  const doneToday = todayRes.count ?? 0;
+  const totalDone = [...doneBySurvey.values()].reduce((sum, n) => sum + n, 0);
   const totalQuota = assignments.reduce((sum, a) => sum + a.quota, 0);
-
   const activos = assignments.filter((a) => a.surveys.status === "activa");
   const otros = assignments.filter((a) => a.surveys.status !== "activa");
 
@@ -143,12 +153,29 @@ export default async function CampoPage() {
                         {formatNumber(done)} / {formatNumber(a.quota)}
                       </span>
                     </div>
+                    {quotasByAssignment.get(a.id)?.length ? (
+                      <ul className="mt-4 space-y-2">
+                        {quotasByAssignment.get(a.id)!.map((q) => {
+                          const zDone = doneByZone.get(`${a.survey_id}:${foldZone(q.zone)}`) ?? 0;
+                          return (
+                            <li key={q.id} className="flex items-center gap-3 text-xs">
+                              <span className="w-28 shrink-0 truncate text-[var(--muted)]">{q.zone}</span>
+                              <Progress
+                                value={zDone}
+                                max={q.quota}
+                                tone={zDone >= q.quota ? "success" : "primary"}
+                                className="flex-1"
+                              />
+                              <span className="w-12 shrink-0 text-right tabular-nums text-[var(--muted)]">
+                                {zDone}/{q.quota}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
 
-                    <ButtonLink
-                      href={`/campo/encuestas/${a.survey_id}`}
-                      size="lg"
-                      className="mt-5 w-full"
-                    >
+                    <ButtonLink href={`/campo/encuestas/${a.survey_id}`} size="lg" className="mt-5 w-full">
                       <Play />
                       Cargar entrevista
                     </ButtonLink>
@@ -169,9 +196,7 @@ export default async function CampoPage() {
                   className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] p-4"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-[var(--foreground)]">
-                      {a.surveys.title}
-                    </p>
+                    <p className="truncate text-sm font-medium text-[var(--foreground)]">{a.surveys.title}</p>
                     <p className="mt-0.5 text-xs text-[var(--muted)]">
                       {formatNumber(doneBySurvey.get(a.survey_id) ?? 0)} entrevistas cargadas
                     </p>

@@ -3,6 +3,8 @@ import type { Database, Survey } from "@/lib/types";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { addDays, dayKey, daysBetween, formatDayKey, median } from "@/lib/stats";
 import type { Pace } from "@/lib/analytics";
+import { qualityFlags } from "@/lib/quality";
+import { foldZone } from "@/lib/san-juan-zones";
 
 type Client = SupabaseClient<Database>;
 
@@ -12,6 +14,7 @@ export type DashResponse = {
   duration_seconds: number | null;
   channel: string | null;
   surveyor_id: string | null;
+  zone: string | null;
 };
 
 export type DashSocial = {
@@ -115,7 +118,7 @@ export async function loadDashboard(supabase: Client, organizationId: string, to
     fetchAll<DashResponse>((from, to) =>
       supabase
         .from("responses")
-        .select("survey_id, submitted_at, duration_seconds, channel, surveyor_id")
+        .select("survey_id, submitted_at, duration_seconds, channel, surveyor_id, zone")
         .eq("organization_id", organizationId)
         .eq("status", "completada")
         .order("id")
@@ -143,8 +146,12 @@ export async function loadDashboard(supabase: Client, organizationId: string, to
   const activeIds = active.map((s) => s.id);
 
   const { data: assignmentRows } = activeIds.length
-    ? await supabase.from("survey_assignments").select("survey_id, surveyor_id, zone").in("survey_id", activeIds)
-    : { data: [] as { survey_id: string; surveyor_id: string; zone: string | null }[] };
+    ? await supabase.from("survey_assignments").select("id, survey_id, surveyor_id, zone").in("survey_id", activeIds)
+    : { data: [] as { id: string; survey_id: string; surveyor_id: string; zone: string | null }[] };
+  const assignmentIds = (assignmentRows ?? []).map((a) => a.id);
+  const { data: zoneQuotaRows } = assignmentIds.length
+    ? await supabase.from("survey_zone_quotas").select("assignment_id, zone, quota").in("assignment_id", assignmentIds)
+    : { data: [] as { assignment_id: string; zone: string; quota: number }[] };
   const surveyorIds = [...new Set((assignmentRows ?? []).map((a) => a.surveyor_id))];
   const { data: profileRows } = surveyorIds.length
     ? await supabase.from("profiles").select("id, full_name").in("id", surveyorIds)
@@ -185,6 +192,42 @@ export async function loadDashboard(supabase: Client, organizationId: string, to
   const expressBySurvey = new Map(active.map((s) => [s.id, expressCount(completed.filter((r) => r.survey_id === s.id))]));
   const social = socialPulse(socialPosts, today);
 
+  const todayRows = completed.filter((r) => r.submitted_at && dayKey(r.submitted_at) === today);
+  const todayBySurveyor = new Map<string, number>();
+  const todayByZone = new Map<string, number>();
+  for (const r of todayRows) {
+    if (r.surveyor_id) todayBySurveyor.set(r.surveyor_id, (todayBySurveyor.get(r.surveyor_id) ?? 0) + 1);
+    if (r.zone?.trim()) todayByZone.set(foldZone(r.zone), (todayByZone.get(foldZone(r.zone)) ?? 0) + 1);
+  }
+
+  const allowedZones = [...new Set((zoneQuotaRows ?? []).map((q) => q.zone))];
+  const quality = qualityFlags(completed, allowedZones);
+
+  const control = {
+    today: todayRows.length,
+    surveyors: [...new Map((assignmentRows ?? []).map((a) => [a.surveyor_id, a])).values()].map((a) => {
+      const last = completed
+        .filter((r) => r.surveyor_id === a.surveyor_id && r.submitted_at)
+        .map((r) => r.submitted_at as string)
+        .sort()
+        .at(-1);
+      return {
+        id: a.surveyor_id,
+        name: names.get(a.surveyor_id) ?? "Encuestador",
+        today: todayBySurveyor.get(a.surveyor_id) ?? 0,
+        lastAt: last ?? null,
+        stalled: (todayBySurveyor.get(a.surveyor_id) ?? 0) === 0,
+      };
+    }),
+    zones: (zoneQuotaRows ?? []).map((q) => ({
+      zone: q.zone,
+      quota: q.quota,
+      today: todayByZone.get(foldZone(q.zone)) ?? 0,
+      done: completed.filter((r) => r.zone && foldZone(r.zone) === foldZone(q.zone)).length,
+    })),
+    quality,
+  };
+
   return {
     surveys,
     active,
@@ -196,5 +239,6 @@ export async function loadDashboard(supabase: Client, organizationId: string, to
     staleBySurvey,
     reports: reportRows ?? [],
     social,
+    control,
   };
 }

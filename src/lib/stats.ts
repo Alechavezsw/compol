@@ -228,6 +228,16 @@ export function todayKey() {
   return dayKey(Date.now());
 }
 
+/**
+ * Inicio y fin (ISO UTC) del día calendario `key` en la zona del operativo.
+ * Argentina no tiene DST: el offset fijo -03 coincide con TIME_ZONE por defecto.
+ */
+export function dayBoundsIso(key: string) {
+  const start = new Date(`${key}T00:00:00-03:00`);
+  const end = new Date(`${addDays(key, 1)}T00:00:00-03:00`);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 export function addDays(key: string, n: number) {
   const d = new Date(`${key}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);

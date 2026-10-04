@@ -8,11 +8,14 @@ import { useInterview, type Draft } from "@/components/interview/use-interview";
 import { InterviewView } from "@/components/interview/interview-view";
 import { ProgressRing } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
+import { ZoneSearch } from "@/components/zone-search";
+import { enqueueInterview, readQueue, removeQueued } from "@/lib/campo/offline-queue";
+import { foldZone } from "@/lib/san-juan-zones";
 import type { QuestionWithOptions } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Extra = { zone: string };
-type Outcome = { status: "completada" | "descartada" } | null;
+type Outcome = { status: "completada" | "descartada"; queued?: boolean } | null;
 
 function ago(ms: number) {
   const min = Math.round((Date.now() - ms) / 60000);
@@ -28,6 +31,7 @@ export function SurveyRunner({
   questions,
   defaultZone,
   zones,
+  zoneQuotas = [],
   done,
   doneToday,
   quota,
@@ -38,6 +42,7 @@ export function SurveyRunner({
   questions: QuestionWithOptions[];
   defaultZone: string | null;
   zones: string[];
+  zoneQuotas?: { zone: string; quota: number }[];
   done: number;
   doneToday: number;
   quota: number;
@@ -52,28 +57,72 @@ export function SurveyRunner({
   const [outcome, setOutcome] = useState<Outcome>(null);
   const [draft, setDraft] = useState<Draft<Extra> | null>(null);
   const [pending, startTransition] = useTransition();
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [queued, setQueued] = useState(0);
 
   // El borrador vive en localStorage: solo se puede leer después de montar.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lectura única de almacenamiento del navegador
     setDraft(interview.pendingDraft());
-  }, [interview.pendingDraft]);
+    setQueued(readQueue(surveyorId).length);
+  }, [interview.pendingDraft, surveyorId]);
+
+  useEffect(() => {
+    async function flush() {
+      for (const item of readQueue(surveyorId)) {
+        const result = await submitResponseAction({
+          surveyId: item.surveyId,
+          zone: item.zone,
+          durationSeconds: item.durationSeconds,
+          answers: item.answers,
+          latitude: item.latitude,
+          longitude: item.longitude,
+        });
+        if (!result.ok) break;
+        removeQueued(surveyorId, item.id);
+        if (result.status === "completada") {
+          setSaved((n) => n + 1);
+          setToday((n) => n + 1);
+        }
+      }
+      setQueued(readQueue(surveyorId).length);
+    }
+    const onOnline = () => {
+      void flush();
+    };
+    window.addEventListener("online", onOnline);
+    if (navigator.onLine) void flush();
+    return () => window.removeEventListener("online", onOnline);
+  }, [surveyorId]);
 
   const total = questions.length;
   const quotaDone = saved >= quota;
+
+  function requestFix() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 60_000, timeout: 8000 },
+    );
+  }
 
   function begin() {
     setOutcome(null);
     setDraft(null);
     interview.clearDraft();
+    requestFix();
     interview.start({ zone: zone.trim() });
   }
 
   function resume(d: Draft<Extra>) {
     setZone(d.extra?.zone ?? zone);
     setDraft(null);
+    requestFix();
     interview.restore(d);
   }
+
+  const zoneQuota = zoneQuotas.find((q) => foldZone(q.zone) === foldZone(zone));
 
   function submit() {
     const { answers, errors, ended, durationSeconds } = interview.collect();
@@ -83,26 +132,35 @@ export function SurveyRunner({
       return;
     }
 
+    const payload = {
+      surveyId,
+      zone: interview.extra?.zone || zone.trim() || null,
+      durationSeconds,
+      answers,
+      latitude: coords?.lat ?? null,
+      longitude: coords?.lng ?? null,
+    };
+
     startTransition(async () => {
-      const result = await submitResponseAction({
-        surveyId,
-        zone: interview.extra?.zone || zone.trim() || null,
-        durationSeconds,
-        answers,
-      });
-
-      if (!result.ok) {
-        // El borrador sigue guardado: si se cortó la señal, no se pierde nada.
-        interview.setError(result.error ?? "No se pudo guardar la entrevista. Probá de nuevo.");
-        return;
+      const offline = typeof navigator !== "undefined" && !navigator.onLine;
+      if (!offline) {
+        const result = await submitResponseAction(payload);
+        if (result.ok) {
+          interview.stop();
+          if (result.status === "completada") {
+            setSaved((n) => n + 1);
+            setToday((n) => n + 1);
+          }
+          setOutcome({ status: result.status ?? (ended ? "descartada" : "completada") });
+          return;
+        }
       }
 
+      enqueueInterview(surveyorId, payload);
       interview.stop();
-      if (result.status === "completada") {
-        setSaved((n) => n + 1);
-        setToday((n) => n + 1);
-      }
-      setOutcome({ status: result.status ?? (ended ? "descartada" : "completada") });
+      interview.clearDraft();
+      setQueued((n) => n + 1);
+      setOutcome({ status: ended ? "descartada" : "completada", queued: true });
     });
   }
 
@@ -126,14 +184,22 @@ export function SurveyRunner({
               </span>
             )}
             <h2 className="display mt-5 text-3xl text-[var(--foreground)]">
-              {completed ? (quotaDone ? "¡Cuota cumplida!" : "Entrevista guardada") : "Contacto registrado"}
+              {outcome.queued
+                ? "Quedó en cola"
+                : completed
+                  ? quotaDone
+                    ? "¡Cuota cumplida!"
+                    : "Entrevista guardada"
+                  : "Contacto registrado"}
             </h2>
             <p className="mt-1.5 text-sm text-[var(--muted)]">
-              {completed
-                ? quotaDone
-                  ? `Llegaste a los ${quota} casos asignados. Consultá con la coordinación antes de seguir cargando.`
-                  : `Te faltan ${quota - saved} casos · hoy llevás ${today}.`
-                : "Quedó como descartada por filtro. No suma a tu cuota."}
+              {outcome.queued
+                ? "No había señal. Se sube sola cuando el teléfono vuelva a conectarse."
+                : completed
+                  ? quotaDone
+                    ? `Llegaste a los ${quota} casos asignados. Consultá con la coordinación antes de seguir cargando.`
+                    : `Te faltan ${quota - saved} casos · hoy llevás ${today}.`
+                  : "Quedó como descartada por filtro. No suma a tu cuota."}
             </p>
 
             <Button size="lg" className="mt-7 w-full" onClick={begin}>
@@ -210,22 +276,23 @@ export function SurveyRunner({
               <MapPin className="size-3.5 text-[var(--muted)]" />
               Zona del relevamiento
             </span>
-            <input
+            <ZoneSearch
               value={zone}
-              onChange={(e) => setZone(e.target.value)}
-              list="zonas-sugeridas"
-              placeholder="Centro, Norte, Sur…"
-              className="h-12 w-full rounded-2xl border border-[var(--border)] bg-[var(--surface)] px-4 text-[15px] text-[var(--foreground)] placeholder:text-[var(--muted)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[color-mix(in_oklab,var(--primary)_16%,transparent)] focus:outline-none"
+              onChange={setZone}
+              recents={zones}
+              placeholder="Santa Lucía, Chimbas, Rawson…"
             />
-            <datalist id="zonas-sugeridas">
-              {zones.map((z) => (
-                <option key={z} value={z} />
-              ))}
-            </datalist>
             <span className="mt-1.5 block text-xs text-[var(--muted)]">
-              Queda registrada en cada entrevista para poder analizar por barrio.
+              {zoneQuota
+                ? `Cuota en ${zoneQuota.zone}: ${zoneQuota.quota} casos.`
+                : "Escribí 3 letras para buscar el departamento. Al empezar se pide ubicación."}
             </span>
           </label>
+          {queued ? (
+            <p className="relative mt-4 rounded-xl bg-[var(--warning-soft)] px-3.5 py-2.5 text-sm text-[var(--warning)]">
+              {queued} entrevista{queued === 1 ? "" : "s"} en cola. Se suben cuando haya señal.
+            </p>
+          ) : null}
 
           {quotaDone ? (
             <p className="relative mt-4 rounded-xl bg-[var(--success-soft)] px-3.5 py-2.5 text-sm text-[var(--success)]">

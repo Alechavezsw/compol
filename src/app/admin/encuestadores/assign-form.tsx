@@ -3,7 +3,8 @@
 import { useActionState, useMemo, useState } from "react";
 import { UserPlus } from "lucide-react";
 import { assignSurveyorAction, type ActionState } from "../actions";
-import { Field, FormMessage, Input, Select } from "@/components/ui/field";
+import { Field, FormMessage, Select } from "@/components/ui/field";
+import { ZoneQuotasFields } from "@/components/zone-quotas-fields";
 import { SubmitButton } from "@/components/submit-button";
 
 type SurveyOption = { id: string; title: string; organization_id: string; remaining: number; status: string };
@@ -64,22 +65,9 @@ export function AssignForm({ surveys, surveyors }: { surveys: SurveyOption[]; su
         </Select>
       </Field>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Cuota" hint={survey ? `Sin cubrir por otras cuotas: ${Math.max(0, survey.remaining)}` : undefined}>
-          <Input
-            key={surveyId}
-            name="quota"
-            type="number"
-            min={1}
-            max={5000}
-            defaultValue={survey ? Math.max(10, Math.min(250, survey.remaining)) : 50}
-            required
-          />
-        </Field>
-        <Field label="Zona" hint="Opcional">
-          <Input name="zone" placeholder="Centro y Norte" maxLength={80} />
-        </Field>
-      </div>
+      <Field hint={survey ? `Sin cubrir por otras cuotas: ${Math.max(0, survey.remaining)}` : "Partí la meta en departamentos."}>
+        <ZoneQuotasFields />
+      </Field>
 
       {state.error ? <FormMessage>{state.error}</FormMessage> : null}
       {state.ok ? <FormMessage tone="success">{state.ok}</FormMessage> : null}

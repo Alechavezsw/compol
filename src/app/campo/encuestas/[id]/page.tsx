@@ -5,8 +5,7 @@ import { SurveyRunner } from "./survey-runner";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { loadQuestions } from "@/lib/questions";
-import { fetchAll } from "@/lib/supabase/fetch-all";
-import { dayKey, todayKey } from "@/lib/stats";
+import { dayBoundsIso, todayKey } from "@/lib/stats";
 import { SURVEY_STATUS_LABEL, type Survey } from "@/lib/types";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -23,7 +22,7 @@ export default async function CargarEntrevistaPage({ params }: { params: Promise
 
   const { data: assignment } = await supabase
     .from("survey_assignments")
-    .select("*, surveys(*)")
+    .select("id, quota, zone, surveys(id, title, status)")
     .eq("survey_id", id)
     .eq("surveyor_id", profile.id)
     .maybeSingle();
@@ -56,24 +55,41 @@ export default async function CargarEntrevistaPage({ params }: { params: Promise
     );
   }
 
-  const [questions, mine] = await Promise.all([
+  const today = todayKey();
+  const { start: todayStart, end: todayEnd } = dayBoundsIso(today);
+
+  const [questions, completedRes, todayRes, zoneRows, { data: quotaRows }] = await Promise.all([
     loadQuestions(supabase, id),
-    fetchAll<{ status: string; zone: string | null; submitted_at: string | null }>((from, to) =>
-      supabase
-        .from("responses")
-        .select("status, zone, submitted_at")
-        .eq("survey_id", id)
-        .eq("surveyor_id", profile.id)
-        .order("submitted_at", { ascending: false })
-        .range(from, to),
-    ),
+    supabase
+      .from("responses")
+      .select("id", { count: "exact", head: true })
+      .eq("survey_id", id)
+      .eq("surveyor_id", profile.id)
+      .eq("status", "completada"),
+    supabase
+      .from("responses")
+      .select("id", { count: "exact", head: true })
+      .eq("survey_id", id)
+      .eq("surveyor_id", profile.id)
+      .eq("status", "completada")
+      .gte("submitted_at", todayStart)
+      .lt("submitted_at", todayEnd),
+    supabase
+      .from("responses")
+      .select("zone")
+      .eq("survey_id", id)
+      .eq("surveyor_id", profile.id)
+      .not("zone", "is", null)
+      .order("submitted_at", { ascending: false })
+      .limit(40),
+    supabase.from("survey_zone_quotas").select("zone, quota").eq("assignment_id", assignment.id),
   ]);
 
-  const completed = mine.filter((r) => r.status === "completada");
-  const today = todayKey();
-
-  // Zonas sugeridas: las que ya cargó, primero las más recientes.
-  const zones = [...new Set(mine.map((r) => r.zone?.trim()).filter((z): z is string => Boolean(z)))].slice(0, 12);
+  const zones = [
+    ...new Set(
+      (zoneRows.data ?? []).map((r) => r.zone?.trim()).filter((z): z is string => Boolean(z)),
+    ),
+  ].slice(0, 12);
 
   return (
     <SurveyRunner
@@ -81,10 +97,11 @@ export default async function CargarEntrevistaPage({ params }: { params: Promise
       surveyTitle={survey.title}
       surveyorId={profile.id}
       questions={questions}
-      defaultZone={zones[0] ?? assignment.zone}
-      zones={zones}
-      done={completed.length}
-      doneToday={completed.filter((r) => r.submitted_at && dayKey(r.submitted_at) === today).length}
+      defaultZone={zones[0] ?? quotaRows?.[0]?.zone ?? assignment.zone}
+      zones={[...(quotaRows ?? []).map((q) => q.zone), ...zones]}
+      zoneQuotas={quotaRows ?? []}
+      done={completedRes.count ?? 0}
+      doneToday={todayRes.count ?? 0}
       quota={assignment.quota}
     />
   );

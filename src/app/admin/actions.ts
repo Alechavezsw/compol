@@ -161,6 +161,36 @@ export async function toggleUserActiveAction(formData: FormData) {
 // misma regla está en RLS (migración 05), esto es la primera barrera.
 // ---------------------------------------------------------------------------
 
+function parseZoneQuotas(formData: FormData): { rows: { zone: string; quota: number }[]; total: number } | { error: string } {
+  const zones = formData.getAll("zones").map((v) => String(v).trim()).filter(Boolean);
+  const quotas = formData.getAll("quotas").map((v) => Number(v));
+  const rows: { zone: string; quota: number }[] = [];
+  const seen = new Set<string>();
+  for (let i = 0; i < zones.length; i += 1) {
+    const zone = zones[i].slice(0, 80);
+    const quota = quotas[i];
+    const key = zone.toLowerCase();
+    if (seen.has(key)) continue;
+    if (!Number.isInteger(quota) || quota < 1 || quota > 5000) {
+      return { error: `La cuota de ${zone} tiene que ser un entero entre 1 y 5000.` };
+    }
+    seen.add(key);
+    rows.push({ zone, quota });
+  }
+  if (!rows.length) return { error: "Cargá al menos un departamento con su cuota." };
+  return { rows, total: rows.reduce((sum, r) => sum + r.quota, 0) };
+}
+
+async function replaceZoneQuotas(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  assignmentId: string,
+  rows: { zone: string; quota: number }[],
+) {
+  await supabase.from("survey_zone_quotas").delete().eq("assignment_id", assignmentId);
+  if (!rows.length) return;
+  await supabase.from("survey_zone_quotas").insert(rows.map((r) => ({ assignment_id: assignmentId, ...r })));
+}
+
 async function loadAssignable(supabase: Awaited<ReturnType<typeof createClient>>, surveyId: string, surveyorId: string) {
   const [{ data: survey }, { data: surveyor }] = await Promise.all([
     supabase.from("surveys").select("id, title, status, organization_id, target_responses").eq("id", surveyId).maybeSingle(),
@@ -174,13 +204,12 @@ export async function assignSurveyorAction(_prev: ActionState, formData: FormDat
 
   const surveyId = String(formData.get("survey_id") ?? "");
   const surveyorId = String(formData.get("surveyor_id") ?? "");
-  const quota = Number(formData.get("quota") ?? 0);
-  const zone = String(formData.get("zone") ?? "").trim().slice(0, 80) || null;
+  const parsed = parseZoneQuotas(formData);
+  if ("error" in parsed) return { error: parsed.error };
+  const quota = parsed.total;
+  const zone = parsed.rows.length > 1 ? "Gran San Juan" : (parsed.rows[0]?.zone ?? null);
 
   if (!surveyId || !surveyorId) return { error: "Elegí la encuesta y el encuestador." };
-  if (!Number.isInteger(quota) || quota < 1 || quota > 5000) {
-    return { error: "La cuota tiene que ser un número entero entre 1 y 5000." };
-  }
 
   const supabase = await createClient();
   const { survey, surveyor } = await loadAssignable(supabase, surveyId, surveyorId);
@@ -193,10 +222,13 @@ export async function assignSurveyorAction(_prev: ActionState, formData: FormDat
   }
   if (survey.status === "cerrada") return { error: "La encuesta está cerrada: no admite nuevas asignaciones." };
 
-  const { error } = await supabase
+  const { data: assignment, error } = await supabase
     .from("survey_assignments")
-    .upsert({ survey_id: surveyId, surveyor_id: surveyorId, quota, zone }, { onConflict: "survey_id,surveyor_id" });
-  if (error) return { error: `No se pudo asignar: ${error.message}` };
+    .upsert({ survey_id: surveyId, surveyor_id: surveyorId, quota, zone }, { onConflict: "survey_id,surveyor_id" })
+    .select("id")
+    .single();
+  if (error || !assignment) return { error: `No se pudo asignar: ${error?.message ?? "sin detalle"}` };
+  await replaceZoneQuotas(supabase, assignment.id, parsed.rows);
 
   // Aviso útil: si las cuotas no alcanzan la meta, alguien va a tener que cubrir la diferencia.
   const { data: all } = await supabase.from("survey_assignments").select("quota").eq("survey_id", surveyId);
@@ -217,13 +249,15 @@ export async function assignSurveyorAction(_prev: ActionState, formData: FormDat
 export async function updateAssignmentAction(formData: FormData) {
   await requireRole(["super_admin"]);
   const id = String(formData.get("id") ?? "");
-  const quota = Number(formData.get("quota") ?? 0);
-  const zone = String(formData.get("zone") ?? "").trim().slice(0, 80) || null;
-  if (!id || !Number.isInteger(quota) || quota < 1 || quota > 5000) return;
+  const parsed = parseZoneQuotas(formData);
+  if (!id || "error" in parsed) return;
 
   const supabase = await createClient();
-  await supabase.from("survey_assignments").update({ quota, zone }).eq("id", id);
+  const zone = parsed.rows.length > 1 ? "Gran San Juan" : (parsed.rows[0]?.zone ?? null);
+  await supabase.from("survey_assignments").update({ quota: parsed.total, zone }).eq("id", id);
+  await replaceZoneQuotas(supabase, id, parsed.rows);
   revalidatePath("/admin/encuestadores");
+  revalidatePath("/campo");
 }
 
 export async function removeAssignmentAction(formData: FormData) {

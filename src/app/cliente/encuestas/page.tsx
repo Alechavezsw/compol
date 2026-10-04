@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BarChart3, ClipboardList, FolderKanban, MapPin, Users } from "lucide-react";
+import { BarChart3, ClipboardList, Copy, FolderKanban, MapPin, Users } from "lucide-react";
+import { duplicateSurveyAction } from "../actions";
 import { EmptyState, PageHeader, Progress } from "@/components/ui/misc";
 import { ButtonLink } from "@/components/ui/button";
 import { SurveyStatusBadge } from "@/components/ui/badge";
@@ -129,6 +130,19 @@ export default async function EncuestasPage() {
                     Cierre: {formatDate(s.ends_at)}
                   </span>
                   <div className="flex gap-2">
+                    {canManage ? (
+                      <form action={duplicateSurveyAction}>
+                        <input type="hidden" name="id" value={s.id} />
+                        <button
+                          type="submit"
+                          className="inline-flex h-8 items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm font-medium text-[var(--foreground)] hover:bg-[var(--surface-2)]"
+                          title="Crea un borrador con el mismo cuestionario"
+                        >
+                          <Copy className="size-3.5" />
+                          Clonar
+                        </button>
+                      </form>
+                    ) : null}
                     <ButtonLink href={`/cliente/encuestas/${s.id}`} size="sm" variant="outline">
                       {canManage ? "Editar" : "Ver"}
                     </ButtonLink>

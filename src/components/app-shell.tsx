@@ -105,6 +105,12 @@ export function AppShell({
     setPendingHref(null);
   }, [pathname]);
 
+  useEffect(() => {
+    if (!pendingHref) return;
+    const timer = window.setTimeout(() => setPendingHref(null), 10_000);
+    return () => window.clearTimeout(timer);
+  }, [pendingHref]);
+
   const isActive = (item: NavItem) => {
     const current = pendingHref ?? pathname;
     return item.exact ? current === item.href : current === item.href || current.startsWith(`${item.href}/`);
@@ -144,9 +150,14 @@ export function AppShell({
               key={item.href}
               href={item.href}
               prefetch
-              onClick={() => {
-                setPendingHref(item.href);
+              onClick={(event) => {
                 setOpen(false);
+                if (pathname === item.href) {
+                  event.preventDefault();
+                  setPendingHref(null);
+                  return;
+                }
+                setPendingHref(item.href);
               }}
               aria-current={active ? "page" : undefined}
               className={cn(

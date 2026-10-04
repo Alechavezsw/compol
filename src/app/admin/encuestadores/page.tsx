@@ -7,7 +7,9 @@ import { StatCard } from "@/components/stat-card";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge, SurveyStatusBadge } from "@/components/ui/badge";
 import { AssignForm } from "./assign-form";
+import { ZoneQuotasFields } from "@/components/zone-quotas-fields";
 import { removeAssignmentAction, toggleUserActiveAction, updateAssignmentAction } from "../actions";
+import type { SurveyZoneQuota } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { dayKey, daysBetween, todayKey } from "@/lib/stats";
@@ -20,12 +22,13 @@ export default async function EncuestadoresPage({ searchParams }: { searchParams
   const { org } = await searchParams;
   const supabase = await createClient();
 
-  const [{ data: orgRows }, { data: profileRows }, { data: surveyRows }, { data: assignmentRows }, responses] =
+  const [{ data: orgRows }, { data: profileRows }, { data: surveyRows }, { data: assignmentRows }, { data: quotaRows }, responses] =
     await Promise.all([
       supabase.from("organizations").select("id, name").order("name"),
       supabase.from("profiles").select("*").eq("role", "surveyor").order("full_name"),
       supabase.from("surveys").select("*").order("updated_at", { ascending: false }),
       supabase.from("survey_assignments").select("*"),
+      supabase.from("survey_zone_quotas").select("*"),
       fetchAll<{ survey_id: string; surveyor_id: string | null; submitted_at: string | null }>((from, to) =>
         supabase
           .from("responses")
@@ -43,6 +46,12 @@ export default async function EncuestadoresPage({ searchParams }: { searchParams
   const surveys = (surveyRows ?? []) as Survey[];
   const surveyById = new Map(surveys.map((s) => [s.id, s]));
   const assignments = (assignmentRows ?? []) as SurveyAssignment[];
+  const quotasByAssignment = new Map<string, SurveyZoneQuota[]>();
+  for (const q of (quotaRows ?? []) as SurveyZoneQuota[]) {
+    const list = quotasByAssignment.get(q.assignment_id) ?? [];
+    list.push(q);
+    quotasByAssignment.set(q.assignment_id, list);
+  }
 
   const today = todayKey();
   const doneBy = new Map<string, number>();
@@ -223,30 +232,16 @@ export default async function EncuestadoresPage({ searchParams }: { searchParams
                                 </span>
                               </div>
                               <div className="mt-2.5 flex flex-wrap items-end gap-2">
-                                <form action={updateAssignmentAction} className="flex flex-1 flex-wrap items-end gap-2">
+                                <form action={updateAssignmentAction} className="flex-1 space-y-2">
                                   <input type="hidden" name="id" value={a.id} />
-                                  <label className="flex flex-col text-[10px] font-semibold tracking-wider text-[var(--muted)] uppercase">
-                                    Cuota
-                                    <input
-                                      name="quota"
-                                      type="number"
-                                      min={1}
-                                      max={5000}
-                                      defaultValue={a.quota}
-                                      className="mt-1 h-8 w-20 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-sm font-normal tracking-normal text-[var(--foreground)] normal-case tabular-nums"
-                                    />
-                                  </label>
-                                  <label className="flex min-w-[140px] flex-1 flex-col text-[10px] font-semibold tracking-wider text-[var(--muted)] uppercase">
-                                    Zona
-                                    <input
-                                      name="zone"
-                                      defaultValue={a.zone ?? ""}
-                                      maxLength={80}
-                                      className="mt-1 h-8 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-2 text-sm font-normal tracking-normal text-[var(--foreground)] normal-case"
-                                    />
-                                  </label>
+                                  <ZoneQuotasFields
+                                    initial={
+                                      quotasByAssignment.get(a.id)?.map((q) => ({ zone: q.zone, quota: q.quota })) ??
+                                      (a.zone ? [{ zone: a.zone, quota: a.quota }] : undefined)
+                                    }
+                                  />
                                   <button type="submit" className="h-8 rounded-lg px-3 text-xs font-medium text-[var(--primary)] hover:bg-[var(--primary-soft)]">
-                                    Guardar
+                                    Guardar cuotas
                                   </button>
                                 </form>
                                 <form action={removeAssignmentAction}>

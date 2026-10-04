@@ -15,6 +15,8 @@ export async function submitResponseAction(payload: {
   zone: string | null;
   durationSeconds: number;
   answers: AnswerInput[];
+  latitude?: number | null;
+  longitude?: number | null;
 }): Promise<SubmitResult> {
   const { profile } = await requireRole(["surveyor"]);
   const { surveyId, zone, durationSeconds, answers } = payload;
@@ -50,6 +52,8 @@ export async function submitResponseAction(payload: {
       surveyor_id: profile.id,
       zone,
       duration_seconds: durationSeconds,
+      latitude: payload.latitude,
+      longitude: payload.longitude,
     },
   });
 

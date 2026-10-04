@@ -160,6 +160,13 @@ export type SurveyAssignment = {
   created_at: string;
 }
 
+export type SurveyZoneQuota = {
+  id: string;
+  assignment_id: string;
+  zone: string;
+  quota: number;
+}
+
 export type SurveyResponse = {
   id: string;
   survey_id: string;
@@ -412,6 +419,7 @@ export type Database = {
         SurveyAssignment,
         [FK<"survey_id", "surveys">, FK<"surveyor_id", "profiles">]
       >;
+      survey_zone_quotas: TableDef<SurveyZoneQuota, [FK<"assignment_id", "survey_assignments">]>;
       responses: TableDef<
         SurveyResponse,
         [

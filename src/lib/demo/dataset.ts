@@ -11,6 +11,7 @@ import type {
   QuestionOption,
   Survey,
   SurveyAssignment,
+  SurveyZoneQuota,
   SurveyResponse,
   SocialImport,
   SocialPost,
@@ -378,6 +379,7 @@ export type DemoTables = {
   questions: Question[];
   question_options: QuestionOption[];
   survey_assignments: SurveyAssignment[];
+  survey_zone_quotas: SurveyZoneQuota[];
   responses: SurveyResponse[];
   answers: Answer[];
   ai_reports: AiReport[];
@@ -1175,6 +1177,7 @@ export function buildDemoData(): DemoTables {
     questions,
     question_options,
     survey_assignments,
+    survey_zone_quotas: [],
     responses,
     answers,
     ai_reports,

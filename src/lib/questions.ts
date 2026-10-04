@@ -52,6 +52,10 @@ export type PersistResult =
  * El orden importa por RLS: la respuesta nace `en_curso` (único estado en el
  * que el encuestador puede escribir sus answers) y recién al final se cierra.
  */
+function finiteCoord(value: number | null | undefined) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 export async function persistInterview(
   supabase: Client,
   params: {
@@ -63,6 +67,8 @@ export async function persistInterview(
       surveyor_id: string | null;
       zone: string | null;
       duration_seconds: number;
+      latitude?: number | null;
+      longitude?: number | null;
       source_url?: string | null;
       respondent_hash?: string | null;
     };
@@ -102,6 +108,8 @@ export async function persistInterview(
       status: "en_curso",
       channel: meta.channel,
       zone: meta.zone?.trim().slice(0, 80) || null,
+      latitude: finiteCoord(meta.latitude),
+      longitude: finiteCoord(meta.longitude),
       duration_seconds: Math.max(0, Math.round(meta.duration_seconds)),
       source_url: meta.source_url ?? null,
       respondent_hash: meta.respondent_hash ?? null,

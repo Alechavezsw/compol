@@ -449,10 +449,89 @@
   }
 }
 
+@keyframes hero-bar {
+  from {
+    transform: scaleY(0);
+    opacity: 0.3;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@keyframes hero-feed {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hero-bar {
+  transform-origin: bottom;
+  animation: hero-bar 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes hero-fill {
+  from {
+    width: 0;
+  }
+}
+
+.hero-fill {
+  animation: hero-fill 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.landing-rise {
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes landing-ken {
+  0%,
+  100% {
+    transform: scale(1.02);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+.landing-ken {
+  animation: landing-ken 22s ease-in-out infinite;
+}
+
+@keyframes landing-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.landing-marquee {
+  width: max-content;
+  animation: landing-marquee 32s linear infinite;
+}
+
+.hero-feed-in {
+  animation: hero-feed 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
   .animate-float,
   .animate-pulse-soft,
+  .hero-bar,
+  .hero-fill,
+  .hero-feed-in,
+  .landing-rise,
+  .landing-ken,
+  .landing-marquee,
   .field-map-marker-new,
   .radar-spin,
   .radar-spin-fast,

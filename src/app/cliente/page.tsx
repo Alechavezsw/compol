@@ -7,10 +7,12 @@ import {
   CheckCircle2,
   ClipboardList,
   Globe,
+  MapPin,
   Radar,
   Sparkles,
   Target,
   Timer,
+  UserRound,
 } from "lucide-react";
 import { EmptyState, Progress } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,6 +46,7 @@ export default async function ClienteDashboard() {
     staleBySurvey,
     reports,
     social,
+    control,
   } = await loadDashboard(supabase, organization.id, today);
 
   const totalTarget = active.reduce((sum, s) => sum + s.target_responses, 0);
@@ -94,6 +97,25 @@ export default async function ClienteDashboard() {
       });
     }
   }
+  if (control.quality.bursts.length) {
+    const burst = control.quality.bursts[0];
+    attention.push({
+      tone: "warning",
+      icon: <Timer className="size-4" />,
+      title: `Racha rara en ${burst.zone}`,
+      detail: `${burst.count} casos en menos de media hora. Conviene revisar si fueron reales.`,
+      href: "/cliente/encuestas",
+    });
+  }
+  if (control.quality.offQuota) {
+    attention.push({
+      tone: "primary",
+      icon: <MapPin className="size-4" />,
+      title: `${control.quality.offQuota} casos fuera de cuota`,
+      detail: "Se cargaron en un departamento que no estaba en la asignación.",
+      href: "/cliente/encuestas",
+    });
+  }
   for (const al of social.alerts.slice(0, 2)) {
     attention.push({
       tone: "danger",
@@ -138,6 +160,68 @@ export default async function ClienteDashboard() {
               Nueva encuesta
             </ButtonLink>
           ) : null}
+        </div>
+      </section>
+
+      <section className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,transparent)] p-5 shadow-[var(--shadow-card)]">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--primary)] uppercase">Hoy en campo</p>
+            <h2 className="display mt-1 text-2xl text-[var(--foreground)]">{formatNumber(control.today)} casos</h2>
+          </div>
+          <p className="text-xs text-[var(--muted)]">
+            {control.quality.express
+              ? `${control.quality.express} exprés · `
+              : ""}
+            {control.surveyors.filter((s) => s.stalled).length
+              ? `${control.surveyors.filter((s) => s.stalled).length} sin cargar hoy`
+              : "El equipo está cargando"}
+          </p>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div>
+            <p className="mb-2 text-xs font-semibold tracking-wide text-[var(--muted)] uppercase">Equipo</p>
+            <ul className="space-y-2">
+              {control.surveyors.length === 0 ? (
+                <li className="text-sm text-[var(--muted)]">Nadie asignado a un operativo activo.</li>
+              ) : (
+                control.surveyors.map((s) => (
+                  <li key={s.id} className="flex items-center justify-between gap-3 rounded-xl bg-[var(--surface-2)] px-3 py-2">
+                    <span className="inline-flex min-w-0 items-center gap-2 text-sm text-[var(--foreground)]">
+                      <UserRound className="size-3.5 shrink-0 text-[var(--muted)]" />
+                      <span className="truncate">{s.name}</span>
+                    </span>
+                    <span className={cn("text-xs font-medium tabular-nums", s.stalled ? "text-[var(--warning)]" : "text-[var(--success)]")}>
+                      {s.stalled ? "Sin carga" : `${s.today} hoy`}
+                    </span>
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
+          <div>
+            <p className="mb-2 text-xs font-semibold tracking-wide text-[var(--muted)] uppercase">Departamentos</p>
+            <ul className="space-y-2">
+              {control.zones.length === 0 ? (
+                <li className="text-sm text-[var(--muted)]">Todavía no hay cuotas por departamento.</li>
+              ) : (
+                control.zones.map((z) => (
+                  <li key={z.zone}>
+                    <div className="flex items-center justify-between gap-3 text-xs">
+                      <span className="inline-flex items-center gap-1.5 text-[var(--muted)]">
+                        <MapPin className="size-3.5" />
+                        {z.zone}
+                      </span>
+                      <span className="tabular-nums text-[var(--foreground)]">
+                        {z.done}/{z.quota} · hoy {z.today}
+                      </span>
+                    </div>
+                    <Progress value={z.done} max={z.quota} className="mt-1.5" tone={z.done >= z.quota ? "success" : "primary"} />
+                  </li>
+                ))
+              )}
+            </ul>
+          </div>
         </div>
       </section>
 
