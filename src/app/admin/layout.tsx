@@ -7,7 +7,10 @@ import { DemoBanner } from "@/components/demo-banner";
 // Estas areas dependen de la sesion: nunca deben prerenderizarse.
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: { default: "Administración", template: "%s · Administración" } };
+export const metadata: Metadata = {
+  title: { default: "Administración", template: "%s · Administración" },
+  robots: { index: false, follow: false },
+};
 
 const NAV: NavItem[] = [
   { href: "/admin", label: "Panel general", icon: "dashboard", exact: true },

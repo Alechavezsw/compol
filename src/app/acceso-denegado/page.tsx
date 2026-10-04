@@ -3,7 +3,7 @@ import { ShieldAlert } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
 
-export const metadata: Metadata = { title: "Acceso denegado" };
+export const metadata: Metadata = { title: "Acceso denegado", robots: { index: false, follow: false } };
 
 const MOTIVOS: Record<string, { title: string; text: string }> = {
   rol: {

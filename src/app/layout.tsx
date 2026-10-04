@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, siteOrigin } from "@/lib/site";
 import { themeScript } from "@/lib/theme-script";
 import "./globals.css";
 
@@ -21,12 +22,45 @@ const instrument = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(siteOrigin()),
+  applicationName: SITE_NAME,
   title: {
-    default: "Consulta — Plataforma de encuestas para gobiernos e instituciones",
-    template: "%s · Consulta",
+    default: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    template: `%s · ${SITE_NAME}`,
   },
-  description:
-    "Diseño de cuestionarios, trabajo de campo, tableros en vivo e informes asistidos por IA para organismos públicos e instituciones.",
+  description: SITE_DESCRIPTION,
+  keywords: [
+    "encuestas",
+    "opinión pública",
+    "trabajo de campo",
+    "gobiernos",
+    "San Juan",
+    "tableros",
+    "informes IA",
+  ],
+  authors: [{ name: SITE_NAME }],
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  category: "government",
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "es_AR",
+    url: "/",
+    siteName: SITE_NAME,
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true },
+  },
 };
 
 export const viewport: Viewport = {

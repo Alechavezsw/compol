@@ -15,6 +15,7 @@ import { Logo } from "@/components/logo";
 import { HeroPreview } from "@/components/hero-preview";
 import { Photo, Polaroid } from "@/components/photo";
 import { ModulesRail } from "@/components/modules-rail";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, absoluteUrl } from "@/lib/site";
 
 const IMG = {
   plaza: "/landing/plaza.jpg",
@@ -121,8 +122,21 @@ const ZONES = [
 ];
 
 export default function LandingPage() {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    name: SITE_NAME,
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Web",
+    description: SITE_DESCRIPTION,
+    url: absoluteUrl("/"),
+    inLanguage: "es-AR",
+    slogan: SITE_TAGLINE,
+  };
+
   return (
     <div className="flex min-h-dvh flex-col bg-[#07060f] text-[#f3effc]">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <header className="sticky top-0 z-30 border-b border-white/8 bg-[#07060f]/72 backdrop-blur-xl">
         <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-3.5 sm:px-6">
           <Logo invert />

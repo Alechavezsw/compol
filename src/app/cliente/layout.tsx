@@ -9,6 +9,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: { default: "Panel", template: "%s · Panel" },
+  robots: { index: false, follow: false },
 };
 
 const NAV: NavItem[] = [

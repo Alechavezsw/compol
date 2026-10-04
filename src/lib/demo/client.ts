@@ -51,6 +51,7 @@ const CASCADES: Partial<Record<TableName, { table: TableName; fk: string }[]>> =
     { table: "responses", fk: "survey_id" },
     { table: "ai_reports", fk: "survey_id" },
   ],
+  survey_assignments: [{ table: "survey_zone_quotas", fk: "assignment_id" }],
   questions: [
     { table: "question_options", fk: "question_id" },
     { table: "answers", fk: "question_id" },
@@ -175,6 +176,14 @@ function visibleRows(table: TableName, viewer: Profile | null, tables: DemoTable
       return all.filter(
         (r) => r.surveyor_id === viewer.id || readableSurveyIds.has(r.survey_id as string),
       );
+    case "survey_zone_quotas": {
+      const readableAssignmentIds = new Set(
+        tables.survey_assignments
+          .filter((a) => a.surveyor_id === viewer.id || readableSurveyIds.has(a.survey_id))
+          .map((a) => a.id),
+      );
+      return all.filter((r) => readableAssignmentIds.has(r.assignment_id as string));
+    }
     case "responses":
       return all.filter((r) => readableResponseIds.has(r.id as string));
     case "answers":
