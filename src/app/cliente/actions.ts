@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
 import { computeAnalytics, keyFindings, loadSurveyData, type AnalyticsFilters } from "@/lib/analytics";
 import { askAboutSurvey, generateSurveyReport, isGeminiConfigured } from "@/lib/ai/gemini";
@@ -184,7 +184,16 @@ export async function createSurveyAction(_prev: ActionState, formData: FormData)
     if (!project) return { error: "El proyecto elegido no existe." };
   }
 
-  const { data, error } = await supabase
+  // El alta ya está autorizada (org_admin de esta org). Se escribe con
+  // service role para no chocar con RLS si la sesión no viaja al insert.
+  let writer = supabase;
+  try {
+    writer = createAdminClient();
+  } catch {
+    writer = supabase;
+  }
+
+  const { data, error } = await writer
     .from("surveys")
     .insert({
       organization_id: organization.id,

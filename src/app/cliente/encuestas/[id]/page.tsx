@@ -1,20 +1,28 @@
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import {
+  AlignLeft,
   ArrowDown,
   ArrowUp,
   BarChart3,
+  Calendar,
   CheckCircle2,
+  CheckSquare,
   Circle,
+  CircleDot,
   ClipboardList,
   Copy,
+  Gauge,
   GitBranch,
   Globe,
+  Hash,
   ShieldCheck,
   Sparkles,
   StopCircle,
   Target,
+  ToggleLeft,
   Trash2,
+  Type,
   Users,
   X,
 } from "lucide-react";
@@ -41,7 +49,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { describeCondition, isBranchable, isExclusiveOption, maxChoices } from "@/lib/survey-logic";
 import { NOTICES, STATUS_FLOW, transitionLabel } from "@/lib/survey-status";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
-import { QUESTION_TYPE_LABEL, type Survey, type SurveyStatus } from "@/lib/types";
+import { QUESTION_TYPE_LABEL, type QuestionType, type Survey, type SurveyStatus } from "@/lib/types";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -113,7 +121,7 @@ export default async function EncuestaDetallePage({
     return q.logic?.show_if && (!parent || parent.position >= q.position);
   });
   const checklist = [
-    { ok: questions.length > 0, label: "Cuestionario con al menos una pregunta", detail: `${questions.length} preguntas` },
+    { ok: questions.length > 0, label: "Cuestionario con al menos una pregunta", detail: plural(questions.length, "pregunta", "preguntas") },
     { ok: !brokenLogic, label: "Saltos consistentes", detail: brokenLogic ? "Hay condiciones rotas" : "Sin problemas" },
     {
       ok: survey.web_enabled || totalQuota >= survey.target_responses,
@@ -249,19 +257,32 @@ export default async function EncuestaDetallePage({
         </Card>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard label="Preguntas" value={formatNumber(questions.length)} icon={<ClipboardList className="size-4" />} hint={plural(questions.filter((q) => q.logic?.show_if).length, "condicional", "condicionales") + " · " + plural(questions.filter((q) => q.logic?.end_if?.length).length, "filtro", "filtros")} />
-        <StatCard label="Equipo de campo" value={formatNumber(assignments.length)} icon={<Users className="size-4" />} tone="accent" hint={`Cuotas: ${formatNumber(totalQuota)}`} />
-        <StatCard label="Descartadas por filtro" value={formatNumber(responses.filter((r) => r.status === "descartada").length)} icon={<StopCircle className="size-4" />} tone="warning" hint="No suman a la meta" />
-      </div>
+      {questions.length > 0 || completed.length > 0 || assignments.length > 0 ? (
+        <div className="grid gap-4 sm:grid-cols-3">
+          <StatCard label="Preguntas" value={formatNumber(questions.length)} icon={<ClipboardList className="size-4" />} hint={plural(questions.filter((q) => q.logic?.show_if).length, "condicional", "condicionales") + " · " + plural(questions.filter((q) => q.logic?.end_if?.length).length, "filtro", "filtros")} />
+          <StatCard label="Equipo de campo" value={formatNumber(assignments.length)} icon={<Users className="size-4" />} tone="accent" hint={`Cuotas: ${formatNumber(totalQuota)}`} />
+          <StatCard label="Descartadas por filtro" value={formatNumber(responses.filter((r) => r.status === "descartada").length)} icon={<StopCircle className="size-4" />} tone="warning" hint="No suman a la meta" />
+        </div>
+      ) : null}
 
       <div className="grid items-start gap-4 xl:grid-cols-5">
-        {/* --------------------------------------------------- cuestionario */}
-        <Card className="xl:col-span-3">
+        {questions.length === 0 && canManage && survey.status !== "cerrada" ? (
+          <Card className="overflow-hidden xl:col-span-3">
+            <CardContent className="p-5 sm:p-6">
+              <QuestionForm surveyId={id} sources={sources} nextPosition={1} wide />
+            </CardContent>
+          </Card>
+        ) : null}
+
+        <Card className={questions.length === 0 ? "xl:col-span-2" : "xl:col-span-3"}>
           <CardHeader>
             <div>
-              <CardTitle>Cuestionario</CardTitle>
-              <p className="mt-1 text-sm text-[var(--muted)]">El orden es el que ve quien responde. Las ramas se recalculan solas.</p>
+              <CardTitle>{questions.length === 0 ? "El cuestionario" : `Cuestionario · ${questions.length}`}</CardTitle>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                {questions.length === 0
+                  ? "Acá se van listando, en el orden de la entrevista."
+                  : "El orden es el que ve quien responde. Las ramas se recalculan solas."}
+              </p>
             </div>
           </CardHeader>
           <CardContent className="space-y-3 pt-4">
@@ -269,14 +290,15 @@ export default async function EncuestaDetallePage({
               <>
                 <EmptyState
                   icon={<ClipboardList className="size-5" />}
-                  title="El cuestionario está vacío"
-                  description="Agregá la primera pregunta desde el panel de la derecha, o copiá el de otra encuesta."
+                  title="Todavía no hay preguntas"
+                  description="Escribí la primera a la izquierda, o copiá un cuestionario que ya tengas."
+                  className="py-10"
                 />
                 {canManage && survey.status === "borrador" && (otherSurveys ?? []).length ? (
                   <form action={copyQuestionnaireAction} className="flex flex-wrap items-end gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] p-4">
                     <input type="hidden" name="survey_id" value={id} />
-                    <label className="min-w-[220px] flex-1 text-xs font-medium text-[var(--muted)]">
-                      Copiar cuestionario de…
+                    <label className="min-w-[180px] flex-1 text-xs font-medium text-[var(--muted)]">
+                      Copiar de otra encuesta
                       <select
                         name="source_id"
                         required
@@ -291,7 +313,7 @@ export default async function EncuestaDetallePage({
                     </label>
                     <button type="submit" className="inline-flex h-10 items-center gap-2 rounded-xl bg-[var(--primary)] px-4 text-sm font-medium text-[var(--primary-fg)] hover:brightness-110">
                       <Copy className="size-4" />
-                      Copiar con saltos
+                      Copiar
                     </button>
                   </form>
                 ) : null}
@@ -317,60 +339,71 @@ export default async function EncuestaDetallePage({
                       )}
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-mono text-xs font-semibold text-[var(--primary)]">P{q.position}</span>
-                            <Badge tone="neutral">{QUESTION_TYPE_LABEL[q.type]}</Badge>
-                            {!q.is_required ? <Badge tone="neutral">Opcional</Badge> : null}
-                            {limit ? <Badge tone="neutral">Hasta {limit}</Badge> : null}
-                            {q.type === "escala" ? <Badge tone="neutral">{q.min_value ?? 1} a {q.max_value ?? 10}</Badge> : null}
-                            {q.type === "numero" && (q.min_value !== null || q.max_value !== null) ? (
-                              <Badge tone="neutral">
-                                {q.min_value ?? "−∞"} a {q.max_value ?? "∞"}
-                              </Badge>
-                            ) : null}
-                          </div>
-                          <p className="mt-2 text-sm font-medium text-[var(--foreground)]">{q.text}</p>
-                          {q.help_text ? <p className="mt-1 text-xs text-[var(--muted)]">{q.help_text}</p> : null}
-                          {q.options.length ? (
-                            <ul className="mt-2.5 flex flex-wrap gap-1.5">
-                              {q.options.map((o) => (
-                                <li
-                                  key={o.id}
-                                  className={cn(
-                                    "rounded-md px-2 py-0.5 text-xs",
-                                    endIf.includes(o.id)
-                                      ? "bg-[var(--warning-soft)] font-medium text-[var(--warning)]"
-                                      : "bg-[var(--surface-2)] text-[var(--muted)]",
-                                    q.type === "opcion_multiple" && isExclusiveOption(o) && "border border-dashed border-[var(--border)]",
-                                  )}
-                                >
-                                  {o.label}
-                                </li>
-                              ))}
-                            </ul>
-                          ) : null}
-
-                          {parent || endIf.length ? (
-                            <div className="mt-3 space-y-1.5">
-                              {parent ? (
-                                <LogicLine
-                                  icon={<GitBranch className="size-3.5" />}
-                                  tone="accent"
-                                  text={`Solo si P${parent.position} = ${describeCondition(q.logic!.show_if!.values, parent)}`}
-                                  form={canManage ? { id: q.id, surveyId: id, which: "show_if" } : null}
-                                />
-                              ) : null}
-                              {endIf.length ? (
-                                <LogicLine
-                                  icon={<StopCircle className="size-3.5" />}
-                                  tone="warning"
-                                  text={`Termina la entrevista si responde ${describeCondition(endIf, q)}`}
-                                  form={canManage ? { id: q.id, surveyId: id, which: "end_if" } : null}
-                                />
+                        <div className="flex min-w-0 items-start gap-3">
+                          <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
+                            {typeIcon(q.type)}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="font-mono text-xs font-semibold text-[var(--primary)]">P{q.position}</span>
+                              <Badge tone="neutral">{QUESTION_TYPE_LABEL[q.type]}</Badge>
+                              {!q.is_required ? <Badge tone="neutral">Opcional</Badge> : null}
+                              {limit ? <Badge tone="neutral">Hasta {limit}</Badge> : null}
+                              {q.type === "escala" ? <Badge tone="neutral">{q.min_value ?? 1} a {q.max_value ?? 10}</Badge> : null}
+                              {q.type === "numero" && (q.min_value !== null || q.max_value !== null) ? (
+                                <Badge tone="neutral">
+                                  {q.min_value ?? "−∞"} a {q.max_value ?? "∞"}
+                                </Badge>
                               ) : null}
                             </div>
-                          ) : null}
+                            <p className="mt-2 text-sm font-medium text-[var(--foreground)]">{q.text}</p>
+                            {q.help_text ? <p className="mt-1 text-xs text-[var(--muted)]">{q.help_text}</p> : null}
+                            {q.options.length ? (
+                              <ul className="mt-2.5 flex flex-wrap gap-1.5">
+                                {q.options.map((o) => (
+                                  <li
+                                    key={o.id}
+                                    className={cn(
+                                      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs",
+                                      endIf.includes(o.id)
+                                        ? "bg-[var(--warning-soft)] font-medium text-[var(--warning)]"
+                                        : "bg-[var(--surface-2)] text-[var(--muted)]",
+                                      q.type === "opcion_multiple" && isExclusiveOption(o) && "border border-dashed border-[var(--border)]",
+                                    )}
+                                  >
+                                    <span
+                                      className={cn(
+                                        "size-2.5 border border-current opacity-50",
+                                        q.type === "opcion_multiple" ? "rounded-[2px]" : "rounded-full",
+                                      )}
+                                    />
+                                    {o.label}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : null}
+
+                            {parent || endIf.length ? (
+                              <div className="mt-3 space-y-1.5">
+                                {parent ? (
+                                  <LogicLine
+                                    icon={<GitBranch className="size-3.5" />}
+                                    tone="accent"
+                                    text={`Solo si P${parent.position} = ${describeCondition(q.logic!.show_if!.values, parent)}`}
+                                    form={canManage ? { id: q.id, surveyId: id, which: "show_if" } : null}
+                                  />
+                                ) : null}
+                                {endIf.length ? (
+                                  <LogicLine
+                                    icon={<StopCircle className="size-3.5" />}
+                                    tone="warning"
+                                    text={`Termina la entrevista si responde ${describeCondition(endIf, q)}`}
+                                    form={canManage ? { id: q.id, surveyId: id, which: "end_if" } : null}
+                                  />
+                                ) : null}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
 
                         {canManage ? (
@@ -423,15 +456,11 @@ export default async function EncuestaDetallePage({
           </CardContent>
         </Card>
 
-        {/* ------------------------------------------ alta, web y equipo */}
-        <div className="space-y-4 xl:col-span-2">
-          {canManage && survey.status !== "cerrada" ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Agregar pregunta</CardTitle>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <QuestionForm surveyId={id} sources={sources} />
+        <div className={questions.length === 0 ? "grid gap-4 xl:col-span-5 xl:grid-cols-2" : "space-y-4 xl:col-span-2"}>
+          {questions.length > 0 && canManage && survey.status !== "cerrada" ? (
+            <Card className="overflow-hidden">
+              <CardContent className="p-5 sm:p-6">
+                <QuestionForm surveyId={id} sources={sources} nextPosition={questions.length + 1} />
               </CardContent>
             </Card>
           ) : null}
@@ -504,6 +533,20 @@ export default async function EncuestaDetallePage({
 
 function plural(n: number, one: string, many: string) {
   return `${n} ${n === 1 ? one : many}`;
+}
+
+function typeIcon(type: QuestionType) {
+  const icons: Record<QuestionType, React.ReactNode> = {
+    opcion_unica: <CircleDot className="size-4" />,
+    opcion_multiple: <CheckSquare className="size-4" />,
+    si_no: <ToggleLeft className="size-4" />,
+    escala: <Gauge className="size-4" />,
+    numero: <Hash className="size-4" />,
+    texto_corto: <Type className="size-4" />,
+    texto_largo: <AlignLeft className="size-4" />,
+    fecha: <Calendar className="size-4" />,
+  };
+  return icons[type];
 }
 
 function LogicLine({

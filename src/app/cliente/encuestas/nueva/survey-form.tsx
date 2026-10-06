@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Globe, MapPin } from "lucide-react";
 import { createSurveyAction, type ActionState } from "../../actions";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/field";
+import { GeographyFields } from "@/components/geography-fields";
 import { SubmitButton } from "@/components/submit-button";
 import { maxMarginOfError } from "@/lib/stats";
 import { cn } from "@/lib/utils";
@@ -83,25 +84,22 @@ export function SurveyForm({
         {channel !== "campo" ? <input type="hidden" name="web_enabled" value="on" /> : null}
       </Field>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Ámbito geográfico">
-          <Input name="geography" placeholder="San Juan, Argentina" />
-        </Field>
-        <Field
-          label="Meta de casos"
-          hint={moe ? `Margen de error máximo con esa muestra: ±${moe.toFixed(1).replace(".", ",")} pp al 95%.` : undefined}
-        >
-          <Input
-            name="target_responses"
-            type="number"
-            min={1}
-            max={100000}
-            value={target}
-            onChange={(e) => setTarget(Number(e.target.value))}
-            required
-          />
-        </Field>
-      </div>
+      <GeographyFields />
+
+      <Field
+        label="Meta de casos"
+        hint={moe ? `Margen de error máximo con esa muestra: ±${moe.toFixed(1).replace(".", ",")} pp al 95%.` : undefined}
+      >
+        <Input
+          name="target_responses"
+          type="number"
+          min={1}
+          max={100000}
+          value={target}
+          onChange={(e) => setTarget(Number(e.target.value))}
+          required
+        />
+      </Field>
 
       <Field label="Metodología">
         <Select key={channel} name="methodology" defaultValue={METHODS[channel][0]}>
