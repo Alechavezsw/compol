@@ -173,24 +173,25 @@ export async function fetchRss(url: string): Promise<RawPost[]> {
   }
 
   const items = xml.match(/<(item|entry)\b[\s\S]*?<\/(item|entry)>/gi) ?? [];
-  return items
-    .slice(0, 200)
-    .map((item) => {
-      const pick = (tag: string) => decode(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i").exec(item)?.[1] ?? "");
-      const link = pick("link") || /<link[^>]*href="([^"]+)"/i.exec(item)?.[1] || null;
-      const title = pick("title");
-      const published = parseNewsDate(pick("pubDate") || pick("published") || pick("updated"));
-      if (!published || !isRecentNews(published, MAX_NEWS_AGE_DAYS)) return null;
-      return {
-        network: "noticias" as const,
-        text: cleanHeadline(title),
-        published_at: published,
-        author: decode(pick("source") || host),
-        url: link ? safeUrl(link) : null,
-        external_id: link ?? null,
-      };
-    })
-    .filter((p): p is RawPost => Boolean(p && p.text.length > 10));
+  const posts: RawPost[] = [];
+  for (const item of items.slice(0, 200)) {
+    const pick = (tag: string) => decode(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i").exec(item)?.[1] ?? "");
+    const link = pick("link") || /<link[^>]*href="([^"]+)"/i.exec(item)?.[1] || null;
+    const title = pick("title");
+    const published = parseNewsDate(pick("pubDate") || pick("published") || pick("updated"));
+    if (!published || !isRecentNews(published, MAX_NEWS_AGE_DAYS)) continue;
+    const text = cleanHeadline(title);
+    if (text.length <= 10) continue;
+    posts.push({
+      network: "noticias",
+      text,
+      published_at: published,
+      author: decode(pick("source") || host),
+      url: link ? safeUrl(link) : null,
+      external_id: link ?? null,
+    });
+  }
+  return posts;
 }
 
 export const MAX_NEWS_AGE_DAYS = 30;
