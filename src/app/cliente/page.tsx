@@ -1,3 +1,4 @@
+import { cache, Suspense } from "react";
 import Link from "next/link";
 import {
   Activity,
@@ -29,16 +30,88 @@ import { cn, formatDate, formatNumber, formatPercent } from "@/lib/utils";
 
 type Attention = { tone: "danger" | "warning" | "primary"; icon: React.ReactNode; title: string; detail: string; href: string };
 
+const dashboard = cache(async function dashboard() {
+  const { organization } = await requireOrganization(["org_admin", "org_analyst"]);
+  const supabase = await createClient();
+  return loadDashboard(supabase, organization.id, todayKey());
+});
+
 export default async function ClienteDashboard() {
   const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
-  const supabase = await createClient();
-  const today = todayKey();
   const firstName = profile.full_name.split(" ")[0] || "equipo";
 
+  return (
+    <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-[28px] bg-[#0b1020] px-6 py-7 text-slate-100 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.55)] sm:px-8 sm:py-8">
+        <div className="pointer-events-none absolute -left-16 -top-20 size-64 rounded-full bg-violet-500/25 blur-3xl" />
+        <div className="pointer-events-none absolute -right-10 bottom-0 size-56 rounded-full bg-teal-400/20 blur-3xl" />
+        <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(148,163,184,0.35)_1px,transparent_1px)] [background-size:22px_22px]" />
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[12px] font-semibold tracking-[0.18em] text-cyan-200/80 uppercase">Hola, {firstName}</p>
+            <h1 className="display mt-2 text-[34px] leading-none text-white sm:text-[42px]">{organization.name}</h1>
+            <p className="mt-3 max-w-xl text-sm text-slate-400">
+              Estado de tus relevamientos, el humor en redes y lo que necesita atención hoy.
+            </p>
+            <Suspense fallback={<div className="mt-5 h-8 w-72 animate-pulse rounded-full bg-white/10" />}>
+              <HeroChips />
+            </Suspense>
+          </div>
+          {profile.role === "org_admin" ? (
+            <ButtonLink href="/cliente/encuestas/nueva" className="h-12 bg-cyan-300 text-slate-950 hover:bg-cyan-200">
+              Nueva encuesta
+            </ButtonLink>
+          ) : null}
+        </div>
+      </section>
+
+      <Suspense fallback={<DashboardFallback />}>
+        <DashboardBody role={profile.role} />
+      </Suspense>
+    </div>
+  );
+}
+
+async function HeroChips() {
+  const { active, days, social } = await dashboard();
+  const todayCount = days.at(-1)?.value ?? 0;
+  return (
+    <div className="mt-5 flex flex-wrap gap-2">
+      <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-slate-200">
+        <span className="size-1.5 animate-pulse rounded-full bg-emerald-300" />
+        {formatNumber(todayCount)} casos hoy
+      </span>
+      <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-slate-200">
+        {formatNumber(active.length)} en campo
+      </span>
+      <Link
+        href="/cliente/redes"
+        className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1.5 text-[12px] text-cyan-100 hover:bg-cyan-400/15"
+      >
+        Radar {social.total ? `${social.mood > 0 ? "+" : ""}${Math.round(social.mood)}` : "en espera"}
+      </Link>
+    </div>
+  );
+}
+
+function DashboardFallback() {
+  return (
+    <div className="space-y-6" aria-busy="true">
+      <div className="h-48 animate-pulse rounded-[22px] bg-[var(--surface-2)]" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <div key={i} className="h-28 animate-pulse rounded-[22px] bg-[var(--surface-2)]" />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+async function DashboardBody({ role }: { role: string }) {
   const {
     surveys,
     active,
-    completed,
+    completedCount,
     countBySurvey,
     days,
     paceBySurvey,
@@ -47,7 +120,7 @@ export default async function ClienteDashboard() {
     reports,
     social,
     control,
-  } = await loadDashboard(supabase, organization.id, today);
+  } = await dashboard();
 
   const totalTarget = active.reduce((sum, s) => sum + s.target_responses, 0);
   const activeDone = active.reduce((sum, s) => sum + (countBySurvey.get(s.id) ?? 0), 0);
@@ -128,41 +201,6 @@ export default async function ClienteDashboard() {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[28px] bg-[#0b1020] px-6 py-7 text-slate-100 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.55)] sm:px-8 sm:py-8">
-        <div className="pointer-events-none absolute -left-16 -top-20 size-64 rounded-full bg-violet-500/25 blur-3xl" />
-        <div className="pointer-events-none absolute -right-10 bottom-0 size-56 rounded-full bg-teal-400/20 blur-3xl" />
-        <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(148,163,184,0.35)_1px,transparent_1px)] [background-size:22px_22px]" />
-        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-[12px] font-semibold tracking-[0.18em] text-cyan-200/80 uppercase">Hola, {firstName}</p>
-            <h1 className="display mt-2 text-[34px] leading-none text-white sm:text-[42px]">{organization.name}</h1>
-            <p className="mt-3 max-w-xl text-sm text-slate-400">
-              Estado de tus relevamientos, el humor en redes y lo que necesita atención hoy.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-slate-200">
-                <span className="size-1.5 animate-pulse rounded-full bg-emerald-300" />
-                {formatNumber(todayCount)} casos hoy
-              </span>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-[12px] text-slate-200">
-                {formatNumber(active.length)} en campo
-              </span>
-              <Link
-                href="/cliente/redes"
-                className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1.5 text-[12px] text-cyan-100 hover:bg-cyan-400/15"
-              >
-                Radar {social.total ? `${social.mood > 0 ? "+" : ""}${Math.round(social.mood)}` : "en espera"}
-              </Link>
-            </div>
-          </div>
-          {profile.role === "org_admin" ? (
-            <ButtonLink href="/cliente/encuestas/nueva" className="h-12 bg-cyan-300 text-slate-950 hover:bg-cyan-200">
-              Nueva encuesta
-            </ButtonLink>
-          ) : null}
-        </div>
-      </section>
-
       <section className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,transparent)] p-5 shadow-[var(--shadow-card)]">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -235,7 +273,7 @@ export default async function ClienteDashboard() {
         />
         <StatCard
           label="Casos completados"
-          value={formatNumber(completed.length)}
+          value={formatNumber(completedCount)}
           icon={<ClipboardList className="size-4" />}
           hint={`${formatNumber(todayCount)} hoy · ${formatNumber(last14)} en 14 días`}
         />
@@ -330,7 +368,7 @@ export default async function ClienteDashboard() {
                 icon={<ClipboardList className="size-5" />}
                 title="Todavía no hay encuestas"
                 description="Creá tu primer cuestionario y salí a campo o publicalo en la web."
-                action={profile.role === "org_admin" ? <ButtonLink href="/cliente/encuestas/nueva">Crear encuesta</ButtonLink> : null}
+                action={role === "org_admin" ? <ButtonLink href="/cliente/encuestas/nueva">Crear encuesta</ButtonLink> : null}
               />
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
@@ -374,7 +412,7 @@ export default async function ClienteDashboard() {
           <CardHeader>
             <CardTitle>Últimos informes</CardTitle>
             <Link href="/cliente/informes" className="text-sm font-medium text-[var(--primary)] hover:underline">
-              Ver todos
+              Ver biblioteca
             </Link>
           </CardHeader>
           <CardContent className="space-y-2 pt-4">

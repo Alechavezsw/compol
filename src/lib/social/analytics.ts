@@ -1,11 +1,13 @@
 import type { Emotion, SentimentLabel, SocialNetwork, SocialPost } from "@/lib/types";
-import { cleanHeadline } from "@/lib/social/headline";
+import { NETWORK_LABEL } from "@/lib/types";
+import { cleanHeadline, uniqueStories } from "@/lib/social/headline";
 import { addDays, dayKey, formatDayKey, mean, stdDev } from "@/lib/stats";
 
 export type SocialFilters = {
   days: number;
   network?: SocialNetwork | null;
   topic?: string | null;
+  q?: string | null;
 };
 
 type Split = { positivo: number; neutral: number; negativo: number };
@@ -84,27 +86,48 @@ const STOP = new Set(
   ),
 );
 
+export function countCaptured(posts: SocialPost[], days: number, today: string) {
+  const from = addDays(today, -(Math.max(1, days) - 1));
+  return uniqueStories(
+    posts.filter((p) => {
+      const k = dayKey(p.published_at);
+      return k >= from && k <= today;
+    }),
+  ).length;
+}
+
 export function computeSocial(all: SocialPost[], filters: SocialFilters, today: string): SocialAnalytics {
-  const days = Math.max(1, Math.min(365, filters.days));
+  const days = Math.max(1, Math.min(30, filters.days));
   const from = addDays(today, -(days - 1));
   const prevFrom = addDays(from, -days);
 
-  const scoped = all.filter(
-    (p) => (!filters.network || p.network === filters.network) && (!filters.topic || p.topics.includes(filters.topic)),
-  );
-  const current = scoped.filter((p) => {
-    const k = dayKey(p.published_at);
-    return k >= from && k <= today;
+  const needle = filters.q?.trim().toLowerCase() ?? "";
+  const monthFrom = addDays(today, -29);
+  const scoped = all.filter((p) => {
+    const published = dayKey(p.published_at);
+    if (published < monthFrom || published > today) return false;
+    if (filters.network && p.network !== filters.network) return false;
+    if (filters.topic && !p.topics.includes(filters.topic)) return false;
+    if (needle && !`${p.text} ${p.author ?? ""} ${p.topics.join(" ")}`.toLowerCase().includes(needle)) return false;
+    return true;
   });
+  const current = uniqueStories(
+    scoped.filter((p) => {
+      const k = dayKey(p.published_at);
+      return k >= from && k <= today;
+    }),
+  );
   // Solo se compara contra el período anterior si hay datos desde su comienzo:
   // si la escucha arrancó hace 40 días, "creció 300%" en 30 días es un artefacto.
   const earliest = all.reduce((min, p) => (p.published_at < min ? p.published_at : min), "9999");
   const comparable = earliest !== "9999" && dayKey(earliest) <= addDays(prevFrom, 2);
   const previous = comparable
-    ? scoped.filter((p) => {
-        const k = dayKey(p.published_at);
-        return k >= prevFrom && k < from;
-      })
+    ? uniqueStories(
+        scoped.filter((p) => {
+          const k = dayKey(p.published_at);
+          return k >= prevFrom && k < from;
+        }),
+      )
     : [];
 
   const split = emptySplit();
@@ -250,16 +273,6 @@ export function computeSocial(all: SocialPost[], filters: SocialFilters, today: 
 
   const byImpact = (a: SocialPost, b: SocialPost) => b.engagement - a.engagement;
 
-  function uniqueHeadline(posts: SocialPost[]) {
-    const best = new Map<string, SocialPost>();
-    for (const p of posts) {
-      const key = cleanHeadline(p.text).toLowerCase();
-      const prev = best.get(key);
-      if (!prev || (!prev.url && p.url)) best.set(key, p);
-    }
-    return posts.filter((p) => best.get(cleanHeadline(p.text).toLowerCase())?.id === p.id);
-  }
-
   return {
     from,
     to: today,
@@ -274,9 +287,9 @@ export function computeSocial(all: SocialPost[], filters: SocialFilters, today: 
     topics,
     emotions,
     alerts: alerts.slice(0, 6),
-    topNegative: uniqueHeadline(current.filter((p) => p.label === "negativo").sort(byImpact)).slice(0, 6),
-    topPositive: uniqueHeadline(current.filter((p) => p.label === "positivo").sort(byImpact)).slice(0, 6),
-    recent: uniqueHeadline([...current].sort((a, b) => b.published_at.localeCompare(a.published_at))).slice(0, 10),
+    topNegative: uniqueStories(current.filter((p) => p.label === "negativo").sort(byImpact)).slice(0, 6),
+    topPositive: uniqueStories(current.filter((p) => p.label === "positivo").sort(byImpact)).slice(0, 6),
+    recent: uniqueStories([...current].sort((a, b) => b.published_at.localeCompare(a.published_at))).slice(0, 10),
     terms,
   };
 }
@@ -295,6 +308,51 @@ export function socialBriefing(a: SocialAnalytics) {
       .join("; ")}.`,
   ];
   for (const al of a.alerts) lines.push(`Alerta: ${al.title}. ${al.detail}`);
+  return lines.join("\n");
+}
+
+/** Briefing largo para el informe IA del radar. */
+export function radarBriefing(a: SocialAnalytics) {
+  if (!a.total) return "";
+  const pct = (n: number) => `${((n / a.total) * 100).toFixed(1).replace(".", ",")}%`;
+  const lines = [
+    "RADAR DE CONVERSACIÓN. Esto NO es una encuesta ni una muestra representativa.",
+    "Son notas públicas de portales de San Juan, deduplicadas por historia. No inventes cifras.",
+    `Período: ${formatDayKey(a.from)} a ${formatDayKey(a.to)}.`,
+    `Notas únicas: ${a.total}. A favor ${pct(a.split.positivo)} (${a.split.positivo}), neutrales ${pct(a.split.neutral)} (${a.split.neutral}), en contra ${pct(a.split.negativo)} (${a.split.negativo}).`,
+    `Índice de humor: ${Math.round(a.mood)} (de -100 a +100)${a.previousMood !== null ? `; período anterior ${Math.round(a.previousMood)}` : ""}.`,
+  ];
+  if (a.topics.length) {
+    lines.push(
+      `Temas: ${a.topics
+        .slice(0, 8)
+        .map((t) => `${t.name} ${t.volume} notas, humor ${Math.round(t.mood)}${t.growth !== null ? `, ${Math.round(t.growth)}% vs período previo` : ""}`)
+        .join("; ")}.`,
+    );
+  }
+  if (a.byNetwork.length) {
+    lines.push(
+      `Fuentes: ${a.byNetwork.map((n) => `${NETWORK_LABEL[n.network]} ${n.volume}`).join("; ")}.`,
+    );
+  }
+  if (a.emotions.length) {
+    lines.push(`Emociones: ${a.emotions.map((e) => `${e.emotion} ${e.count}`).join("; ")}.`);
+  }
+  for (const al of a.alerts) lines.push(`Alerta: ${al.title}. ${al.detail}`);
+  if (a.recent.length) {
+    lines.push("Notas recientes:");
+    for (const p of a.recent.slice(0, 8)) {
+      lines.push(`- [${p.label}] ${cleanHeadline(p.text)}${p.topics.length ? ` · ${p.topics.join(", ")}` : ""}`);
+    }
+  }
+  if (a.topNegative.length) {
+    lines.push("Más críticas:");
+    for (const p of a.topNegative.slice(0, 4)) lines.push(`- ${cleanHeadline(p.text)}`);
+  }
+  if (a.topPositive.length) {
+    lines.push("Más elogios:");
+    for (const p of a.topPositive.slice(0, 4)) lines.push(`- ${cleanHeadline(p.text)}`);
+  }
   return lines.join("\n");
 }
 

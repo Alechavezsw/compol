@@ -54,6 +54,7 @@ const SERVICE_LINES: ServiceLine[] = [
   "radar_conversacion",
   "estudios_tematicos",
   "flash",
+  "otro",
 ];
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;

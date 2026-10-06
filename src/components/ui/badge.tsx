@@ -120,6 +120,7 @@ const serviceLineTone: Record<ServiceLine, Tone> = {
   radar_conversacion: "success",
   estudios_tematicos: "neutral",
   flash: "warning",
+  otro: "neutral",
 };
 
 export function ServiceLineBadge({ line }: { line: ServiceLine }) {

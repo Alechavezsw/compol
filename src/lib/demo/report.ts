@@ -295,3 +295,60 @@ export function buildLocalReport(params: {
     model: "plantilla local (sin modelo)",
   };
 }
+
+export function buildLocalRadarReport(params: {
+  social: SocialAnalytics;
+  organizationName: string;
+}): GeneratedReport {
+  const { social, organizationName } = params;
+  const share = (n: number) => pct((n / Math.max(1, social.total)) * 100);
+  const highlights: ReportHighlight[] = [
+    {
+      titulo: "Humor del período",
+      detalle: `Sobre ${social.total} notas únicas, ${share(social.split.positivo)} van a favor y ${share(social.split.negativo)} en contra.`,
+      metrica: `${social.mood >= 0 ? "+" : ""}${Math.round(social.mood)}`,
+    },
+  ];
+  for (const t of social.topics.slice(0, 3)) {
+    highlights.push({
+      titulo: t.name,
+      detalle: `${t.volume} notas, humor ${Math.round(t.mood)}.`,
+      metrica: `${t.volume}`,
+    });
+  }
+
+  const parts = [
+    `# Qué se dice de ${organizationName}`,
+    `_${organizationName} · radar de conversación · ${formatDayKey(social.from)} a ${formatDayKey(social.to)}_`,
+    "\n## Resumen ejecutivo\n",
+    `El radar reunió **${social.total} notas únicas** de portales públicos. El índice de humor queda en **${Math.round(social.mood)}** (de −100 a +100): ${share(social.split.positivo)} a favor, ${share(social.split.neutral)} neutrales y ${share(social.split.negativo)} en contra.`,
+  ];
+  if (social.topics.length) {
+    parts.push("\n## Temas\n");
+    parts.push(
+      social.topics
+        .slice(0, 6)
+        .map((t) => `- **${t.name}**: ${t.volume} notas, humor ${Math.round(t.mood)}.`)
+        .join("\n"),
+    );
+  }
+  if (social.recent.length) {
+    parts.push("\n## Notas que marcan agenda\n");
+    parts.push(social.recent.slice(0, 6).map((p) => `- ${p.text.split(/\s+-\s+/)[0]}`).join("\n"));
+  }
+  parts.push("\n## Advertencias metodológicas\n");
+  parts.push(
+    [
+      "- Este texto ordena las cifras del radar. No es una encuesta ni una muestra representativa.",
+      "- Las notas se agrupan por historia para no contar dos veces la misma noticia.",
+      "- Sirve para leer agenda y tono, no para medir la opinión general de la ciudad.",
+    ].join("\n"),
+  );
+
+  return {
+    title: `Qué se dice de ${organizationName}`.slice(0, 140),
+    markdown: parts.join("\n"),
+    highlights: highlights.slice(0, 6),
+    model: "plantilla local (sin modelo)",
+  };
+}

@@ -6,6 +6,7 @@ import { createProjectAction } from "../../actions";
 import type { ActionState } from "../../actions";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
+import { ColorPalette } from "@/components/color-palette";
 import { SERVICE_LINE_LABEL, type ServiceLine } from "@/lib/types";
 
 const SERVICE_LINES = Object.keys(SERVICE_LINE_LABEL) as ServiceLine[];
@@ -29,11 +30,9 @@ export function ProyectoForm() {
         </Select>
       </Field>
 
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Color" hint="Formato #RRGGBB, opcional">
-          <Input name="color" placeholder="#0ea5a4" />
-        </Field>
-      </div>
+      <Field label="Color" hint="Opcional. Identifica el proyecto en el tablero.">
+        <ColorPalette name="color" />
+      </Field>
 
       <Field label="Descripción" hint="Opcional">
         <Textarea name="description" placeholder="Serie trimestral de medición de percepción ciudadana…" />

@@ -5,19 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   ImportPanel,
-  ListenButton,
   MetaListenButton,
   PostFeed,
+  RadarActionBar,
   ReclassifyButton,
   SocialFilterBar,
   SourceForm,
   TrackerForm,
 } from "./panel";
-import { deleteSourceAction, deleteTrackerAction } from "./actions";
+import { deleteSourceAction, deleteTrackerAction, persistMissingTopics } from "./actions";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
 import { fetchAll } from "@/lib/supabase/fetch-all";
-import { computeSocial, moodLabel } from "@/lib/social/analytics";
+import { computeSocial, countCaptured, moodLabel } from "@/lib/social/analytics";
 import { addDays, todayKey } from "@/lib/stats";
 import { cn, formatDateTime, formatNumber, formatPercent } from "@/lib/utils";
 import {
@@ -46,14 +46,14 @@ function SplitBar({ split, total }: { split: { positivo: number; neutral: number
 export default async function RedesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dias?: string; red?: string; tema?: string }>;
+  searchParams: Promise<{ dias?: string; red?: string; tema?: string; q?: string }>;
 }) {
   const query = await searchParams;
   const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
   const supabase = await createClient();
-  const days = [1, 7, 30, 90].includes(Number(query.dias)) ? Number(query.dias) : 30;
+  const days = [1, 7, 30].includes(Number(query.dias)) ? Number(query.dias) : 1;
   const today = todayKey();
-  const since = `${addDays(today, -(days * 2))}T00:00:00-03:00`;
+  const since = `${addDays(today, -30)}T00:00:00-03:00`;
 
   const [{ data: trackerRows }, { data: sourceRows }, { data: importRows }, posts] = await Promise.all([
     supabase.from("social_trackers").select("*").eq("organization_id", organization.id).order("created_at"),
@@ -79,11 +79,17 @@ export default async function RedesPage({
   const trackers = (trackerRows ?? []) as SocialTracker[];
   const sources = (sourceRows ?? []) as SocialSource[];
   const imports = (importRows ?? []) as SocialImport[];
+  const tagged = await persistMissingTopics(supabase, organization.id, posts, trackers);
   const network = NETWORKS.includes(query.red as SocialNetwork) ? (query.red as SocialNetwork) : null;
-  const a = computeSocial(posts, { days, network, topic: query.tema || null }, today);
+  const a = computeSocial(tagged, { days, network, topic: query.tema || null, q: query.q || null }, today);
+  const periodCounts = {
+    1: countCaptured(tagged, 1, today),
+    7: countCaptured(tagged, 7, today),
+    30: countCaptured(tagged, 30, today),
+  };
   const canManage = profile.role === "org_admin";
-  const pendingLexicon = posts.filter((p) => p.classified_by === "lexico").length;
-  const allTopics = [...new Set(posts.flatMap((p) => p.topics))].sort((x, y) => x.localeCompare(y, "es"));
+  const pendingLexicon = tagged.filter((p) => p.classified_by === "lexico").length;
+  const allTopics = [...new Set(tagged.flatMap((p) => p.topics))].sort((x, y) => x.localeCompare(y, "es"));
   const mood = moodLabel(a.mood);
   const lastSync = sources.map((s) => s.last_fetched_at).filter(Boolean).sort().at(-1) ?? imports[0]?.created_at;
   const favor = a.total ? (a.split.positivo / a.total) * 100 : 0;
@@ -96,37 +102,35 @@ export default async function RedesPage({
           <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)] uppercase">Radar</p>
           <h1 className="display mt-1 text-[34px] leading-none text-[var(--foreground)]">Qué se dice de la gestión</h1>
           <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
-            Encendé el radar: recorre portales de San Juan, guarda notas reales y muestra el tono.
+            Encendé el radar, revisá las notas y guardalas. Cada guardado suma a Hoy, a la semana y al mes.
           </p>
         </div>
-        {canManage ? (
-          <div className="shrink-0">
-            <ListenButton />
-            {lastSync ? (
-              <p suppressHydrationWarning className="mt-2 text-right text-[11px] text-[var(--muted)]">
-                Última búsqueda {formatDateTime(lastSync)}
-              </p>
-            ) : null}
-          </div>
-        ) : null}
+        <RadarActionBar canListen={canManage} days={days} notes={a.total} lastSync={lastSync} />
       </header>
+
+      <SocialFilterBar
+        topics={allTopics}
+        networks={NETWORKS.filter((n) => posts.some((p) => p.network === n))}
+        counts={periodCounts}
+      />
 
       {a.total === 0 ? (
         <Card>
           <CardContent className="py-14 text-center">
-            <p className="display text-2xl">Todavía no hay notas</p>
+            <p className="display text-2xl">{query.q ? "Nada para esa búsqueda" : "Todavía no hay notas en este recorte"}</p>
             <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">
-              El botón de arriba busca noticias públicas de {organization.name} y de tus temas, y las deja en la base.
+              {query.q
+                ? "Probá otro término o encendé el radar para buscarlo en los portales."
+                : `Encendé el radar para buscar notas de ${organization.name}. Guardalas y van a aparecer en Hoy.`}
             </p>
           </CardContent>
         </Card>
       ) : (
         <>
-          <SocialFilterBar topics={allTopics} networks={NETWORKS.filter((n) => posts.some((p) => p.network === n))} />
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
-              ["Notas", formatNumber(a.total), query.tema ? `Sobre ${query.tema}` : days === 1 ? "Hoy" : `Últimos ${days} días`],
+              ["Notas", formatNumber(a.total), query.q ? `«${query.q}»` : query.tema ? `Sobre ${query.tema}` : days === 1 ? "Hoy" : `Últimos ${days} días`],
               ["Tono", `${a.mood > 0 ? "+" : ""}${Math.round(a.mood)}`, mood.text],
               ["A favor", formatPercent(favor), `${formatNumber(a.split.positivo)} notas`],
               ["En contra", formatPercent(contra), `${formatNumber(a.split.negativo)} notas`],
@@ -159,6 +163,7 @@ export default async function RedesPage({
                         href={`?${new URLSearchParams({
                           ...(query.dias ? { dias: query.dias } : {}),
                           ...(query.red ? { red: query.red } : {}),
+                          ...(query.q ? { q: query.q } : {}),
                           tema: t.name,
                         }).toString()}`}
                         scroll={false}
@@ -194,7 +199,10 @@ export default async function RedesPage({
                   })
                 )}
                 {query.tema ? (
-                  <Link href="/cliente/redes" className="mt-2 block px-3 text-xs text-[var(--primary)]">
+                  <Link
+                    href={`/cliente/redes${query.dias || query.q ? `?${new URLSearchParams({ ...(query.dias ? { dias: query.dias } : {}), ...(query.q ? { q: query.q } : {}) }).toString()}` : ""}`}
+                    className="mt-2 block px-3 text-xs text-[var(--primary)]"
+                  >
                     Ver todos los temas
                   </Link>
                 ) : null}

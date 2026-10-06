@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3,
   Building2,
@@ -91,6 +91,7 @@ export function AppShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pendingHref, setPendingHref] = useState<string | null>(null);
 
@@ -100,6 +101,10 @@ export function AppShell({
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  useEffect(() => {
+    for (const item of nav) router.prefetch(item.href);
+  }, [nav, router]);
 
   useEffect(() => {
     setPendingHref(null);

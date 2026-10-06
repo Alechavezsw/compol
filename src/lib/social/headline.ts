@@ -1,3 +1,55 @@
+const STORY_STOP = new Set(
+  "esta este estos estas para como pero cuando donde porque desde hasta sobre entre ante segun segun ciudad juan san capital municipalidad municipio intendente diario noticias nota portal".split(
+    " ",
+  ),
+);
+
+function storyTokens(text: string) {
+  return fold(cleanHeadline(text))
+    .split(/[^a-z0-9ñ]+/)
+    .filter((w) => w.length >= 4 && !STORY_STOP.has(w));
+}
+
+function storyEntities(text: string) {
+  const t = fold(text);
+  const hits: string[] = [];
+  if (/unicef|muna/.test(t)) hits.push("unicef-muna");
+  if (/baistrocchi/.test(t)) hits.push("baistrocchi");
+  if (/plaza ?25/.test(t)) hits.push("plaza-25");
+  if (/amas de casa|feriant/.test(t)) hits.push("feria-amas");
+  if (/asistencia al vecino/.test(t)) hits.push("asistencia-vecino");
+  if (/walter melcher/.test(t)) hits.push("plaza-melcher");
+  if (/arbolado/.test(t)) hits.push("arbolado");
+  if (/ladrillos? plastic/.test(t)) hits.push("ladrillos-plasticos");
+  return new Set(hits);
+}
+
+/** Misma noticia contada por varios portales. */
+export function sameStory(a: string, b: string) {
+  if (fold(cleanHeadline(a)) === fold(cleanHeadline(b))) return true;
+  const ea = storyEntities(a);
+  const eb = storyEntities(b);
+  for (const e of ea) {
+    if (eb.has(e)) return true;
+  }
+  const A = new Set(storyTokens(a));
+  const B = new Set(storyTokens(b));
+  if (!A.size || !B.size) return false;
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter += 1;
+  const jaccard = inter / (A.size + B.size - inter);
+  return jaccard >= 0.42 || inter >= 4;
+}
+
+export function uniqueStories<T extends { text: string }>(posts: T[]): T[] {
+  const kept: T[] = [];
+  for (const post of posts) {
+    if (kept.some((row) => sameStory(row.text, post.text))) continue;
+    kept.push(post);
+  }
+  return kept;
+}
+
 /** Título corto para el tablero: saca repeticiones y el medio al final. */
 export function cleanHeadline(text: string) {
   const raw = text.replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
@@ -31,6 +83,7 @@ export function looksLikeLocalNews(text: string, organizationName: string, sourc
   const s = fold(source ?? "");
   const head = fold(cleanHeadline(text));
   if (head.length < 28 || /^municipalidad de capital(\s*\|\s*san juan)?$/.test(head)) return false;
+  if (/^noticias sobre\b/.test(head) || /^noticias de\b/.test(head)) return false;
   if (FOREIGN.test(t) || FOREIGN.test(s) || NOISE.test(t)) return false;
   if (OTHER_MUNI.test(t) && !/ciudad de san juan|municipalidad de san juan|municipalidad de capital/.test(t)) {
     return false;

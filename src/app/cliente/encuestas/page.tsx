@@ -21,7 +21,7 @@ export default async function EncuestasPage() {
     await Promise.all([
       supabase
         .from("surveys")
-        .select("*")
+        .select("id, title, description, status, target_responses, ends_at, geography, web_enabled, project_id, updated_at")
         .eq("organization_id", organization.id)
         .order("updated_at", { ascending: false }),
       fetchAll<{ survey_id: string; surveyor_id: string | null; submitted_at: string | null }>((from, to) =>

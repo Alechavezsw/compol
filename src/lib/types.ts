@@ -32,7 +32,8 @@ export type ServiceLine =
   | "laboratorio_opinion"
   | "radar_conversacion"
   | "estudios_tematicos"
-  | "flash";
+  | "flash"
+  | "otro";
 
 export type Organization = {
   id: string;
@@ -199,7 +200,7 @@ export type Answer = {
 
 export type AiReport = {
   id: string;
-  survey_id: string;
+  survey_id: string | null;
   organization_id: string;
   title: string;
   kind: ReportKind;
@@ -544,6 +545,7 @@ export const SERVICE_LINE_LABEL: Record<ServiceLine, string> = {
   radar_conversacion: "Radar de conversación pública",
   estudios_tematicos: "Estudios temáticos",
   flash: "Estudios Flash",
+  otro: "Otro",
 };
 
 export const SERVICE_LINE_DESCRIPTION: Record<ServiceLine, string> = {
@@ -564,4 +566,5 @@ export const SERVICE_LINE_DESCRIPTION: Record<ServiceLine, string> = {
     "Análisis de fuentes digitales públicas: temas, volumen y evolución.",
   estudios_tematicos: "Investigación propia sobre agenda pública y temas específicos.",
   flash: "Operativos breves para preguntas puntuales, con alcance acotado.",
+  otro: "Una línea que no entra en el portfolio habitual.",
 };

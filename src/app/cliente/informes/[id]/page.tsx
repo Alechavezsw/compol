@@ -8,8 +8,11 @@ import { createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
 import { computeAnalytics, loadSurveyData } from "@/lib/analytics";
 import { formatDate } from "@/lib/utils";
-import { pickReportCharts } from "@/lib/reports/visual";
-import { REPORT_KIND_LABEL, type AiReport } from "@/lib/types";
+import { pickRadarCharts, pickReportCharts } from "@/lib/reports/visual";
+import { computeSocial } from "@/lib/social/analytics";
+import { fetchAll } from "@/lib/supabase/fetch-all";
+import { addDays, todayKey } from "@/lib/stats";
+import { REPORT_KIND_LABEL, type AiReport, type SocialPost } from "@/lib/types";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -36,6 +39,8 @@ export default async function InformePage({ params }: { params: Promise<{ id: st
   let charts = [] as ReturnType<typeof pickReportCharts>;
   let completed = 0;
   let geography = report.surveys?.geography ?? null;
+  let sampleLabel = "casos";
+  const isRadar = !report.survey_id || report.focus?.startsWith("radar");
 
   if (report.surveys && report.status === "listo") {
     const surveyData = await loadSurveyData(supabase, report.surveys.id);
@@ -45,9 +50,27 @@ export default async function InformePage({ params }: { params: Promise<{ id: st
       completed = analytics.totals.completed;
       geography = analytics.survey.geography;
     }
+  } else if (isRadar && report.status === "listo") {
+    const today = todayKey();
+    const days = Number(report.focus?.split(":")[1] ?? 30);
+    const window = [1, 7, 30].includes(days) ? days : 30;
+    const posts = await fetchAll<SocialPost>((from, to) =>
+      supabase
+        .from("social_posts")
+        .select("*")
+        .eq("organization_id", organization.id)
+        .gte("published_at", new Date(`${addDays(today, -30)}T00:00:00-03:00`).toISOString())
+        .order("id")
+        .range(from, to),
+    );
+    const social = computeSocial(posts, { days: window }, today);
+    charts = pickRadarCharts(social);
+    completed = social.total;
+    geography = "Radar de conversación";
+    sampleLabel = "notas";
   }
 
-  const kindLabel = REPORT_KIND_LABEL[report.kind];
+  const kindLabel = isRadar ? "Informe del radar" : REPORT_KIND_LABEL[report.kind];
   const dateLabel = formatDate(report.created_at);
 
   return (
@@ -58,7 +81,7 @@ export default async function InformePage({ params }: { params: Promise<{ id: st
           className="inline-flex items-center gap-1.5 text-sm text-[var(--muted)] transition-colors hover:text-[var(--foreground)]"
         >
           <ArrowLeft className="size-4" />
-          Volver a informes
+          Volver a la biblioteca
         </Link>
         <div className="flex flex-wrap gap-2">
           {report.surveys ? (
@@ -69,6 +92,11 @@ export default async function InformePage({ params }: { params: Promise<{ id: st
             >
               <BarChart3 />
               Ver los datos
+            </ButtonLink>
+          ) : isRadar ? (
+            <ButtonLink href="/cliente/redes" variant="outline" size="sm">
+              <BarChart3 />
+              Volver al radar
             </ButtonLink>
           ) : null}
           {report.status === "listo" ? (
@@ -81,6 +109,7 @@ export default async function InformePage({ params }: { params: Promise<{ id: st
                 audience: report.audience,
                 geography,
                 completed,
+                sampleLabel,
                 highlights: report.highlights ?? [],
                 charts,
                 markdown: report.content ?? "",
@@ -108,6 +137,7 @@ export default async function InformePage({ params }: { params: Promise<{ id: st
           audience={report.audience}
           geography={geography}
           completed={completed}
+          sampleLabel={sampleLabel}
           highlights={report.highlights ?? []}
           charts={charts}
           markdown={report.content ?? ""}

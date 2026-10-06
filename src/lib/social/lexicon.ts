@@ -61,7 +61,9 @@ export const DEFAULT_TOPICS: { name: string; keywords: string[] }[] = [
   { name: "Residuos", keywords: ["basura", "residuos", "recoleccion", "contenedor", "mugre", "limpieza"] },
   { name: "Tasas e impuestos", keywords: ["tasa", "impuesto", "tarifazo", "aumento", "boleta", "cobr"] },
   { name: "Presupuesto participativo", keywords: ["presupuesto participativo", "presupuesto 2027", "consulta vecinal", "audiencia publica"] },
-  { name: "Gestión municipal", keywords: ["intendent", "municipio", "municipalidad", "gestion", "concejo", "gobierno"] },
+  { name: "Gestión municipal", keywords: ["intendent", "municipio", "municipalidad", "gestion", "concejo", "gobierno", "asistencia al vecino"] },
+  { name: "Niñez y familia", keywords: ["unicef", "muna", "ninez", "infancia", "adolescen", "ninos", "familia"] },
+  { name: "Espacios públicos", keywords: ["plaza", "espacios verdes", "feria", "feriant", "parque"] },
 ];
 
 export type Classification = {

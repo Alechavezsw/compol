@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Survey } from "@/lib/types";
 import { fetchAll } from "@/lib/supabase/fetch-all";
@@ -109,57 +110,68 @@ export function socialPulse(posts: DashSocial[], today: string) {
   return { mood, total: current.length, alerts };
 }
 
-export async function loadDashboard(supabase: Client, organizationId: string, today: string) {
+export const loadDashboard = cache(async function loadDashboard(
+  supabase: Client,
+  organizationId: string,
+  today: string,
+) {
   const since14 = `${addDays(today, -13)}T00:00:00-03:00`;
   const socialSince = `${addDays(today, -13)}T00:00:00-03:00`;
 
-  const [{ data: surveyRows }, completed, { data: reportRows }, socialPosts] = await Promise.all([
-    supabase.from("surveys").select("*").eq("organization_id", organizationId).order("updated_at", { ascending: false }),
-    fetchAll<DashResponse>((from, to) =>
+  const [{ data: surveyRows }, completed, { data: reportRows }, { data: socialRows }, { data: assignmentRows }] =
+    await Promise.all([
       supabase
-        .from("responses")
-        .select("survey_id, submitted_at, duration_seconds, channel, surveyor_id, zone")
+        .from("surveys")
+        .select(
+          "id, organization_id, project_id, title, description, status, target_responses, starts_at, ends_at, geography, methodology, web_enabled, public_token, web_settings, created_by, created_at, updated_at",
+        )
         .eq("organization_id", organizationId)
-        .eq("status", "completada")
-        .order("id")
-        .range(from, to),
-    ),
-    supabase
-      .from("ai_reports")
-      .select("id, title, created_at, survey_id, kind")
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false })
-      .limit(4),
-    fetchAll<DashSocial>((from, to) =>
+        .order("updated_at", { ascending: false }),
+      fetchAll<DashResponse>((from, to) =>
+        supabase
+          .from("responses")
+          .select("survey_id, submitted_at, duration_seconds, channel, surveyor_id, zone")
+          .eq("organization_id", organizationId)
+          .eq("status", "completada")
+          .order("id")
+          .range(from, to),
+      ),
+      supabase
+        .from("ai_reports")
+        .select("id, title, created_at, survey_id, kind")
+        .eq("organization_id", organizationId)
+        .order("created_at", { ascending: false })
+        .limit(4),
       supabase
         .from("social_posts")
         .select("label, engagement, topics, published_at")
         .eq("organization_id", organizationId)
         .gte("published_at", new Date(socialSince).toISOString())
-        .order("id")
-        .range(from, to),
-    ),
-  ]);
+        .order("published_at", { ascending: false })
+        .limit(200),
+      supabase.from("survey_assignments").select("id, survey_id, surveyor_id, zone"),
+    ]);
 
   const surveys = (surveyRows ?? []) as Survey[];
   const active = surveys.filter((s) => s.status === "activa");
-  const activeIds = active.map((s) => s.id);
+  const activeIds = new Set(active.map((s) => s.id));
+  const activeAssignments = (assignmentRows ?? []).filter((a) => activeIds.has(a.survey_id));
+  const assignmentIds = activeAssignments.map((a) => a.id);
+  const surveyorIds = [...new Set(activeAssignments.map((a) => a.surveyor_id))];
 
-  const { data: assignmentRows } = activeIds.length
-    ? await supabase.from("survey_assignments").select("id, survey_id, surveyor_id, zone").in("survey_id", activeIds)
-    : { data: [] as { id: string; survey_id: string; surveyor_id: string; zone: string | null }[] };
-  const assignmentIds = (assignmentRows ?? []).map((a) => a.id);
-  const { data: zoneQuotaRows } = assignmentIds.length
-    ? await supabase.from("survey_zone_quotas").select("assignment_id, zone, quota").in("assignment_id", assignmentIds)
-    : { data: [] as { assignment_id: string; zone: string; quota: number }[] };
-  const surveyorIds = [...new Set((assignmentRows ?? []).map((a) => a.surveyor_id))];
-  const { data: profileRows } = surveyorIds.length
-    ? await supabase.from("profiles").select("id, full_name").in("id", surveyorIds)
-    : { data: [] as { id: string; full_name: string }[] };
+  const [{ data: zoneQuotaRows }, { data: profileRows }] = await Promise.all([
+    assignmentIds.length
+      ? supabase.from("survey_zone_quotas").select("assignment_id, zone, quota").in("assignment_id", assignmentIds)
+      : Promise.resolve({ data: [] as { assignment_id: string; zone: string; quota: number }[] }),
+    surveyorIds.length
+      ? supabase.from("profiles").select("id, full_name").in("id", surveyorIds)
+      : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
+  ]);
+  const socialPosts = (socialRows ?? []) as DashSocial[];
 
   const names = new Map((profileRows ?? []).map((p) => [p.id, p.full_name]));
   const staleBySurvey = new Map<string, DashSurveyor[]>();
-  for (const a of assignmentRows ?? []) {
+  for (const a of activeAssignments) {
     const last = completed
       .filter((r) => r.survey_id === a.survey_id && r.surveyor_id === a.surveyor_id && r.submitted_at)
       .map((r) => r.submitted_at as string)
@@ -205,7 +217,7 @@ export async function loadDashboard(supabase: Client, organizationId: string, to
 
   const control = {
     today: todayRows.length,
-    surveyors: [...new Map((assignmentRows ?? []).map((a) => [a.surveyor_id, a])).values()].map((a) => {
+    surveyors: [...new Map(activeAssignments.map((a) => [a.surveyor_id, a])).values()].map((a) => {
       const last = completed
         .filter((r) => r.surveyor_id === a.surveyor_id && r.submitted_at)
         .map((r) => r.submitted_at as string)
@@ -231,7 +243,7 @@ export async function loadDashboard(supabase: Client, organizationId: string, to
   return {
     surveys,
     active,
-    completed,
+    completedCount: completed.length,
     countBySurvey,
     days,
     paceBySurvey,
@@ -241,4 +253,4 @@ export async function loadDashboard(supabase: Client, organizationId: string, to
     social,
     control,
   };
-}
+});

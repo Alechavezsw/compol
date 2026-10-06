@@ -173,19 +173,48 @@ export async function fetchRss(url: string): Promise<RawPost[]> {
   }
 
   const items = xml.match(/<(item|entry)\b[\s\S]*?<\/(item|entry)>/gi) ?? [];
-  return items.slice(0, 200).map((item) => {
-    const pick = (tag: string) => decode(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i").exec(item)?.[1] ?? "");
-    const link = pick("link") || /<link[^>]*href="([^"]+)"/i.exec(item)?.[1] || null;
-    const title = pick("title");
-    return {
-      network: "noticias" as const,
-      text: cleanHeadline(title),
-      published_at: parseDate(pick("pubDate") || pick("published") || pick("updated")),
-      author: decode(pick("source") || host),
-      url: link ? safeUrl(link) : null,
-      external_id: link ?? null,
-    };
-  }).filter((p) => p.text.length > 10);
+  return items
+    .slice(0, 200)
+    .map((item) => {
+      const pick = (tag: string) => decode(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i").exec(item)?.[1] ?? "");
+      const link = pick("link") || /<link[^>]*href="([^"]+)"/i.exec(item)?.[1] || null;
+      const title = pick("title");
+      const published = parseNewsDate(pick("pubDate") || pick("published") || pick("updated"));
+      if (!published || !isRecentNews(published, MAX_NEWS_AGE_DAYS)) return null;
+      return {
+        network: "noticias" as const,
+        text: cleanHeadline(title),
+        published_at: published,
+        author: decode(pick("source") || host),
+        url: link ? safeUrl(link) : null,
+        external_id: link ?? null,
+      };
+    })
+    .filter((p): p is RawPost => Boolean(p && p.text.length > 10));
+}
+
+export const MAX_NEWS_AGE_DAYS = 30;
+
+export function isRecentNews(iso: string, maxDays = MAX_NEWS_AGE_DAYS) {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return false;
+  const age = Date.now() - t;
+  return age >= -12 * 3_600_000 && age <= maxDays * 86_400_000;
+}
+
+function parseNewsDate(raw: string | undefined) {
+  if (!raw?.trim()) return null;
+  const trimmed = raw.trim();
+  const ar = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})(?:\s+(\d{1,2}):(\d{2}))?/.exec(trimmed);
+  if (ar) {
+    const year = ar[3].length === 2 ? `20${ar[3]}` : ar[3];
+    const d = new Date(
+      `${year}-${ar[2].padStart(2, "0")}-${ar[1].padStart(2, "0")}T${(ar[4] ?? "12").padStart(2, "0")}:${ar[5] ?? "00"}:00-03:00`,
+    );
+    if (!Number.isNaN(d.getTime())) return d.toISOString();
+  }
+  const d = new Date(trimmed);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
 export function externalId(p: RawPost) {

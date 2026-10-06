@@ -1,14 +1,15 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { FileSpreadsheet, Heart, Loader2, Plus, Radio, Rss, Type, Upload } from "lucide-react";
+import { FileSpreadsheet, Heart, Loader2, Plus, Radio, Rss, Sparkles, Type, Upload } from "lucide-react";
 import {
+  analyzeRadarAction,
   createSourceAction,
   createTrackerAction,
   importSocialAction,
   listenMetaAction,
-  listenNowAction,
   reclassifyAction,
   type SocialActionState,
 } from "./actions";
@@ -18,14 +19,23 @@ import { Button } from "@/components/ui/button";
 import { NETWORK_LABEL, type SocialNetwork, type SocialPost } from "@/lib/types";
 import { cleanHeadline } from "@/lib/social/headline";
 import { RadarIgnition } from "./radar-visual";
-import { cn, formatNumber } from "@/lib/utils";
+import { cn, formatDateTime, formatNumber } from "@/lib/utils";
 
-export function SocialFilterBar({ topics, networks }: { topics: string[]; networks: SocialNetwork[] }) {
+export function SocialFilterBar({
+  topics,
+  networks,
+  counts,
+}: {
+  topics: string[];
+  networks: SocialNetwork[];
+  counts: { 1: number; 7: number; 30: number };
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const search = useSearchParams();
   const [pending, startTransition] = useTransition();
-  const days = search.get("dias") ?? "30";
+  const [q, setQ] = useState(search.get("q") ?? "");
+  const days = search.get("dias") ?? "1";
 
   function update(key: string, value: string | null) {
     const params = new URLSearchParams(search.toString());
@@ -35,19 +45,34 @@ export function SocialFilterBar({ topics, networks }: { topics: string[]; networ
   }
 
   return (
-    <div className="flex h-11 flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
+      <form
+        className="flex h-11 min-w-[220px] flex-1 items-center rounded-full border border-[var(--border)] bg-[var(--surface)] px-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          update("q", q.trim() || null);
+        }}
+      >
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar notas o un tema para el radar"
+          className="h-full w-full bg-transparent text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
+        />
+      </form>
       <div className="flex h-11 items-center rounded-full border border-[var(--border)] bg-[var(--surface)] p-1">
-        {["1", "7", "30", "90"].map((d) => (
+        {(["1", "7", "30"] as const).map((d) => (
           <button
             key={d}
             type="button"
-            onClick={() => update("dias", d === "30" ? null : d)}
+            onClick={() => update("dias", d === "1" ? null : d)}
             className={cn(
               "h-9 rounded-full px-3.5 text-xs font-semibold transition-colors",
               days === d ? "bg-[var(--foreground)] text-[var(--surface)]" : "text-[var(--muted)] hover:text-[var(--foreground)]",
             )}
           >
-            {d === "1" ? "Hoy" : d === "7" ? "Última semana" : d === "30" ? "Último mes" : "3 meses"}
+            {d === "1" ? "Hoy" : d === "7" ? "Semana" : "Mes"}
+            <span className="ml-1.5 tabular-nums opacity-70">{counts[d]}</span>
           </button>
         ))}
       </div>
@@ -194,6 +219,79 @@ export function PostFeed({
 
 export function ListenButton({ label = "Encender radar" }: { label?: string }) {
   return <RadarIgnition label={label} />;
+}
+
+export function RadarActionBar({
+  canListen,
+  days,
+  notes,
+  lastSync,
+}: {
+  canListen: boolean;
+  days: number;
+  notes: number;
+  lastSync?: string | null;
+}) {
+  const [state, action, pending] = useActionState(analyzeRadarAction, {});
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  return (
+    <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+      <div className="flex h-12 items-center rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-card)]">
+        {canListen ? <RadarIgnition grouped /> : null}
+        <form action={action} className="contents">
+          <input type="hidden" name="dias" value={String(days)} />
+          <Button
+            type="submit"
+            variant={canListen ? "ghost" : "primary"}
+            disabled={pending || notes < 1}
+            className={cn(
+              "h-10 rounded-full px-4 hover:translate-y-0",
+              canListen &&
+                "text-[var(--foreground)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]",
+            )}
+          >
+            {pending ? <Loader2 className="animate-spin" /> : <Sparkles />}
+            {pending ? "Analizando…" : "Informe IA"}
+          </Button>
+        </form>
+      </div>
+      {state.error ? <FormMessage>{state.error}</FormMessage> : null}
+      {canListen && lastSync ? (
+        <p suppressHydrationWarning className="text-right text-[11px] text-[var(--muted)]">
+          Última búsqueda {formatDateTime(lastSync)}
+        </p>
+      ) : null}
+      {mounted && pending
+        ? createPortal(
+            <div
+              className="fixed inset-0 z-[80] flex items-center justify-center bg-[#120f0c]/88 p-4 backdrop-blur-xl"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="w-full max-w-md rounded-[28px] border border-white/10 bg-[#1a1612] px-7 py-8 text-center text-white shadow-[0_40px_120px_-24px_rgba(0,0,0,0.65)]">
+                <p className="inline-flex items-center gap-2 rounded-full border border-amber-200/20 bg-amber-300/10 px-3 py-1 text-[11px] font-semibold tracking-[0.16em] text-amber-100 uppercase">
+                  <Sparkles className="size-3.5" />
+                  Informe IA
+                </p>
+                <h2 className="display mt-4 text-[28px] leading-none">La IA está leyendo las notas</h2>
+                <p className="mt-3 text-sm text-white/65">
+                  JEV y Gemini arman el reporte con gráficos. En un momento lo vas a poder bajar en PDF.
+                </p>
+                <div className="mx-auto mt-6 h-1.5 w-40 overflow-hidden rounded-full bg-amber-200/20">
+                  <div className="h-full w-2/5 animate-pulse rounded-full bg-amber-200" />
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
+    </div>
+  );
 }
 
 export function MetaListenButton() {

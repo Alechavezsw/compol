@@ -1,4 +1,6 @@
 import type { SurveyAnalytics } from "@/lib/analytics";
+import type { SocialAnalytics } from "@/lib/social/analytics";
+import { NETWORK_LABEL } from "@/lib/types";
 
 export const REPORT_PHOTOS = {
   cover: "/landing/civico.jpg",
@@ -97,6 +99,64 @@ export function pickReportCharts(analytics: SurveyAnalytics): ReportChart[] {
   }
 
   return charts;
+}
+
+/** Gráficos del radar: tono, temas, días y fuentes. */
+export function pickRadarCharts(a: SocialAnalytics): ReportChart[] {
+  const charts: ReportChart[] = [];
+  if (a.total) {
+    charts.push({
+      title: "Tono de las notas",
+      caption: `${a.total} notas únicas del período`,
+      unit: "percent",
+      rows: [
+        { name: "A favor", percent: (a.split.positivo / a.total) * 100, value: a.split.positivo },
+        { name: "Neutras", percent: (a.split.neutral / a.total) * 100, value: a.split.neutral },
+        { name: "En contra", percent: (a.split.negativo / a.total) * 100, value: a.split.negativo },
+      ].filter((row) => row.value > 0),
+    });
+  }
+  if (a.topics.length) {
+    const top = a.topics.slice(0, 6);
+    const max = Math.max(...top.map((t) => t.volume), 1);
+    charts.push({
+      title: "Temas en la conversación",
+      caption: "Notas por tema",
+      unit: "percent",
+      rows: top.map((t) => ({
+        name: t.name,
+        percent: (t.volume / max) * 100,
+        value: t.volume,
+      })),
+    });
+  }
+  const days = a.daily.filter((d) => d.positivo + d.neutral + d.negativo > 0).slice(-8);
+  if (days.length > 1) {
+    const max = Math.max(...days.map((d) => d.positivo + d.neutral + d.negativo), 1);
+    charts.push({
+      title: "Volumen día a día",
+      caption: "Notas únicas por día",
+      unit: "percent",
+      rows: days.map((d) => {
+        const value = d.positivo + d.neutral + d.negativo;
+        return { name: d.name, percent: (value / max) * 100, value };
+      }),
+    });
+  }
+  if (a.byNetwork.length) {
+    const max = Math.max(...a.byNetwork.map((n) => n.volume), 1);
+    charts.push({
+      title: "De dónde salen",
+      caption: "Notas por fuente",
+      unit: "percent",
+      rows: a.byNetwork.map((n) => ({
+        name: NETWORK_LABEL[n.network],
+        percent: (n.volume / max) * 100,
+        value: n.volume,
+      })),
+    });
+  }
+  return charts.slice(0, 4);
 }
 
 /** Saca menciones de modelo y el H1, que van en la tapa del documento. */

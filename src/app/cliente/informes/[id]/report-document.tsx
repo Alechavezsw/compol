@@ -17,6 +17,7 @@ export type ReportDocumentProps = {
   audience?: string | null;
   geography?: string | null;
   completed?: number;
+  sampleLabel?: string;
   highlights: ReportHighlight[];
   charts: ReportChart[];
   markdown: string;
@@ -30,6 +31,7 @@ export function ReportDocument({
   audience,
   geography,
   completed,
+  sampleLabel = "casos",
   highlights,
   charts,
   markdown,
@@ -70,7 +72,7 @@ export function ReportDocument({
             {completed ? (
               <>
                 <span aria-hidden>·</span>
-                <span>{formatNumber(completed)} casos</span>
+                <span>{formatNumber(completed)} {sampleLabel}</span>
               </>
             ) : null}
           </p>

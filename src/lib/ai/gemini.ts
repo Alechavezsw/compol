@@ -5,6 +5,8 @@ import type { CrosstabFinding, SurveyAnalytics } from "@/lib/analytics";
 import { analyticsToBriefing } from "@/lib/analytics";
 import type { ReportKind, ReportHighlight } from "@/lib/types";
 import { askViaGateway, generateReportViaGateway, isAiGatewayConfigured } from "@/lib/ai/gateway";
+import type { SocialAnalytics } from "@/lib/social/analytics";
+import { radarBriefing } from "@/lib/social/analytics";
 
 export const DEFAULT_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-pro";
 /** Modelo de respaldo cuando el principal está saturado o sin cuota. */
@@ -291,6 +293,80 @@ export async function generateSurveyReport(params: {
     title: raw.titulo.slice(0, 140) || `Informe de ${analytics.survey.title}`,
     markdown: toMarkdown(raw, organizationName, model),
     highlights: raw.hallazgos.map((h) => ({ titulo: h.titulo, detalle: h.detalle, metrica: h.metrica || null })),
+    model,
+  };
+}
+
+export async function generateRadarReport(params: {
+  social: SocialAnalytics;
+  organizationName: string;
+  organizationId?: string;
+  focus?: string | null;
+}): Promise<GeneratedReport> {
+  const briefing = radarBriefing(params.social);
+  const focus =
+    params.focus ??
+    "Informe del radar de conversación. No es una encuesta: leé solo las notas públicas, no inventes sondeos ni porcentajes de opinión.";
+
+  if (isAiGatewayConfigured()) {
+    try {
+      return await generateReportViaGateway({
+        briefing,
+        organizationName: params.organizationName,
+        kind: "ejecutivo",
+        audience: "Equipo de comunicación y gestión",
+        focus,
+        organizationId: params.organizationId,
+      });
+    } catch (error) {
+      if (!hasLocalGeminiKey()) throw error;
+    }
+  }
+
+  const prompt = [
+    KIND_BRIEF.ejecutivo,
+    "",
+    `Organismo solicitante: ${params.organizationName}.`,
+    `Audiencia del informe: Equipo de comunicación y gestión.`,
+    `El solicitante pide poner el foco en: ${focus}.`,
+    "",
+    "A continuación, los resultados agregados del relevamiento. Es la única fuente válida:",
+    "",
+    "-----",
+    briefing,
+    "-----",
+  ].join("\n");
+
+  const { text, model } = await generateWithFallback(DEFAULT_MODEL, {
+    contents: prompt,
+    config: {
+      systemInstruction: SYSTEM,
+      temperature: 0.35,
+      responseMimeType: "application/json",
+      responseSchema: REPORT_SCHEMA,
+    },
+  });
+
+  let json: unknown;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error("La respuesta del modelo no pudo interpretarse como JSON.");
+  }
+
+  const parsed = RawReportSchema.safeParse(json);
+  if (!parsed.success) {
+    throw new Error(`La respuesta del modelo no respeta el formato esperado: ${parsed.error.issues[0]?.message ?? "sin detalle"}.`);
+  }
+
+  return {
+    title: parsed.data.titulo.slice(0, 140) || `Radar de ${params.organizationName}`,
+    markdown: toMarkdown(parsed.data, params.organizationName, model),
+    highlights: parsed.data.hallazgos.map((h) => ({
+      titulo: h.titulo,
+      detalle: h.detalle,
+      metrica: h.metrica || null,
+    })),
     model,
   };
 }

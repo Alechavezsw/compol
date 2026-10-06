@@ -16,7 +16,7 @@ const NAV: NavItem[] = [
   { href: "/cliente", label: "Resumen", icon: "dashboard", exact: true },
   { href: "/cliente/proyectos", label: "Proyectos", icon: "projects" },
   { href: "/cliente/encuestas", label: "Encuestas", icon: "surveys" },
-  { href: "/cliente/informes", label: "Informes IA", icon: "ai" },
+  { href: "/cliente/informes", label: "Biblioteca", icon: "ai" },
   { href: "/cliente/redes", label: "Radar de conversación", icon: "social" },
   { href: "/cliente/equipo", label: "Equipo", icon: "users" },
 ];

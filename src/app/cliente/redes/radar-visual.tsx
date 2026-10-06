@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, Radio } from "lucide-react";
-import { listenNowAction, type SocialActionState } from "./actions";
+import { listenNowAction, saveRadarAction, scanRadarAction, type RadarCandidate, type SocialActionState } from "./actions";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/field";
 import { cn, formatDateTime, formatNumber, formatPercent } from "@/lib/utils";
@@ -19,14 +19,24 @@ const SCAN_LINES = [
 
 const PORTALS = ["Diario de Cuyo", "El Zonda", "Diario Huarpe", "Tiempo de San Juan", "Diario 13", "San Juan 8"];
 
-export function RadarIgnition({ label = "Encender radar" }: { label?: string }) {
+export function RadarIgnition({
+  label = "Encender radar",
+  grouped = false,
+}: {
+  label?: string;
+  grouped?: boolean;
+}) {
   const router = useRouter();
+  const search = useSearchParams();
   const [state, setState] = useState<SocialActionState>({});
   const [pending, start] = useTransition();
+  const [saving, saveStart] = useTransition();
   const [line, setLine] = useState(0);
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [hits, setHits] = useState(0);
+  const [candidates, setCandidates] = useState<RadarCandidate[]>([]);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -49,37 +59,52 @@ export function RadarIgnition({ label = "Encender radar" }: { label?: string }) 
   }, [pending]);
 
   useEffect(() => {
-    if (pending || !open || !state.ok) return;
-    if (state.headlines?.length) return;
-    const id = window.setTimeout(() => setOpen(false), 2800);
+    if (pending || saving || !open || !state.ok) return;
+    if (candidates.length && !saved) return;
+    const id = window.setTimeout(() => setOpen(false), saved ? 1600 : 2800);
     return () => window.clearTimeout(id);
-  }, [pending, open, state.ok, state.headlines]);
+  }, [pending, saving, open, state.ok, candidates.length, saved]);
+
+  const trigger = (
+    <Button
+      type="button"
+      size={grouped ? "md" : "lg"}
+      disabled={pending}
+      className={
+        grouped
+          ? "h-10 rounded-full px-4 shadow-none hover:translate-y-0"
+          : undefined
+      }
+      onClick={() => {
+        setState({});
+        setHits(0);
+        setCandidates([]);
+        setSaved(false);
+        setOpen(true);
+        start(async () => {
+          const next = await scanRadarAction(search.get("q"));
+          setState(next);
+          setCandidates(next.candidates ?? []);
+          if (next.error) setOpen(false);
+        });
+      }}
+    >
+      {pending ? <Loader2 className="animate-spin" /> : <Radio />}
+      {pending ? "Escaneando…" : label}
+    </Button>
+  );
 
   return (
     <>
-      <div className="flex w-full max-w-sm flex-col items-stretch gap-2 lg:items-end">
-        <Button
-          type="button"
-          size="lg"
-          disabled={pending}
-          onClick={() => {
-            setState({});
-            setHits(0);
-            setOpen(true);
-            start(async () => {
-              const next = await listenNowAction();
-              setState(next);
-              if (next.ok) router.refresh();
-              if (next.error) setOpen(false);
-            });
-          }}
-        >
-          {pending ? <Loader2 className="animate-spin" /> : <Radio />}
-          {pending ? "Escaneando…" : label}
-        </Button>
-        {state.error ? <FormMessage>{state.error}</FormMessage> : null}
-        {state.ok ? <p className="text-right text-xs text-[var(--success)]">{state.ok}</p> : null}
-      </div>
+      {grouped ? (
+        trigger
+      ) : (
+        <div className="flex w-full max-w-sm flex-col items-stretch gap-2 lg:items-end">
+          {trigger}
+          {state.error ? <FormMessage>{state.error}</FormMessage> : null}
+          {state.ok ? <p className="text-right text-xs text-[var(--success)]">{state.ok}</p> : null}
+        </div>
+      )}
 
       {mounted && open
         ? createPortal(
@@ -111,12 +136,21 @@ export function RadarIgnition({ label = "Encender radar" }: { label?: string }) 
                       </p>
                     </div>
                     <h2 className="display mt-4 text-[30px] leading-none text-white sm:text-[40px]">
-                      {pending ? SCAN_LINES[line] : state.ok}
+                      {pending
+                        ? SCAN_LINES[line]
+                        : (() => {
+                            const n = saved ? (state.inserted ?? 0) : candidates.length || state.headlines?.length || 0;
+                            return `${n} ${n === 1 ? "nota" : "notas"}`;
+                          })()}
                     </h2>
                     <p className="mt-3 text-sm text-slate-400">
                       {pending
                         ? `Recorriendo ${PORTALS[line % PORTALS.length]} y el resto de los diarios de San Juan, Argentina.`
-                        : "Titulares públicos, tal como salieron en los portales locales."}
+                        : saved
+                          ? "Quedaron sumadas a Hoy, la semana y el mes."
+                          : candidates.length
+                            ? "Revisá los titulares y guardalas para que sumen al radar."
+                            : "Estas notas ya estaban en el radar."}
                     </p>
                     {pending ? (
                       <ul className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -153,13 +187,34 @@ export function RadarIgnition({ label = "Encender radar" }: { label?: string }) 
                       </div>
                     ) : null}
                     {!pending && state.ok ? (
-                      <button
-                        type="button"
-                        onClick={() => setOpen(false)}
-                        className="mt-6 text-xs font-medium text-cyan-200 hover:text-white"
-                      >
-                        Cerrar
-                      </button>
+                      <div className="mt-6 flex flex-wrap items-center gap-3">
+                        {candidates.length && !saved ? (
+                          <button
+                            type="button"
+                            disabled={saving}
+                            onClick={() =>
+                              saveStart(async () => {
+                                const next = await saveRadarAction(candidates);
+                                setState(next);
+                                if (next.error) return;
+                                setSaved(true);
+                                setCandidates([]);
+                                router.refresh();
+                              })
+                            }
+                            className="inline-flex h-11 items-center rounded-full bg-cyan-300 px-5 text-sm font-semibold text-slate-950 hover:bg-cyan-200 disabled:opacity-60"
+                          >
+                            {saving ? "Guardando…" : `Guardar ${candidates.length} ${candidates.length === 1 ? "nota" : "notas"}`}
+                          </button>
+                        ) : null}
+                        <button
+                          type="button"
+                          onClick={() => setOpen(false)}
+                          className="text-xs font-medium text-cyan-200 hover:text-white"
+                        >
+                          {saved ? "Listo" : "Cerrar"}
+                        </button>
+                      </div>
                     ) : null}
                   </div>
                 </div>

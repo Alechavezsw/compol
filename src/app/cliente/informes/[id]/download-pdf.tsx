@@ -20,6 +20,7 @@ type Payload = {
   audience?: string | null;
   geography?: string | null;
   completed?: number;
+  sampleLabel?: string;
   highlights: ReportHighlight[];
   charts: ReportChart[];
   markdown: string;
@@ -89,7 +90,7 @@ export function DownloadPdfButton({ payload }: { payload: Payload }) {
         payload.kindLabel,
         payload.dateLabel,
         payload.geography,
-        payload.completed ? `${payload.completed} casos` : null,
+        payload.completed ? `${payload.completed} ${payload.sampleLabel ?? "casos"}` : null,
       ]
         .filter(Boolean)
         .join("  ·  ");
