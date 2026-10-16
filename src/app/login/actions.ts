@@ -6,6 +6,7 @@ import { homePathFor, isSupabaseConfigured } from "@/lib/auth";
 import { isDemoMode } from "@/lib/demo/mode";
 import { setDemoUser } from "@/lib/demo/session";
 import { demoTables } from "@/lib/demo/store";
+import { safeInternalPath } from "@/lib/utils";
 
 export type LoginState = { error?: string | null };
 
@@ -48,12 +49,14 @@ export async function signInAction(
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return {
-      error:
-        error.message === "Invalid login credentials"
-          ? "Correo o contraseña incorrectos."
-          : `No se pudo iniciar sesión: ${error.message}`,
-    };
+    if (error.message === "Invalid login credentials") {
+      return { error: "Correo o contraseña incorrectos." };
+    }
+    // Bloquear un usuario también lo da de baja en Auth (ver toggleUserActiveAction).
+    if (error.code === "user_banned" || /banned/i.test(error.message)) {
+      return { error: "Tu usuario está desactivado. Contactá al administrador." };
+    }
+    return { error: `No se pudo iniciar sesión: ${error.message}` };
   }
 
   const { data: profile } = await supabase
@@ -67,5 +70,5 @@ export async function signInAction(
     return { error: "Tu usuario está desactivado. Contactá al administrador." };
   }
 
-  redirect(next && next.startsWith("/") ? next : homePathFor(profile?.role ?? "surveyor"));
+  redirect(safeInternalPath(next) ?? homePathFor(profile?.role ?? "surveyor"));
 }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ShieldAlert } from "lucide-react";
 import { ButtonLink } from "@/components/ui/button";
 import { Logo } from "@/components/logo";
+import { safeInternalPath } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Acceso denegado", robots: { index: false, follow: false } };
 
@@ -48,7 +49,7 @@ export default async function AccesoDenegadoPage({
         <p className="mt-3 text-sm leading-relaxed text-[var(--muted)]">{info.text}</p>
 
         <div className="mt-8 flex flex-col justify-center gap-2 sm:flex-row">
-          <ButtonLink href={destino && destino.startsWith("/") ? destino : "/inicio"}>
+          <ButtonLink href={safeInternalPath(destino) ?? "/inicio"}>
             Ir a mi panel
           </ButtonLink>
           <form action="/auth/salir" method="post">

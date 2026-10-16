@@ -559,6 +559,10 @@ function buildClient(viewer: Profile | null, bypassRls: boolean) {
           });
           return { data: { user: { id, email: params.email } }, error: null };
         },
+        /** La demo no tiene Supabase Auth: no hay baja que aplicar. */
+        async updateUserById(id: string) {
+          return { data: { user: { id } }, error: null };
+        },
       },
     },
   };

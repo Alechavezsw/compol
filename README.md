@@ -133,8 +133,11 @@ Límites: los datos viven en memoria del servidor, y sin `GEMINI_API_KEY` los
 informes, las respuestas y la clasificación de redes usan redactores y léxicos
 locales (lo indican explícitamente).
 
-El modo se controla con `NEXT_PUBLIC_DEMO_MODE`: `true` lo fuerza, `false` lo
-apaga, y vacío lo decide solo (demo si Supabase no está configurado).
+El modo se controla con `NEXT_PUBLIC_DEMO_MODE`: `true` lo fuerza y `false` lo
+apaga. Si queda vacío, en desarrollo se activa solo cuando Supabase no está
+configurado; **en producción nunca es automático**, porque la demo entra como
+super_admin sin contraseña. Un deploy de demostración tiene que declarar
+`NEXT_PUBLIC_DEMO_MODE=true` (la variable se fija al compilar).
 
 ---
 
@@ -150,7 +153,13 @@ En el **SQL Editor**, en este orden:
 4. `20260913000004_canal_web.sql` — encuestas web y widget.
 5. `20260913000005_encuestadores_central.sql` — equipo de campo solo para la administración central.
 6. `20260913000006_humor_en_redes.sql` — escucha social.
-7. `supabase/seed.sql` — *opcional*, datos de demostración (usuarios con contraseña `Demo1234!`). **No en producción.**
+7. Las migraciones siguientes (`20260926000007` en adelante), en orden de nombre. La última, `20261015000016_acceso_seguro.sql`, cierra el alta de perfiles y hace efectivo el bloqueo de usuarios.
+8. `supabase/seed.sql` — no carga datos: la base de producción arranca vacía y el primer `super_admin` se crea a mano.
+
+Después, en el panel de Supabase: **Authentication → Sign In / Providers →
+desactivá "Allow new users to sign up"**. Los usuarios los da de alta la
+administración central desde la app (`auth.admin.createUser`), que sigue
+funcionando con el registro cerrado.
 
 ### 2. Variables de entorno
 

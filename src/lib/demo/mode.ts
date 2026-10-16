@@ -12,12 +12,18 @@ export function isSupabaseConfigured() {
 }
 
 /**
- * El modo demo se activa explícitamente con NEXT_PUBLIC_DEMO_MODE=true, o solo
- * por no haber configurado Supabase. Así la app arranca mostrando algo real en
- * lugar de una pantalla de error.
+ * El modo demo se activa explícitamente con NEXT_PUBLIC_DEMO_MODE=true. En
+ * desarrollo también se activa solo si no hay Supabase configurado, para que la
+ * app arranque mostrando algo en lugar de una pantalla de error.
+ *
+ * En producción nunca es automático: la demo deja entrar como super_admin sin
+ * contraseña, y un deploy al que le falten las variables de Supabase no puede
+ * convertirse en eso por accidente. Sin Supabase y sin el flag, el login avisa
+ * que falta la configuración.
  */
 export function isDemoMode() {
   if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") return true;
   if (process.env.NEXT_PUBLIC_DEMO_MODE === "false") return false;
+  if (process.env.NODE_ENV === "production") return false;
   return !isSupabaseConfigured();
 }

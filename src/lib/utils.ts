@@ -5,6 +5,23 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Devuelve la ruta solo si apunta a esta misma app. `//sitio.com` y `/\sitio.com`
+ * empiezan con `/` pero los navegadores los leen como otro sitio, así que un
+ * `next` o `destino` armado a mano serviría para redirigir a un tercero.
+ */
+export function safeInternalPath(raw: string | null | undefined): string | null {
+  if (!raw || !raw.startsWith("/")) return null;
+  // Tabuladores y saltos de línea los descarta el parser de URL: "/\t/sitio.com" sería "//sitio.com".
+  if (/[\u0000-\u001f\u007f\\]/.test(raw)) return null;
+  try {
+    const base = "http://internal.invalid";
+    return new URL(raw, base).origin === base ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
 const numberFmt = new Intl.NumberFormat("es-AR");
 const percentFmt = new Intl.NumberFormat("es-AR", {
   minimumFractionDigits: 1,

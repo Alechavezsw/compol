@@ -13,6 +13,8 @@ const ORG_TYPES: OrgType[] = ["gobierno", "institucion", "ong", "privado"];
 const ORG_STATUSES: OrgStatus[] = ["activa", "prueba", "suspendida"];
 const ROLES: UserRole[] = ["super_admin", "org_admin", "org_analyst", "surveyor"];
 const INVOICE_STATUSES: InvoiceStatus[] = ["pendiente", "pagada", "vencida", "anulada"];
+/** Supabase Auth no tiene baja indefinida: cien años equivale a "hasta que se reactive". */
+const BLOCK_DURATION = "876000h";
 
 export async function createOrganizationAction(
   _prev: ActionState,
@@ -147,8 +149,29 @@ export async function toggleUserActiveAction(formData: FormData) {
   // Bloquearse a uno mismo deja la plataforma sin nadie que pueda deshacerlo.
   if (id === profile.id && !next) return;
 
+  // El bloqueo vale en dos capas: `is_active` corta el acceso por RLS al instante,
+  // y la baja en Auth impide que el usuario vuelva a entrar o renueve su sesión.
+  let admin;
+  try {
+    admin = createAdminClient();
+  } catch {
+    // Sin service role no hay baja en Auth: igual se bloquea por `is_active`.
+    admin = null;
+  }
+
+  // Al reactivar, primero se levanta la baja: si falla, el usuario sigue
+  // bloqueado en vez de quedar "activo" pero sin poder entrar.
+  if (next && admin) {
+    const { error } = await admin.auth.admin.updateUserById(id, { ban_duration: "none" });
+    if (error) return;
+  }
+
   const supabase = await createClient();
   await supabase.from("profiles").update({ is_active: next }).eq("id", id);
+
+  if (!next && admin) {
+    await admin.auth.admin.updateUserById(id, { ban_duration: BLOCK_DURATION });
+  }
   revalidatePath("/admin/usuarios");
   revalidatePath("/admin/encuestadores");
 }
