@@ -28,6 +28,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 import { ROLE_LABEL, type UserRole } from "@/lib/types";
 import { Logo } from "@/components/logo";
+import { SkipLink } from "@/components/skip-link";
 
 export type IconName =
   | "dashboard"
@@ -208,6 +209,7 @@ export function AppShell({
 
   return (
     <div className="min-h-dvh">
+      <SkipLink />
       {pendingHref ? (
         <div className="print-hidden pointer-events-none fixed top-0 right-0 left-0 z-50 h-0.5 overflow-hidden lg:left-[272px]">
           <div className="h-full w-1/3 rounded-full bg-[var(--primary)] animate-nav-progress" />
@@ -247,7 +249,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
+        <main id="contenido" className="mx-auto w-full max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
           <div className="print-hidden">{banner}</div>
           {children}
         </main>

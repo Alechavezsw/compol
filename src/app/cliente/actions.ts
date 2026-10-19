@@ -12,7 +12,7 @@ import { buildLocalReport } from "@/lib/demo/report";
 import { loadQuestions } from "@/lib/questions";
 import { isBranchable, looksExclusive } from "@/lib/survey-logic";
 import { WIDGET_MODES, newPublicToken } from "@/lib/web";
-import { STATUS_FLOW } from "@/lib/survey-status";
+import { STATUS_FLOW, isExpired } from "@/lib/survey-status";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { computeSocial, socialBriefing } from "@/lib/social/analytics";
 import { addDays, todayKey } from "@/lib/stats";
@@ -82,6 +82,15 @@ async function completedCount(supabase: Supabase, surveyId: string) {
     .eq("survey_id", surveyId)
     .neq("status", "en_curso");
   return count ?? 0;
+}
+
+/**
+ * "Cierre el 20/10" significa hasta el final de ese día en Argentina (UTC-3, sin
+ * horario de verano). Armarlo sin offset lo corría a la hora del servidor, que
+ * en Vercel es UTC: la encuesta cerraba a las 20:59 locales.
+ */
+function endOfDayArgentina(day: string) {
+  return new Date(`${day}T23:59:00-03:00`);
 }
 
 /** Vuelve al detalle con un aviso que la página traduce a mensaje. */
@@ -169,6 +178,9 @@ export async function createSurveyAction(_prev: ActionState, formData: FormData)
   if (startsAt && endsAt && new Date(endsAt) < new Date(startsAt)) {
     return { error: "La fecha de cierre no puede ser anterior a la de inicio." };
   }
+  if (endsAt && !(endOfDayArgentina(endsAt).getTime() >= Date.now())) {
+    return { error: "La fecha de cierre ya pasó: elegí una de hoy en adelante." };
+  }
 
   const supabase = await createClient();
   if (copyFrom && !(await ownedSurvey(supabase, copyFrom, organization.id))) {
@@ -204,7 +216,7 @@ export async function createSurveyAction(_prev: ActionState, formData: FormData)
       methodology,
       target_responses: target,
       starts_at: startsAt ? new Date(startsAt).toISOString() : null,
-      ends_at: endsAt ? new Date(`${endsAt}T23:59:00`).toISOString() : null,
+      ends_at: endsAt ? endOfDayArgentina(endsAt).toISOString() : null,
       created_by: profile.id,
       status: "borrador",
       web_enabled: web,
@@ -237,6 +249,8 @@ export async function updateSurveyStatusAction(formData: FormData) {
   if (!STATUS_FLOW[survey.status as SurveyStatus]?.includes(status)) flash(id, "transicion");
 
   if (status === "activa") {
+    // Sin esto, "Reabrir" dejaría la encuesta en campo pero sin aceptar respuestas.
+    if (isExpired(survey)) flash(id, "vencida");
     const questions = await loadQuestions(supabase, id);
     if (!questions.length) flash(id, "sin-preguntas");
     if (logicProblems(questions).length) flash(id, "logica-rota");
@@ -254,6 +268,30 @@ export async function updateSurveyStatusAction(formData: FormData) {
   revalidatePath("/cliente");
   revalidatePath("/campo");
   flash(id, status === "activa" ? (survey.status === "borrador" ? "en-campo" : "reactivada") : status);
+}
+
+/** Extiende, cambia o quita la fecha de cierre. Sin fecha, la encuesta sigue abierta hasta cerrarla a mano. */
+export async function updateSurveyScheduleAction(formData: FormData) {
+  const { organization } = await requireOrganization([...MANAGERS]);
+  const id = String(formData.get("id") ?? "");
+  const raw = String(formData.get("ends_at") ?? "").trim();
+  const supabase = await createClient();
+  const survey = await ownedSurvey(supabase, id, organization.id);
+  if (!survey) return;
+
+  let endsAt: string | null = null;
+  if (raw) {
+    const date = /^\d{4}-\d{2}-\d{2}$/.test(raw) ? endOfDayArgentina(raw) : null;
+    if (!date || Number.isNaN(date.getTime()) || date.getTime() < Date.now()) flash(id, "fecha-invalida");
+    if (survey.starts_at && date.getTime() < new Date(survey.starts_at).getTime()) flash(id, "fecha-invalida");
+    endsAt = date.toISOString();
+  }
+
+  await supabase.from("surveys").update({ ends_at: endsAt }).eq("id", id);
+  revalidatePath("/cliente");
+  revalidatePath("/cliente/encuestas");
+  revalidatePath("/campo");
+  flash(id, endsAt ? "fecha-actualizada" : "fecha-quitada");
 }
 
 export async function duplicateSurveyAction(formData: FormData) {

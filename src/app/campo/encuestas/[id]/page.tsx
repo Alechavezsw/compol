@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
 import { loadQuestions } from "@/lib/questions";
 import { dayBoundsIso, todayKey } from "@/lib/stats";
+import { acceptsResponses } from "@/lib/survey-status";
 import { SURVEY_STATUS_LABEL, type Survey } from "@/lib/types";
+import { formatDate } from "@/lib/utils";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -22,7 +24,7 @@ export default async function CargarEntrevistaPage({ params }: { params: Promise
 
   const { data: assignment } = await supabase
     .from("survey_assignments")
-    .select("id, quota, zone, surveys(id, title, status)")
+    .select("id, quota, zone, surveys(id, title, status, ends_at)")
     .eq("survey_id", id)
     .eq("surveyor_id", profile.id)
     .maybeSingle();
@@ -30,7 +32,8 @@ export default async function CargarEntrevistaPage({ params }: { params: Promise
   if (!assignment?.surveys) notFound();
   const survey = assignment.surveys as Survey;
 
-  if (survey.status !== "activa") {
+  if (!acceptsResponses(survey)) {
+    const expired = survey.status === "activa";
     return (
       <div className="mx-auto max-w-lg space-y-6 text-center animate-rise">
         <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-[var(--warning-soft)] text-[var(--warning)]">
@@ -38,11 +41,14 @@ export default async function CargarEntrevistaPage({ params }: { params: Promise
         </span>
         <div>
           <h1 className="display text-3xl text-[var(--foreground)]">{survey.title}</h1>
-          <p className="mt-1 text-sm font-medium text-[var(--warning)]">{SURVEY_STATUS_LABEL[survey.status]}</p>
+          <p className="mt-1 text-sm font-medium text-[var(--warning)]">
+            {expired ? "Vencida" : SURVEY_STATUS_LABEL[survey.status]}
+          </p>
         </div>
         <p className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 text-sm text-[var(--muted)]">
-          Esta encuesta no está en campo en este momento, así que no se pueden cargar entrevistas. Consultá con la
-          coordinación del operativo.
+          {expired
+            ? `La fecha de cierre (${formatDate(survey.ends_at)}) ya pasó, así que no se pueden cargar entrevistas. Si hace falta seguir, pedile a la coordinación que extienda la fecha.`
+            : "Esta encuesta no está en campo en este momento, así que no se pueden cargar entrevistas. Consultá con la coordinación del operativo."}
         </p>
         <Link
           href="/campo"

@@ -383,7 +383,7 @@ async function DashboardBody({ role }: { role: string }) {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <p className="line-clamp-2 font-medium text-[var(--foreground)] group-hover:text-[var(--primary)]">{s.title}</p>
-                        <SurveyStatusBadge status={s.status} />
+                        <SurveyStatusBadge status={s.status} endsAt={s.ends_at} />
                       </div>
                       <p className="mt-1 flex items-center gap-1.5 text-xs text-[var(--muted)]">
                         {s.web_enabled ? <Globe className="size-3" /> : null}

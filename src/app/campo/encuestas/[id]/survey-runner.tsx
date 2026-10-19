@@ -15,7 +15,8 @@ import type { QuestionWithOptions } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Extra = { zone: string };
-type Outcome = { status: "completada" | "descartada"; queued?: boolean } | null;
+/** `blocked`: el servidor la rechazó sin remedio (encuesta cerrada o pausada); queda guardada en el teléfono. */
+type Outcome = { status: "completada" | "descartada"; queued?: boolean; blocked?: string } | null;
 
 function ago(ms: number) {
   const min = Math.round((Date.now() - ms) / 60000);
@@ -77,8 +78,13 @@ export function SurveyRunner({
           answers: item.answers,
           latitude: item.latitude,
           longitude: item.longitude,
+          collectedAt: item.savedAt,
         });
-        if (!result.ok) break;
+        if (!result.ok) {
+          // Un rechazo definitivo (encuesta cerrada) no debe trabar las demás: se queda guardada y se sigue.
+          if (result.permanent) continue;
+          break;
+        }
         removeQueued(surveyorId, item.id);
         if (result.status === "completada") {
           setSaved((n) => n + 1);
@@ -143,6 +149,7 @@ export function SurveyRunner({
 
     startTransition(async () => {
       const offline = typeof navigator !== "undefined" && !navigator.onLine;
+      let blocked: string | undefined;
       if (!offline) {
         const result = await submitResponseAction(payload);
         if (result.ok) {
@@ -154,13 +161,15 @@ export function SurveyRunner({
           setOutcome({ status: result.status ?? (ended ? "descartada" : "completada") });
           return;
         }
+        // Error pasajero: queda en cola. Si el rechazo es definitivo se avisa por qué.
+        if (result.permanent) blocked = result.error;
       }
 
       enqueueInterview(surveyorId, payload);
       interview.stop();
       interview.clearDraft();
       setQueued((n) => n + 1);
-      setOutcome({ status: ended ? "descartada" : "completada", queued: true });
+      setOutcome({ status: ended ? "descartada" : "completada", queued: true, blocked });
     });
   }
 
@@ -184,7 +193,9 @@ export function SurveyRunner({
               </span>
             )}
             <h2 className="display mt-5 text-3xl text-[var(--foreground)]">
-              {outcome.queued
+              {outcome.blocked
+                ? "No se pudo enviar"
+                : outcome.queued
                 ? "Quedó en cola"
                 : completed
                   ? quotaDone
@@ -193,7 +204,9 @@ export function SurveyRunner({
                   : "Contacto registrado"}
             </h2>
             <p className="mt-1.5 text-sm text-[var(--muted)]">
-              {outcome.queued
+              {outcome.blocked
+                ? `${outcome.blocked} La entrevista quedó guardada en este teléfono y se envía sola si la encuesta vuelve a estar en campo.`
+                : outcome.queued
                 ? "No había señal. Se sube sola cuando el teléfono vuelva a conectarse."
                 : completed
                   ? quotaDone

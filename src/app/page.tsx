@@ -1,10 +1,14 @@
+import Link from "next/link";
 import {
   ArrowRight,
   BarChart3,
   Building2,
+  ChevronDown,
   ClipboardList,
   FolderKanban,
   Lock,
+  LogIn,
+  Mail,
   MapPin,
   Smartphone,
   Sparkles,
@@ -15,7 +19,46 @@ import { Logo } from "@/components/logo";
 import { HeroPreview } from "@/components/hero-preview";
 import { Photo, Polaroid } from "@/components/photo";
 import { ModulesRail } from "@/components/modules-rail";
-import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, absoluteUrl } from "@/lib/site";
+import { SkipLink } from "@/components/skip-link";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, absoluteUrl, contactEmail } from "@/lib/site";
+
+const NAV = [
+  { href: "#modulos", label: "Módulos" },
+  { href: "#operacion", label: "Cómo se opera" },
+  { href: "#preguntas", label: "Preguntas" },
+];
+
+/** Respuestas de lo que hoy hace la plataforma: nada que no esté en el producto. */
+const FAQ = [
+  {
+    q: "¿Un organismo puede ver los datos de otro?",
+    a: "No. Cada usuario pertenece a una organización y las reglas de acceso viven en la base de datos, fila por fila. Aunque alguien alterara la interfaz, la base no le devolvería datos de otro cliente.",
+  },
+  {
+    q: "¿Los encuestadores necesitan conexión todo el tiempo?",
+    a: "No. Si se corta la señal, la entrevista queda guardada en el teléfono y se envía sola cuando vuelve la conexión. Cada encuestador ve solo las encuestas que le asignaron y su avance sobre la cuota.",
+  },
+  {
+    q: "¿Cómo se controla la calidad del relevamiento?",
+    a: "El tablero marca entrevistas exprés, ráfagas de carga y casos fuera de cuota, y sigue el avance por departamento y por día. Las entrevistas que un filtro del cuestionario deja afuera quedan registradas aparte y no cuentan en los resultados.",
+  },
+  {
+    q: "¿Cómo trabaja la IA con los resultados?",
+    a: "Redacta el informe sobre los agregados reales de la encuesta, no sobre inventos: cita el porcentaje y la base de cada cifra, avisa cuando una base es chica y no presenta como diferencia lo que cae dentro del margen de error.",
+  },
+  {
+    q: "¿Se puede publicar una encuesta en la web de un municipio?",
+    a: "Sí. Cada encuesta tiene un link público y un widget para pegar en cualquier sitio, como botón flotante, ventana emergente o incrustado en la página. Puede limitarse a una respuesta por dispositivo y descarta las respuestas automáticas.",
+  },
+  {
+    q: "¿Puedo llevarme los datos?",
+    a: "Sí. La base de microdatos se descarga en CSV, con una fila por entrevista y una columna por pregunta, lista para Excel, SPSS o R.",
+  },
+  {
+    q: "¿Cómo obtengo acceso?",
+    a: "Las cuentas las da de alta la administración central de la consultora: no hay registro público. Si tu organismo ya tiene usuario, ingresá desde el botón de arriba.",
+  },
+];
 
 const IMG = {
   plaza: "/landing/plaza.jpg",
@@ -122,28 +165,61 @@ const ZONES = [
 ];
 
 export default function LandingPage() {
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "SoftwareApplication",
-    name: SITE_NAME,
-    applicationCategory: "BusinessApplication",
-    operatingSystem: "Web",
-    description: SITE_DESCRIPTION,
-    url: absoluteUrl("/"),
-    inLanguage: "es-AR",
-    slogan: SITE_TAGLINE,
-  };
+  const contact = contactEmail();
+  const jsonLd = [
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      name: SITE_NAME,
+      applicationCategory: "BusinessApplication",
+      operatingSystem: "Web",
+      description: SITE_DESCRIPTION,
+      url: absoluteUrl("/"),
+      inLanguage: "es-AR",
+      slogan: SITE_TAGLINE,
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      inLanguage: "es-AR",
+      mainEntity: FAQ.map((f) => ({
+        "@type": "Question",
+        name: f.q,
+        acceptedAnswer: { "@type": "Answer", text: f.a },
+      })),
+    },
+  ];
 
   return (
     <div className="flex min-h-dvh flex-col bg-[#07060f] text-[#f3effc]">
+      <SkipLink />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <header className="sticky top-0 z-30 border-b border-white/8 bg-[#07060f]/72 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-6xl items-center px-4 py-3.5 sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center gap-6 px-4 py-3.5 sm:px-6">
           <Logo invert />
+          <nav aria-label="Secciones de la página" className="ml-auto hidden items-center gap-1 md:flex">
+            {NAV.map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="rounded-full px-3.5 py-1.5 text-sm font-medium text-white/70 transition-colors duration-200 hover:bg-white/8 hover:text-white"
+              >
+                {item.label}
+              </a>
+            ))}
+          </nav>
+          <ButtonLink
+            href="/login"
+            size="sm"
+            className="ml-auto border border-white/20 bg-white/10 text-white shadow-none hover:translate-y-0 hover:bg-white/20 hover:shadow-none md:ml-0"
+          >
+            <LogIn />
+            Ingresar
+          </ButtonLink>
         </div>
       </header>
 
-      <main className="flex-1">
+      <main id="contenido" className="flex-1">
         <section className="relative isolate min-h-dvh overflow-hidden">
           <Photo
             src={IMG.ciudad}
@@ -181,14 +257,22 @@ export default function LandingPage() {
                   </span>
                 ))}
               </div>
-              <div className="mt-9">
+              <div className="mt-9 flex flex-wrap items-center gap-3">
                 <ButtonLink
-                  href="#modulos"
+                  href="/login"
                   size="lg"
                   className="h-12 border-0 bg-[#f2e6c4] text-[#14111f] shadow-none hover:bg-white hover:text-[#14111f]"
                 >
-                  Ver los módulos
+                  Ingresar a mi panel
                   <ArrowRight />
+                </ButtonLink>
+                <ButtonLink
+                  href="#modulos"
+                  size="lg"
+                  variant="ghost"
+                  className="h-12 text-white/80 hover:bg-white/10 hover:text-white"
+                >
+                  Ver los módulos
                 </ButtonLink>
               </div>
             </div>
@@ -242,7 +326,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-24">
+        <section id="operacion" className="mx-auto w-full max-w-6xl scroll-mt-24 px-4 py-16 sm:px-6 sm:py-24">
           <div className="grid items-end gap-10 lg:grid-cols-[0.9fr_1.1fr]">
             <div>
               <p className="text-[11px] font-semibold tracking-[0.22em] text-[#f2e6c4] uppercase">El operativo</p>
@@ -413,6 +497,30 @@ export default function LandingPage() {
           </div>
         </section>
 
+        <section id="preguntas" className="mx-auto w-full max-w-3xl scroll-mt-24 px-4 pb-20 sm:px-6">
+          <p className="text-[11px] font-semibold tracking-[0.22em] text-[#f2e6c4] uppercase">Preguntas frecuentes</p>
+          <h2 className="display mt-3 text-4xl text-balance text-white sm:text-5xl">
+            Lo que suelen preguntar antes de empezar
+          </h2>
+          <div className="mt-8 space-y-2">
+            {FAQ.map((item) => (
+              <details
+                key={item.q}
+                className="group rounded-2xl border border-white/10 bg-white/[0.04] transition-colors duration-300 open:bg-white/[0.07] hover:border-white/20"
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-5 py-4 text-left text-[15px] font-semibold text-white [&::-webkit-details-marker]:hidden">
+                  {item.q}
+                  <ChevronDown
+                    aria-hidden
+                    className="size-4 shrink-0 text-[#f2e6c4] transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-open:rotate-180"
+                  />
+                </summary>
+                <p className="px-5 pb-5 text-sm leading-relaxed text-pretty text-white/65">{item.a}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
         <section className="px-4 pb-16 sm:px-6 sm:pb-20">
           <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[36px]">
             <div className="relative min-h-[480px]">
@@ -439,6 +547,27 @@ export default function LandingPage() {
                     </span>
                   ))}
                 </div>
+                <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+                  <ButtonLink
+                    href="/login"
+                    size="lg"
+                    className="h-12 border-0 bg-[#f2e6c4] text-[#14111f] shadow-none hover:bg-white hover:text-[#14111f]"
+                  >
+                    Ingresar a mi panel
+                    <ArrowRight />
+                  </ButtonLink>
+                  {contact ? (
+                    <ButtonLink
+                      href={`mailto:${contact}`}
+                      size="lg"
+                      variant="ghost"
+                      className="h-12 text-white/80 hover:bg-white/10 hover:text-white"
+                    >
+                      <Mail />
+                      Escribirle a la consultora
+                    </ButtonLink>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>
@@ -446,8 +575,24 @@ export default function LandingPage() {
       </main>
 
       <footer className="border-t border-white/10">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 md:flex-row md:items-center md:justify-between">
           <Logo invert />
+          <nav aria-label="Pie de página" className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-white/60">
+            <a href="#modulos" className="transition-colors hover:text-white">
+              Módulos
+            </a>
+            <a href="#preguntas" className="transition-colors hover:text-white">
+              Preguntas
+            </a>
+            {contact ? (
+              <a href={`mailto:${contact}`} className="transition-colors hover:text-white">
+                Contacto
+              </a>
+            ) : null}
+            <Link href="/login" className="font-semibold text-[#f2e6c4] transition-colors hover:text-white">
+              Ingresar
+            </Link>
+          </nav>
           <p className="text-xs text-white/45">
             © {new Date().getFullYear()} Consulta · Plataforma de encuestas para gobiernos e instituciones
           </p>

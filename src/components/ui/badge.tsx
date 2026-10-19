@@ -1,3 +1,4 @@
+import { isExpired } from "@/lib/survey-status";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -53,7 +54,11 @@ const surveyTone: Record<SurveyStatus, Tone> = {
   cerrada: "primary",
 };
 
-export function SurveyStatusBadge({ status }: { status: SurveyStatus }) {
+/** Con endsAt, una encuesta activa cuya fecha de cierre ya pasó se muestra como vencida. */
+export function SurveyStatusBadge({ status, endsAt }: { status: SurveyStatus; endsAt?: string | null }) {
+  if (status === "activa" && isExpired({ ends_at: endsAt ?? null })) {
+    return <Badge tone="warning">Vencida</Badge>;
+  }
   return (
     <Badge tone={surveyTone[status]} dot={status === "activa"}>
       {SURVEY_STATUS_LABEL[status]}

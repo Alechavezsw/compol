@@ -77,7 +77,7 @@ export default async function AdminEncuestasPage() {
                         </Td>
                         <Td className="text-[var(--muted)]">{s.organizations?.name ?? "—"}</Td>
                         <Td>
-                          <SurveyStatusBadge status={s.status} />
+                          <SurveyStatusBadge status={s.status} endsAt={s.ends_at} />
                         </Td>
                         <Td>
                           <div className="flex items-center gap-3">

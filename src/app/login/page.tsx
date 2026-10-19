@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { DemoLogin } from "./demo-login";
 import { LoginForm } from "./login-form";
 import { Logo } from "@/components/logo";
+import { SkipLink } from "@/components/skip-link";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { isSupabaseConfigured } from "@/lib/auth";
+import { DEMO_USERS } from "@/lib/demo/dataset";
+import { isDemoMode } from "@/lib/demo/mode";
 
 export const metadata: Metadata = { title: "Ingresar", robots: { index: false, follow: false } };
 
@@ -15,9 +19,11 @@ export default async function LoginPage({
 }) {
   const { next } = await searchParams;
   const configured = isSupabaseConfigured();
+  const demo = isDemoMode();
 
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
+      <SkipLink />
       <aside className="relative hidden overflow-hidden bg-[#0c0a16] lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div className="surface-grid pointer-events-none absolute inset-0 opacity-20 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
         <div className="orb top-[-60px] left-[-40px] size-80 bg-[#6d5cff] opacity-40" />
@@ -61,7 +67,7 @@ export default async function LoginPage({
         </div>
       </aside>
 
-      <main className="flex flex-col justify-center px-5 py-10 sm:px-10">
+      <main id="contenido" className="flex flex-col justify-center px-5 py-10 sm:px-10">
         <div className="mx-auto w-full max-w-sm">
           <div className="mb-8 flex items-center justify-between lg:hidden">
             <Logo />
@@ -77,17 +83,19 @@ export default async function LoginPage({
           </Link>
 
           <h1 className="display text-[34px] leading-tight text-[var(--foreground)]">
-            Ingresar a la plataforma
+            {demo ? "Probá la plataforma" : "Ingresar a la plataforma"}
           </h1>
           <p className="mt-2 mb-8 text-sm leading-relaxed text-[var(--muted)]">
-            Usá las credenciales que te entregó tu organización.
+            {demo
+              ? "Elegí un rol para recorrer la demo con datos simulados. No hace falta contraseña."
+              : "Usá las credenciales que te entregó tu organización."}
           </p>
 
           <div className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_88%,transparent)] p-5 shadow-[var(--shadow-card)] backdrop-blur-sm">
-            <LoginForm next={next} />
+            {demo ? <DemoLogin users={DEMO_USERS} /> : <LoginForm next={next} />}
           </div>
 
-          {!configured ? (
+          {!configured && !demo ? (
             <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--warning-soft)] p-4 text-xs leading-relaxed text-[var(--warning)]">
               <strong className="font-semibold">Falta configurar Supabase.</strong> Copiá{" "}
               <code className="font-mono">.env.example</code> a{" "}

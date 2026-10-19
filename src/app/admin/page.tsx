@@ -102,7 +102,6 @@ export default async function AdminDashboard() {
                   <thead>
                     <tr className="border-b border-[var(--border)]">
                       <Th>Encuesta</Th>
-                      <Th>Organización</Th>
                       <Th>Estado</Th>
                       <Th className="text-right">Meta</Th>
                     </tr>
@@ -113,10 +112,14 @@ export default async function AdminDashboard() {
                         key={s.id}
                         className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)]"
                       >
-                        <Td className="font-medium">{s.title}</Td>
-                        <Td className="text-[var(--muted)]">{s.organizations?.name ?? "—"}</Td>
+                        <Td className="font-medium">
+                          {s.title}
+                          <span className="mt-0.5 block text-xs font-normal text-[var(--muted)]">
+                            {s.organizations?.name ?? "—"}
+                          </span>
+                        </Td>
                         <Td>
-                          <SurveyStatusBadge status={s.status} />
+                          <SurveyStatusBadge status={s.status} endsAt={s.ends_at} />
                         </Td>
                         <Td className="text-right tabular-nums">
                           {formatNumber(s.target_responses)}

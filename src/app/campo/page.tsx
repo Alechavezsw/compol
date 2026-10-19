@@ -1,13 +1,13 @@
 import Link from "next/link";
-import { CheckCircle2, ClipboardList, MapPin, Play, Target } from "lucide-react";
+import { ClipboardList, MapPin, Play } from "lucide-react";
 import { EmptyState, PageHeader, Progress } from "@/components/ui/misc";
-import { StatCard } from "@/components/stat-card";
 import { ButtonLink } from "@/components/ui/button";
-import { SurveyStatusBadge } from "@/components/ui/badge";
+import { Badge, SurveyStatusBadge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
-import { formatDate, formatNumber } from "@/lib/utils";
-import { dayBoundsIso, todayKey } from "@/lib/stats";
+import { cn, formatDate, formatNumber } from "@/lib/utils";
+import { addDays, dayBoundsIso, dayKey, todayKey } from "@/lib/stats";
+import { acceptsResponses, isExpired } from "@/lib/survey-status";
 import { foldZone } from "@/lib/san-juan-zones";
 import type { Survey, SurveyZoneQuota } from "@/lib/types";
 
@@ -56,8 +56,17 @@ export default async function CampoPage() {
   const doneToday = todayRes.count ?? 0;
   const totalDone = [...doneBySurvey.values()].reduce((sum, n) => sum + n, 0);
   const totalQuota = assignments.reduce((sum, a) => sum + a.quota, 0);
-  const activos = assignments.filter((a) => a.surveys.status === "activa");
-  const otros = assignments.filter((a) => a.surveys.status !== "activa");
+  const activos = assignments.filter((a) => acceptsResponses(a.surveys));
+  const otros = assignments.filter((a) => !acceptsResponses(a.surveys));
+
+  /** Aviso corto para que nadie se entere del cierre cuando ya no puede cargar. */
+  const closingHint = (endsAt: string | null) => {
+    if (!endsAt) return null;
+    const end = dayKey(endsAt);
+    if (end === today) return "Cierra hoy";
+    if (end === addDays(today, 1)) return "Cierra mañana";
+    return null;
+  };
 
   return (
     <div className="space-y-7">
@@ -71,30 +80,28 @@ export default async function CampoPage() {
         description="Estas son las encuestas que tenés para relevar. Tocá una para empezar a cargar entrevistas."
       />
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <StatCard
-          label="Cargadas hoy"
-          value={formatNumber(doneToday)}
-          icon={<CheckCircle2 className="size-4" />}
-          tone="success"
-        />
-        <StatCard
-          label="Total cargadas"
-          value={formatNumber(totalDone)}
-          icon={<ClipboardList className="size-4" />}
-        />
-        <StatCard
-          label="Cuota total"
-          value={formatNumber(totalQuota)}
-          icon={<Target className="size-4" />}
-          tone="accent"
-          hint={
-            totalQuota
-              ? `${((totalDone / totalQuota) * 100).toFixed(0)}% de cumplimiento`
-              : "Sin cuotas asignadas"
-          }
-        />
-      </div>
+      {/* Resumen compacto: en el celular no debe empujar las asignaciones fuera de pantalla. */}
+      <dl className="grid grid-cols-3 gap-2 sm:gap-4">
+        {[
+          { label: "Hoy", value: formatNumber(doneToday), hint: "cargadas", accent: "text-[var(--success)]" },
+          { label: "Total", value: formatNumber(totalDone), hint: "cargadas", accent: "text-[var(--foreground)]" },
+          {
+            label: "Cuota",
+            value: formatNumber(totalQuota),
+            hint: totalQuota ? `${((totalDone / totalQuota) * 100).toFixed(0)}% cumplido` : "sin asignar",
+            accent: "text-[var(--accent)]",
+          },
+        ].map((item) => (
+          <div
+            key={item.label}
+            className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,transparent)] p-3 shadow-[var(--shadow-card)] sm:p-4"
+          >
+            <dt className="text-xs font-medium text-[var(--muted)]">{item.label}</dt>
+            <dd className={cn("display mt-1 text-3xl leading-none tabular-nums sm:text-4xl", item.accent)}>{item.value}</dd>
+            <p className="mt-1.5 truncate text-xs text-[var(--muted)]">{item.hint}</p>
+          </div>
+        ))}
+      </dl>
 
       {assignments.length === 0 ? (
         <EmptyState
@@ -137,6 +144,9 @@ export default async function CampoPage() {
                             </span>
                           ) : null}
                           <span>Cierre: {formatDate(a.surveys.ends_at)}</span>
+                          {closingHint(a.surveys.ends_at) ? (
+                            <Badge tone="warning">{closingHint(a.surveys.ends_at)}</Badge>
+                          ) : null}
                         </p>
                       </div>
                       <SurveyStatusBadge status={a.surveys.status} />
@@ -201,7 +211,11 @@ export default async function CampoPage() {
                       {formatNumber(doneBySurvey.get(a.survey_id) ?? 0)} entrevistas cargadas
                     </p>
                   </div>
-                  <SurveyStatusBadge status={a.surveys.status} />
+                  {isExpired(a.surveys) && a.surveys.status === "activa" ? (
+                    <Badge tone="warning">Vencida</Badge>
+                  ) : (
+                    <SurveyStatusBadge status={a.surveys.status} />
+                  )}
                 </div>
               ))}
             </section>

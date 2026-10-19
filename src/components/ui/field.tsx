@@ -42,25 +42,63 @@ export function Select({ className, ...props }: React.SelectHTMLAttributes<HTMLS
   );
 }
 
+type ControlProps = { id?: string; "aria-describedby"?: string; "aria-invalid"?: boolean };
+
+/**
+ * Etiqueta, control, ayuda y error de un campo. Cuando el hijo es un
+ * Input/Textarea/Select (o su equivalente nativo) la etiqueta queda asociada por
+ * `htmlFor`, y la ayuda y el error se leen como descripción del control.
+ */
 export function Field({
   label,
   hint,
   error,
   children,
   className,
+  htmlFor,
 }: {
   label?: string;
   hint?: string;
   error?: string | null;
   children: React.ReactNode;
   className?: string;
+  /** Para cuando el control va envuelto en otro elemento y no se puede asociar solo. */
+  htmlFor?: string;
 }) {
+  const autoId = React.useId();
+  const only = React.Children.count(children) === 1 && React.isValidElement<ControlProps>(children) ? children : null;
+  const isControl =
+    only !== null &&
+    (only.type === Input ||
+      only.type === Textarea ||
+      only.type === Select ||
+      only.type === "input" ||
+      only.type === "textarea" ||
+      only.type === "select");
+  const controlId = (isControl ? only.props.id : undefined) ?? autoId;
+  const note = error || hint;
+  const noteId = note ? `${controlId}-nota` : undefined;
+
   return (
     <div className={cn("w-full", className)}>
-      {label ? <Label>{label}</Label> : null}
-      {children}
-      {hint && !error ? <p className="mt-1.5 text-xs text-[var(--muted)]">{hint}</p> : null}
-      {error ? <p className="mt-1.5 text-xs text-[var(--danger)]">{error}</p> : null}
+      {label ? <Label htmlFor={isControl ? controlId : htmlFor}>{label}</Label> : null}
+      {isControl
+        ? React.cloneElement(only, {
+            id: controlId,
+            "aria-describedby": [only.props["aria-describedby"], noteId].filter(Boolean).join(" ") || undefined,
+            "aria-invalid": error ? true : only.props["aria-invalid"],
+          })
+        : children}
+      {hint && !error ? (
+        <p id={noteId} className="mt-1.5 text-xs text-[var(--muted)]">
+          {hint}
+        </p>
+      ) : null}
+      {error ? (
+        <p id={noteId} className="mt-1.5 text-xs text-[var(--danger)]">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

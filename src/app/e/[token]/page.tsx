@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { WebSurvey } from "./web-survey";
+import { acceptsResponses } from "@/lib/survey-status";
 import { loadPublicSurvey } from "@/lib/web";
 
 // Página pública: depende del estado de la encuesta, nunca se prerenderiza.
@@ -51,7 +52,7 @@ export default async function PublicSurveyPage({
         embed={embed}
         closable={embed && (mode === "flotante" || mode === "emergente")}
         sourceUrl={first("ref") ?? null}
-        open={data.survey.status === "activa"}
+        open={acceptsResponses(data.survey)}
       />
     </>
   );

@@ -8,6 +8,16 @@ export const STATUS_FLOW: Record<SurveyStatus, SurveyStatus[]> = {
   cerrada: ["activa"],
 };
 
+/** La fecha de cierre ya pasó. Hasta que se extienda, la encuesta no recibe respuestas. */
+export function isExpired(survey: { ends_at: string | null }, now = Date.now()) {
+  return Boolean(survey.ends_at) && new Date(survey.ends_at as string).getTime() < now;
+}
+
+/** Una encuesta recibe respuestas si está activa y no venció: lo exigen el campo y la web. */
+export function acceptsResponses(survey: { status: string; ends_at: string | null }, now = Date.now()) {
+  return survey.status === "activa" && !isExpired(survey, now);
+}
+
 /** Texto del botón para pasar a cada estado, según desde dónde se viene. */
 export function transitionLabel(from: SurveyStatus, to: SurveyStatus) {
   if (to === "activa") return from === "borrador" ? "Salir a campo" : from === "cerrada" ? "Reabrir" : "Reanudar";
@@ -36,6 +46,10 @@ export const NOTICES: Record<string, { tone: "success" | "warning" | "danger" | 
   copiado: { tone: "success", text: "Cuestionario copiado con sus opciones y saltos." },
   duplicada: { tone: "success", text: "Nueva ola creada en borrador con el mismo cuestionario." },
   "no-vacia": { tone: "warning", text: "Solo se puede copiar un cuestionario sobre una encuesta vacía." },
+  vencida: { tone: "danger", text: "La fecha de cierre ya pasó. Extendela o quitala antes de volver a poner la encuesta en campo." },
+  "fecha-actualizada": { tone: "success", text: "Fecha de cierre actualizada." },
+  "fecha-quitada": { tone: "success", text: "Se quitó la fecha de cierre: la encuesta sigue abierta hasta que la cierres a mano." },
+  "fecha-invalida": { tone: "danger", text: "La fecha de cierre tiene que ser de hoy en adelante y no anterior al inicio de la encuesta." },
   "token-nuevo": { tone: "warning", text: "Se generó un link nuevo. Los links y widgets publicados antes dejaron de funcionar." },
   error: { tone: "danger", text: "Algo salió mal. Probá de nuevo." },
 };

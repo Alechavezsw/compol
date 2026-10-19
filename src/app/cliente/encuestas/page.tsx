@@ -89,7 +89,7 @@ export default async function EncuestasPage() {
                       </p>
                     ) : null}
                   </div>
-                  <SurveyStatusBadge status={s.status} />
+                  <SurveyStatusBadge status={s.status} endsAt={s.ends_at} />
                 </div>
 
                 <dl className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-xs text-[var(--muted)]">

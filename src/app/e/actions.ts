@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createAdminClient } from "@/lib/supabase/server";
 import { persistInterview, type IncomingAnswer } from "@/lib/questions";
+import { acceptsResponses } from "@/lib/survey-status";
 import { loadPublicSurvey, rateLimited, respondentHash, sanitizeSourceUrl } from "@/lib/web";
 
 export type WebSubmitResult = { ok: boolean; status?: "completada" | "descartada"; error?: string; duplicate?: boolean };
@@ -25,7 +26,7 @@ export async function submitWebResponseAction(payload: {
 }): Promise<WebSubmitResult> {
   const survey = await loadPublicSurvey(String(payload.token ?? ""));
   if (!survey) return { ok: false, error: "Esta encuesta no está disponible." };
-  if (survey.survey.status !== "activa") return { ok: false, error: "La encuesta ya no recibe respuestas." };
+  if (!acceptsResponses(survey.survey)) return { ok: false, error: "La encuesta ya no recibe respuestas." };
 
   // Al bot le decimos que salió bien: no aprende qué lo delató.
   if (payload.website) return { ok: true, status: "completada" };

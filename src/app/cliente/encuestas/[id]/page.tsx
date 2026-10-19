@@ -40,6 +40,7 @@ import {
   deleteQuestionAction,
   duplicateSurveyAction,
   moveQuestionAction,
+  updateSurveyScheduleAction,
   updateSurveyStatusAction,
 } from "../../actions";
 import { createClient } from "@/lib/supabase/server";
@@ -47,7 +48,8 @@ import { requireOrganization } from "@/lib/auth";
 import { loadQuestions } from "@/lib/questions";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { describeCondition, isBranchable, isExclusiveOption, maxChoices } from "@/lib/survey-logic";
-import { NOTICES, STATUS_FLOW, transitionLabel } from "@/lib/survey-status";
+import { dayKey } from "@/lib/stats";
+import { NOTICES, STATUS_FLOW, isExpired, transitionLabel } from "@/lib/survey-status";
 import { cn, formatDate, formatNumber } from "@/lib/utils";
 import { QUESTION_TYPE_LABEL, type QuestionType, type Survey, type SurveyStatus } from "@/lib/types";
 
@@ -105,6 +107,7 @@ export default async function EncuestaDetallePage({
   const byId = new Map(questions.map((q) => [q.id, q]));
   const totalQuota = assignments.reduce((s, a) => s + a.quota, 0);
   const notice = aviso ? NOTICES[aviso] : null;
+  const expired = survey.status === "activa" && isExpired(survey);
   const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host") ?? "localhost:3010"}`;
 
   const sources: BranchSource[] = questions.filter(isBranchable).map((q) => ({
@@ -140,7 +143,7 @@ export default async function EncuestaDetallePage({
       <PageHeader
         eyebrow={
           <div className="flex flex-wrap items-center gap-2">
-            <SurveyStatusBadge status={survey.status} />
+            <SurveyStatusBadge status={survey.status} endsAt={survey.ends_at} />
             {survey.web_enabled ? (
               <Badge tone="accent">
                 <Globe className="size-3" />
@@ -181,6 +184,12 @@ export default async function EncuestaDetallePage({
       />
 
       {notice ? <Notice tone={notice.tone}>{notice.text}</Notice> : null}
+      {expired ? (
+        <Notice tone="danger">
+          La fecha de cierre ({formatDate(survey.ends_at)}) ya pasó: la encuesta dejó de recibir respuestas, por web y en
+          campo. {canManage ? "Extendé la fecha o cerrala." : "Pedile a quien administra la encuesta que la extienda o la cierre."}
+        </Notice>
+      ) : null}
 
       {/* ------------------------------------------------ estado y avance */}
       <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
@@ -228,6 +237,29 @@ export default async function EncuestaDetallePage({
                     );
                   })}
                 </div>
+              ) : null}
+              {canManage ? (
+                <form action={updateSurveyScheduleAction} className="mt-4 flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="id" value={id} />
+                  <label className="text-xs font-medium text-[var(--muted)]">
+                    Fecha de cierre
+                    <input
+                      type="date"
+                      name="ends_at"
+                      defaultValue={survey.ends_at ? dayKey(survey.ends_at) : ""}
+                      className="mt-1.5 block h-9 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--foreground)] focus:border-[var(--primary)] focus:outline-none focus:ring-4 focus:ring-[color-mix(in_oklab,var(--primary)_16%,transparent)]"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    className="h-9 rounded-xl border border-[var(--border)] px-3.5 text-sm font-semibold text-[var(--foreground)] transition-colors hover:bg-[var(--surface-2)]"
+                  >
+                    Guardar fecha
+                  </button>
+                  <p className="basis-full text-xs text-[var(--muted)]">
+                    Vacía, la encuesta sigue abierta hasta que la cierres a mano.
+                  </p>
+                </form>
               ) : null}
             </div>
           </CardContent>
