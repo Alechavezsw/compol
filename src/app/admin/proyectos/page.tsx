@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
 import { FolderKanban } from "lucide-react";
 import { EmptyState, PageHeader, TableWrap, Td, Th } from "@/components/ui/misc";
@@ -12,6 +13,7 @@ export const metadata: Metadata = { title: "Proyectos" };
 type Row = Project & { organizations: { name: string } | null };
 
 export default async function AdminProyectosPage() {
+  await requireRole(["super_admin"]);
   const supabase = await createClient();
 
   const [{ data }, { data: surveyRows }] = await Promise.all([

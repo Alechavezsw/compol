@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
 import { ClipboardList } from "lucide-react";
 import { EmptyState, PageHeader, Progress, TableWrap, Td, Th } from "@/components/ui/misc";
@@ -13,6 +14,7 @@ export const metadata: Metadata = { title: "Encuestas" };
 type Row = Survey & { organizations: { name: string } | null };
 
 export default async function AdminEncuestasPage() {
+  await requireRole(["super_admin"]);
   const supabase = await createClient();
 
   const [{ data }, { data: responseRows }] = await Promise.all([

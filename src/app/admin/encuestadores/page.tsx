@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertTriangle, CalendarClock, ClipboardCheck, MapPin, ShieldCheck, Trash2, UserPlus, Users } from "lucide-react";
@@ -19,6 +20,7 @@ import type { Profile, Survey, SurveyAssignment } from "@/lib/types";
 export const metadata: Metadata = { title: "Encuestadores" };
 
 export default async function EncuestadoresPage({ searchParams }: { searchParams: Promise<{ org?: string }> }) {
+  await requireRole(["super_admin"]);
   const { org } = await searchParams;
   const supabase = await createClient();
 

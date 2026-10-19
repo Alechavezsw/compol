@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
 import { Receipt } from "lucide-react";
 import { PageHeader, EmptyState, TableWrap, Td, Th } from "@/components/ui/misc";
@@ -15,6 +16,7 @@ export const metadata: Metadata = { title: "Facturación" };
 type InvoiceRow = Invoice & { organizations: { name: string } | null };
 
 export default async function FacturacionPage() {
+  await requireRole(["super_admin"]);
   const supabase = await createClient();
 
   const { data } = await supabase

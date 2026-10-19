@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/misc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -5,7 +6,8 @@ import { OrgForm } from "./org-form";
 
 export const metadata: Metadata = { title: "Nueva organización" };
 
-export default function NuevaOrganizacionPage() {
+export default async function NuevaOrganizacionPage() {
+  await requireRole(["super_admin"]);
   return (
     <div className="mx-auto max-w-2xl space-y-7">
       <PageHeader

@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/misc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +16,7 @@ export default async function NuevoUsuarioPage({
 }: {
   searchParams: Promise<{ rol?: string; org?: string; volver?: string }>;
 }) {
+  await requireRole(["super_admin"]);
   const { rol, org, volver } = await searchParams;
   const supabase = await createClient();
   const { data } = await supabase.from("organizations").select("id, name").order("name");

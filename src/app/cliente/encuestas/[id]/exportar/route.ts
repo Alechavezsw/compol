@@ -49,13 +49,21 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
 
+  // Excel y Sheets ejecutan como fórmula lo que empieza con = + - @ (o tab / retorno).
+  // Las respuestas abiertas de la encuesta web las escribe cualquiera, así que el
+  // texto libre se prefija con ' para que llegue como texto y no como fórmula.
+  const plain = (value: string | null | undefined) => {
+    const s = value ?? "";
+    return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+  };
+
   const lines = [header.map(escape).join(";")];
 
   // Segunda fila con los enunciados: quien abre la base en Excel sabe qué es cada P.
   const labels = ["", "", "", "", "", "", ""];
   for (const q of data.questions) {
-    if (q.type === "opcion_multiple") for (const o of q.options) labels.push(`${q.text} — ${o.label}`);
-    else labels.push(q.text);
+    if (q.type === "opcion_multiple") for (const o of q.options) labels.push(plain(`${q.text} — ${o.label}`));
+    else labels.push(plain(q.text));
   }
   lines.push(labels.map(escape).join(";"));
 
@@ -67,8 +75,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       r.status,
       r.submitted_at ? dayKey(r.submitted_at) : "",
       r.submitted_at ? time.format(new Date(r.submitted_at)) : "",
-      r.zone ?? "",
-      r.surveyor_id ? (data.names.get(r.surveyor_id) ?? r.surveyor_id) : "",
+      plain(r.zone),
+      r.surveyor_id ? plain(data.names.get(r.surveyor_id) ?? r.surveyor_id) : "",
       r.duration_seconds ?? "",
     ];
 
@@ -81,7 +89,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       } else if (q.type === "escala" || q.type === "numero") {
         cells.push(typeof v?.number === "number" ? String(v.number).replace(".", ",") : "");
       } else {
-        cells.push(describeAnswer(q, v));
+        cells.push(plain(describeAnswer(q, v)));
       }
     }
     lines.push(cells.map(escape).join(";"));

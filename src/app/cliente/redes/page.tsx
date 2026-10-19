@@ -13,7 +13,8 @@ import {
   SourceForm,
   TrackerForm,
 } from "./panel";
-import { deleteSourceAction, deleteTrackerAction, persistMissingTopics } from "./actions";
+import { deleteSourceAction, deleteTrackerAction } from "./actions";
+import { persistMissingTopics } from "@/lib/social/persist-topics";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
 import { fetchAll } from "@/lib/supabase/fetch-all";

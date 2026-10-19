@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/misc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +9,7 @@ import { InvoiceForm } from "./invoice-form";
 export const metadata: Metadata = { title: "Nueva factura" };
 
 export default async function NuevaFacturaPage() {
+  await requireRole(["super_admin"]);
   const supabase = await createClient();
   const { data } = await supabase
     .from("organizations")

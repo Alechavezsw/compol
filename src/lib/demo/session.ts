@@ -15,6 +15,7 @@ export async function setDemoUser(id: string) {
   const store = await cookies();
   store.set(DEMO_COOKIE, id, {
     httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 8,

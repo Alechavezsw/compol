@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { classifySocialBatch, hasLocalGeminiKey } from "@/lib/ai/gemini";
 import { classifySocialBatchTypesafe, hasLocalTypesafeKey } from "@/lib/ai/typesafe";
 import { classifyViaGateway, isAiGatewayConfigured } from "@/lib/ai/gateway";
+import { UnsafeUrlError, fetchPublic } from "@/lib/net-safety";
 import { cleanHeadline } from "@/lib/social/headline";
 import { fetchMetaOEmbed, isMetaUrl } from "@/lib/social/meta";
 import { DEFAULT_TOPICS, classifyText } from "@/lib/social/lexicon";
@@ -122,7 +123,8 @@ export function parsePasted(input: string, network: SocialNetwork): RawPost[] {
     .map((text) => ({ text: text.slice(0, 2000), network, published_at: new Date().toISOString() }));
 }
 
-function safeUrl(raw: string | undefined) {
+/** Solo http(s): un `javascript:` o `data:` guardado como link de una nota se ejecutaría al hacer clic. */
+export function safeUrl(raw: string | undefined | null) {
   try {
     const u = new URL((raw ?? "").trim());
     return u.protocol === "https:" || u.protocol === "http:" ? u.toString().slice(0, 500) : null;
@@ -159,17 +161,21 @@ export async function fetchRss(url: string): Promise<RawPost[]> {
   const target = safeUrl(url);
   if (!target) throw new Error("La dirección del feed no es válida.");
   const host = new URL(target).hostname;
-  if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host)) throw new Error("No se permiten direcciones internas.");
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 8000);
   let xml: string;
   try {
-    const res = await fetch(target, { signal: controller.signal, headers: { "User-Agent": "ConsultaBot/1.0 (+escucha social)" } });
-    if (!res.ok) throw new Error(`El feed respondió ${res.status}.`);
-    xml = (await res.text()).slice(0, 2_000_000);
-  } finally {
-    clearTimeout(timer);
+    const { response, text } = await fetchPublic(target, {
+      headers: { "User-Agent": "ConsultaBot/1.0 (+escucha social)" },
+      timeoutMs: 8000,
+      maxBytes: 2_000_000,
+    });
+    if (!response.ok) throw new Error(`El feed respondió ${response.status}.`);
+    xml = text;
+  } catch (e) {
+    // Solo se muestran los mensajes propios; un error de red crudo no le sirve a quien carga la fuente.
+    if (e instanceof UnsafeUrlError) throw new Error(e.message);
+    if (e instanceof Error && e.message.startsWith("El feed respondió")) throw e;
+    throw new Error("No se pudo leer el feed. Revisá la dirección.");
   }
 
   const items = xml.match(/<(item|entry)\b[\s\S]*?<\/(item|entry)>/gi) ?? [];
@@ -251,18 +257,14 @@ export async function fetchPageMeta(url: string) {
   const target = safeUrl(url);
   if (!target) return null;
   const host = new URL(target).hostname;
-  if (/^(localhost|127\.|10\.|192\.168\.|169\.254\.|0\.)/.test(host)) return null;
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 7000);
   try {
-    const res = await fetch(target, {
-      signal: controller.signal,
+    const { response, text: html } = await fetchPublic(target, {
       headers: { "User-Agent": "ConsultaBot/1.0 (+escucha social)", Accept: "text/html" },
-      redirect: "follow",
+      timeoutMs: 7000,
+      maxBytes: 350_000,
     });
-    if (!res.ok) return null;
-    const html = (await res.text()).slice(0, 350_000);
+    if (!response.ok) return null;
     const attr = (prop: string) => {
       const a = new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]+content=["']([^"']+)["']`, "i").exec(html);
       const b = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${prop}["']`, "i").exec(html);
@@ -275,8 +277,6 @@ export async function fetchPageMeta(url: string) {
     return { title: title.slice(0, 240), description: description.slice(0, 420), site: site.slice(0, 80) };
   } catch {
     return null;
-  } finally {
-    clearTimeout(timer);
   }
 }
 

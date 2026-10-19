@@ -72,6 +72,15 @@ export default async function proxy(request: NextRequest) {
   return guard(request, Boolean(user)) ?? response;
 }
 
+/**
+ * El proxy no corre sobre archivos estáticos ni sobre los archivos de metadata
+ * (robots, sitemap, manifest, imágenes de vista previa): los pide gente y
+ * buscadores sin sesión, y redirigirlos al login los rompe. Además se ahorra el
+ * viaje a Supabase Auth en cada uno.
+ */
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  // Literal a propósito: Next analiza el matcher en el build y no admite valores calculados.
+  matcher: [
+    "/((?!_next/static|_next/image|favicon\\.ico|(?:robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|opengraph-image|twitter-image|apple-icon)$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };

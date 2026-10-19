@@ -6,7 +6,7 @@ import type { DemoTables } from "@/lib/demo/dataset";
 type TableName = keyof DemoTables;
 type Row = Record<string, unknown>;
 
-type Filter = { column: string; op: "eq" | "neq" | "in" | "gte" | "lte"; value: unknown };
+type Filter = { column: string; op: "eq" | "neq" | "in" | "gte" | "lte" | "lt"; value: unknown };
 type Order = { column: string; ascending: boolean };
 
 // ---------------------------------------------------------------------------
@@ -347,6 +347,11 @@ class DemoQuery implements PromiseLike<Result<unknown>> {
     return this;
   }
 
+  lt(column: string, value: unknown) {
+    this.filters.push({ column, op: "lt", value });
+    return this;
+  }
+
   /** Paginado inclusivo, igual que PostgREST: range(0, 999) son 1000 filas. */
   range(from: number, to: number) {
     this.offsetValue = from;
@@ -404,6 +409,8 @@ class DemoQuery implements PromiseLike<Result<unknown>> {
           return cell !== null && cell !== undefined && compare(cell, f.value) >= 0;
         case "lte":
           return cell !== null && cell !== undefined && compare(cell, f.value) <= 0;
+        case "lt":
+          return cell !== null && cell !== undefined && compare(cell, f.value) < 0;
       }
     });
   }

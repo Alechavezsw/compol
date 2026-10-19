@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import Link from "next/link";
 import { Building2, ClipboardList, MessagesSquare, Users } from "lucide-react";
 import { PageHeader, Td, TableWrap, Th } from "@/components/ui/misc";
@@ -10,6 +11,7 @@ import { formatDate, formatNumber } from "@/lib/utils";
 import { ORG_TYPE_LABEL, type Organization, type Survey } from "@/lib/types";
 
 export default async function AdminDashboard() {
+  await requireRole(["super_admin"]);
   const supabase = await createClient();
 
   const [orgs, profiles, surveys, responses, recentOrgs, recentSurveys] = await Promise.all([

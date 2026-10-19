@@ -33,7 +33,13 @@ export async function submitWebResponseAction(payload: {
   if (!(payload.durationSeconds >= 3)) return { ok: false, error: "Tomate un momento para leer las preguntas." };
 
   const h = await headers();
-  const ip = (h.get("x-forwarded-for") ?? "").split(",")[0].trim() || h.get("x-real-ip") || "local";
+  // En Vercel `x-vercel-forwarded-for` lo fija la plataforma; `x-forwarded-for` puede venir
+  // con valores que puso el cliente, así que es el último recurso.
+  const ip =
+    h.get("x-vercel-forwarded-for")?.split(",")[0].trim() ||
+    h.get("x-real-ip") ||
+    (h.get("x-forwarded-for") ?? "").split(",")[0].trim() ||
+    "local";
   if (rateLimited(`${survey.survey.id}:${ip}`)) {
     return { ok: false, error: "Recibimos demasiadas respuestas desde esta conexión. Probá más tarde." };
   }

@@ -23,6 +23,10 @@ export async function submitResponseAction(payload: {
 
   if (!surveyId) return { ok: false, error: "Falta la encuesta." };
   if (!Array.isArray(answers)) return { ok: false, error: "Formato de respuestas inválido." };
+  // Llega desde el navegador (y desde la cola offline): se valida igual que en la encuesta web.
+  if (typeof surveyId !== "string" || !Number.isFinite(durationSeconds)) {
+    return { ok: false, error: "Los datos de la entrevista no son válidos." };
+  }
 
   const supabase = await createClient();
 
@@ -51,7 +55,7 @@ export async function submitResponseAction(payload: {
       channel: "campo",
       surveyor_id: profile.id,
       zone,
-      duration_seconds: durationSeconds,
+      duration_seconds: Math.min(durationSeconds, 60 * 60 * 6),
       latitude: payload.latitude,
       longitude: payload.longitude,
     },

@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
 import { Building2 } from "lucide-react";
 import { PageHeader, EmptyState, TableWrap, Td, Th } from "@/components/ui/misc";
@@ -12,6 +13,7 @@ import { updateOrganizationStatusAction } from "../actions";
 export const metadata: Metadata = { title: "Organizaciones" };
 
 export default async function OrganizacionesPage() {
+  await requireRole(["super_admin"]);
   const supabase = await createClient();
 
   const { data } = await supabase

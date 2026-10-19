@@ -7,7 +7,8 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/admin", "/cliente", "/campo", "/login", "/acceso-denegado"],
+        // Paneles privados, accesos y las encuestas web (que se comparten por link, no se indexan).
+        disallow: ["/admin", "/cliente", "/campo", "/login", "/inicio", "/auth", "/acceso-denegado", "/e/"],
       },
     ],
     sitemap: absoluteUrl("/sitemap.xml"),

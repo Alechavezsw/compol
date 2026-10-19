@@ -1,3 +1,4 @@
+import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
 import { Users } from "lucide-react";
 import { Avatar, EmptyState, PageHeader, TableWrap, Td, Th } from "@/components/ui/misc";
@@ -14,6 +15,7 @@ export const metadata: Metadata = { title: "Usuarios" };
 type Row = Profile & { organizations: { name: string } | null };
 
 export default async function UsuariosPage() {
+  await requireRole(["super_admin"]);
   const supabase = await createClient();
   const { data } = await supabase
     .from("profiles")

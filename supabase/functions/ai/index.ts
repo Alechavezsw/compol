@@ -358,6 +358,18 @@ Deno.serve(async (req) => {
   const { data: auth } = await userClient.auth.getUser();
   if (!auth.user) return json({ error: "No autenticado." }, 401);
 
+  // Un token vigente no alcanza: la cuenta tiene que estar activa y no ser de campo.
+  // La organización sale del perfil y no del cuerpo del pedido, así nadie puede
+  // cargar el consumo de IA (ni su registro) a otra organización.
+  const { data: caller } = await userClient
+    .from("profiles")
+    .select("organization_id, role, is_active")
+    .eq("id", auth.user.id)
+    .maybeSingle();
+  if (!caller?.is_active || caller.role === "surveyor") {
+    return json({ error: "Tu usuario no tiene acceso a la capa de IA." }, 403);
+  }
+
   let body: Json;
   try {
     body = await req.json();
@@ -366,7 +378,7 @@ Deno.serve(async (req) => {
   }
 
   const action = String(body.action ?? "");
-  const organizationId = typeof body.organization_id === "string" ? body.organization_id : null;
+  const organizationId: string | null = caller.organization_id ?? null;
 
   try {
     if (action === "status") {

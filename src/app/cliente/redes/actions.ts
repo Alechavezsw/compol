@@ -20,12 +20,20 @@ import {
   normalizeNetwork,
   parseCsv,
   parsePasted,
+  safeUrl,
   type RawPost,
 } from "@/lib/social/ingest";
 import { cleanHeadline, looksLikeLocalNews, sameStory, uniqueStories } from "@/lib/social/headline";
 import { fetchMetaListen, isMetaConfigured } from "@/lib/social/meta";
 import { classifyText } from "@/lib/social/lexicon";
+import { persistMissingTopics } from "@/lib/social/persist-topics";
+import { EMOTION_LABEL, NETWORK_LABEL } from "@/lib/types";
 import type { Emotion, SentimentLabel, SocialNetwork, SocialPost, SocialSource, SocialTracker } from "@/lib/types";
+
+const NETWORKS: ReadonlySet<string> = new Set(Object.keys(NETWORK_LABEL));
+const EMOTIONS: ReadonlySet<string> = new Set(Object.keys(EMOTION_LABEL));
+/** Quién clasificó la nota; se muestra en el panel y define si se reclasifica. */
+const CLASSIFIERS: ReadonlySet<string> = new Set(["lexico", "gemini", "jev", "typesafe", "demo"]);
 
 export type RadarCandidate = {
   network: SocialNetwork;
@@ -171,7 +179,7 @@ async function insertFresh(
   return persistClassified(supabase, organizationId, classified);
 }
 
-export async function retagRecent(
+async function retagRecent(
   supabase: Awaited<ReturnType<typeof createClient>>,
   organizationId: string,
   trackers: SocialTracker[],
@@ -221,43 +229,6 @@ export async function retagRecent(
       .eq("organization_id", organizationId);
   }
   return patched;
-}
-
-export async function persistMissingTopics(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  organizationId: string,
-  posts: SocialPost[],
-  trackers: SocialTracker[],
-) {
-  const out = posts.map((p) => {
-    if (p.topics.length) return p;
-    const local = classifyText(p.text, trackers);
-    return {
-      ...p,
-      topics: local.topics,
-      sentiment: local.sentiment,
-      label: local.label,
-      emotion: local.emotion,
-      classified_by: "lexico",
-    };
-  });
-  const changed = out.filter((p, i) => p.topics.length > 0 && posts[i].topics.length === 0);
-  await Promise.all(
-    changed.map((p) =>
-      supabase
-        .from("social_posts")
-        .update({
-          topics: p.topics,
-          sentiment: p.sentiment,
-          label: p.label,
-          emotion: p.emotion,
-          classified_by: "lexico",
-        })
-        .eq("id", p.id)
-        .eq("organization_id", organizationId),
-    ),
-  );
-  return out;
 }
 
 async function ensureDefaults(supabase: Awaited<ReturnType<typeof createClient>>, organizationId: string) {
@@ -423,25 +394,33 @@ export async function scanRadarAction(query?: string | null): Promise<SocialActi
   }
 }
 
+/**
+ * Esta acción recibe las notas desde el navegador, así que nada de lo que trae
+ * es confiable: cada campo se vuelve a validar contra los valores permitidos.
+ */
 export async function saveRadarAction(candidates: RadarCandidate[]): Promise<SocialActionState> {
   const { organization } = await requireOrganization(["org_admin"]);
+  if (!Array.isArray(candidates)) return { error: "No hay notas nuevas para guardar." };
   const supabase = await createClient();
+  const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) || null : null);
   const clean: RadarCandidate[] = candidates
-    .filter((p) => p.text?.trim().length >= 8 && isRecentNews(p.published_at || new Date().toISOString()))
+    .filter((p) => typeof p?.text === "string" && p.text.trim().length >= 8 && isRecentNews(p.published_at || new Date().toISOString()))
     .slice(0, 120)
     .map((p) => ({
-      network: p.network,
-      external_id: p.external_id ?? null,
-      author: p.author ?? null,
-      url: p.url ?? null,
+      network: NETWORKS.has(p.network) ? p.network : "otros",
+      external_id: text(p.external_id, 500),
+      author: text(p.author, 80),
+      url: safeUrl(typeof p.url === "string" ? p.url : null),
       text: cleanHeadline(p.text).slice(0, 2000),
       published_at: p.published_at || new Date().toISOString(),
-      engagement: Math.max(0, Number(p.engagement) || 0),
-      sentiment: Number(p.sentiment) || 0,
+      engagement: Math.min(1e9, Math.max(0, Math.round(Number(p.engagement) || 0))),
+      sentiment: Math.min(1, Math.max(-1, Number(p.sentiment) || 0)),
       label: p.label === "positivo" || p.label === "negativo" ? p.label : "neutral",
-      emotion: p.emotion ?? null,
-      topics: Array.isArray(p.topics) ? p.topics.slice(0, 8) : [],
-      classified_by: p.classified_by || "lexico",
+      emotion: EMOTIONS.has(p.emotion as string) ? p.emotion : null,
+      topics: Array.isArray(p.topics)
+        ? p.topics.filter((t): t is string => typeof t === "string" && t.trim().length > 0).map((t) => t.trim().slice(0, 60)).slice(0, 8)
+        : [],
+      classified_by: CLASSIFIERS.has(p.classified_by) ? p.classified_by : "lexico",
     }));
 
   if (!clean.length) return { error: "No hay notas nuevas para guardar." };
