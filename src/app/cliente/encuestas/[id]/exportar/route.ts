@@ -3,6 +3,7 @@ import { requireOrganization } from "@/lib/auth";
 import { applyFilters, loadSurveyData } from "@/lib/analytics";
 import { filtersFromParams } from "@/lib/filters";
 import { describeAnswer, resolvePath } from "@/lib/survey-logic";
+import { neutralizeFormula } from "@/lib/csv";
 import { dayKey, TIME_ZONE } from "@/lib/stats";
 import { slugify } from "@/lib/utils";
 
@@ -49,13 +50,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
 
-  // Excel y Sheets ejecutan como fórmula lo que empieza con = + - @ (o tab / retorno).
-  // Las respuestas abiertas de la encuesta web las escribe cualquiera, así que el
-  // texto libre se prefija con ' para que llegue como texto y no como fórmula.
-  const plain = (value: string | null | undefined) => {
-    const s = value ?? "";
-    return /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
-  };
+  const plain = neutralizeFormula;
 
   const lines = [header.map(escape).join(";")];
 

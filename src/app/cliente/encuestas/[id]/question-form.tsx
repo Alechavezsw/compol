@@ -305,6 +305,7 @@ export function QuestionForm({
                       requestAnimationFrame(() => addRef.current?.focus());
                     }
                   }}
+                  aria-label={`Opción ${i + 1}`}
                   placeholder={i === 0 ? "Primera opción" : "Siguiente opción"}
                   className="h-10 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[color-mix(in_oklab,var(--primary)_16%,transparent)]"
                 />
@@ -325,6 +326,7 @@ export function QuestionForm({
             <input
               ref={addRef}
               maxLength={160}
+              aria-label="Agregar otra opción"
               placeholder="Agregar otra y Enter"
               className="h-10 min-w-0 flex-1 rounded-xl border border-dashed border-[var(--border)] bg-transparent px-3 text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)] focus:border-[var(--primary)]"
               onKeyDown={(e) => {
@@ -444,7 +446,7 @@ export function QuestionForm({
           <span className="ml-auto text-xs font-normal text-[var(--muted)] group-open:hidden">Opcional</span>
         </summary>
         <div className="border-t border-[var(--border)] px-4 py-3">
-          <Input name="help_text" placeholder="Leer las opciones en voz alta." maxLength={300} />
+          <Input name="help_text" aria-label="Aclaración de la pregunta" placeholder="Leer las opciones en voz alta." maxLength={300} />
         </div>
       </details>
 

@@ -80,10 +80,12 @@ export function UserForm({
 
       <Field
         label="Contraseña inicial"
+        htmlFor="contrasena-inicial"
         hint="Mínimo 8 caracteres. Entregásela a la persona por un canal seguro."
       >
         <div className="flex gap-2">
           <Input
+            id="contrasena-inicial"
             name="password"
             required
             minLength={8}

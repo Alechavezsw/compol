@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
@@ -38,6 +39,8 @@ export async function submitResponseAction(payload: {
   longitude?: number | null;
   /** Momento (ms) en que se tomó la entrevista, si salió de la cola sin conexión. */
   collectedAt?: number;
+  /** Id que genera el teléfono para que un envío repetido no cree una segunda entrevista. */
+  clientId?: string;
 }): Promise<SubmitResult> {
   const { profile } = await requireRole(["surveyor"]);
   const { surveyId, zone, durationSeconds, answers } = payload;
@@ -50,6 +53,25 @@ export async function submitResponseAction(payload: {
   }
 
   const supabase = await createClient();
+
+  // Idempotencia: si la señal se cortó justo después de guardar, el teléfono repite el
+  // envío. Se reconoce por el id que generó y se responde "ok" sin duplicar la entrevista.
+  // Va antes de mirar el estado de la encuesta: una entrevista ya guardada no se rechaza
+  // porque la encuesta cerró mientras tanto.
+  const clientKey = typeof payload.clientId === "string" && /^[\w-]{8,64}$/.test(payload.clientId) ? payload.clientId : null;
+  const respondentHash = clientKey
+    ? createHash("sha256").update(`campo|${profile.id}|${clientKey}`).digest("hex").slice(0, 40)
+    : null;
+  if (respondentHash) {
+    const { data: prior } = await supabase
+      .from("responses")
+      .select("id, status")
+      .eq("survey_id", surveyId)
+      .eq("respondent_hash", respondentHash)
+      .limit(1)
+      .maybeSingle();
+    if (prior) return { ok: true, status: prior.status === "descartada" ? "descartada" : "completada" };
+  }
 
   const [{ data: survey }, { data: assignment }] = await Promise.all([
     supabase.from("surveys").select("id, status, organization_id, ends_at").eq("id", surveyId).maybeSingle(),
@@ -86,6 +108,7 @@ export async function submitResponseAction(payload: {
       duration_seconds: Math.min(durationSeconds, 60 * 60 * 6),
       latitude: payload.latitude,
       longitude: payload.longitude,
+      respondent_hash: respondentHash,
     },
   });
 

@@ -56,6 +56,7 @@ export function SocialFilterBar({
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
+          aria-label="Buscar notas o un tema"
           placeholder="Buscar notas o un tema para el radar"
           className="h-full w-full bg-transparent text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
         />
@@ -78,6 +79,7 @@ export function SocialFilterBar({
       </div>
       {networks.length > 1 ? (
         <select
+          aria-label="Filtrar por fuente"
           value={search.get("red") ?? ""}
           onChange={(e) => update("red", e.target.value || null)}
           className="h-11 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 text-xs font-medium"
@@ -92,6 +94,7 @@ export function SocialFilterBar({
       ) : null}
       {topics.length ? (
         <select
+          aria-label="Filtrar por tema"
           value={search.get("tema") ?? ""}
           onChange={(e) => update("tema", e.target.value || null)}
           className="h-11 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 text-xs font-medium"
@@ -461,9 +464,9 @@ export function SourceForm() {
           </button>
         ))}
       </div>
-      <Input name="name" placeholder="Nombre de la fuente" maxLength={80} required />
+      <Input name="name" aria-label="Nombre de la fuente" placeholder="Nombre de la fuente" maxLength={80} required />
       {kind === "noticias" ? (
-        <Input name="query" placeholder="Municipalidad San Juan" required />
+        <Input name="query" aria-label="Qué buscar en noticias" placeholder="Municipalidad San Juan" required />
       ) : (
         <Input name="url" type="url" placeholder="https://…/rss" required />
       )}
@@ -481,9 +484,9 @@ export function TrackerForm() {
   const [state, formAction] = useActionState<SocialActionState, FormData>(createTrackerAction, {});
   return (
     <form action={formAction} className="space-y-3">
-      <Input name="name" placeholder="Nombre del tema (ej. Terminal de ómnibus)" maxLength={60} required />
-      <Input name="keywords" placeholder="Palabras clave, separadas por coma" required />
-      <Input name="exclude" placeholder="Excluir si contiene… (opcional)" />
+      <Input name="name" aria-label="Nombre del tema" placeholder="Nombre del tema (ej. Terminal de ómnibus)" maxLength={60} required />
+      <Input name="keywords" aria-label="Palabras clave" placeholder="Palabras clave, separadas por coma" required />
+      <Input name="exclude" aria-label="Palabras a excluir" placeholder="Excluir si contiene… (opcional)" />
       {state.error ? <FormMessage>{state.error}</FormMessage> : null}
       {state.ok ? <FormMessage tone="success">{state.ok}</FormMessage> : null}
       <SubmitButton pendingLabel="Guardando…" variant="outline" size="sm" className="w-full">

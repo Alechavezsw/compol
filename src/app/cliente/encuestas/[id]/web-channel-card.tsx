@@ -210,7 +210,7 @@ export function WebChannelCard({
                     style={{ background: c }}
                   />
                 ))}
-                <Input name="accent" value={accent} onChange={(e) => setAccent(e.target.value)} className="h-8 w-24 font-mono text-xs" maxLength={7} />
+                <Input name="accent" aria-label="Color de acento en hexadecimal" value={accent} onChange={(e) => setAccent(e.target.value)} className="h-8 w-24 font-mono text-xs" maxLength={7} />
               </div>
             </Field>
 

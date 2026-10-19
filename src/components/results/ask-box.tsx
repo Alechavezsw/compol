@@ -118,6 +118,7 @@ export function AskBox({
           value={input}
           onChange={(e) => setInput(e.target.value)}
           maxLength={400}
+          aria-label="Pregunta sobre los resultados"
           placeholder="¿Qué zona evalúa peor la gestión?"
           className="h-11 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3.5 text-sm text-[var(--foreground)] placeholder:text-[var(--muted)] focus:border-[var(--accent)] focus:ring-4 focus:ring-[color-mix(in_oklab,var(--accent)_16%,transparent)] focus:outline-none"
         />

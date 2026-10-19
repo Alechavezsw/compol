@@ -27,6 +27,7 @@ export function ZoneQuotasFields({
             onChange={(e) =>
               setRows((prev) => prev.map((r, j) => (j === i ? { ...r, zone: e.target.value } : r)))
             }
+            aria-label={`Departamento ${i + 1}`}
             placeholder="Capital"
             maxLength={80}
             required
@@ -34,6 +35,7 @@ export function ZoneQuotasFields({
           />
           <Input
             name="quotas"
+            aria-label={`Cuota del departamento ${i + 1}`}
             type="number"
             min={1}
             max={5000}

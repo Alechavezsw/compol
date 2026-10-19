@@ -6,7 +6,7 @@ import type { DemoTables } from "@/lib/demo/dataset";
 type TableName = keyof DemoTables;
 type Row = Record<string, unknown>;
 
-type Filter = { column: string; op: "eq" | "neq" | "in" | "gte" | "lte" | "lt"; value: unknown };
+type Filter = { column: string; op: "eq" | "neq" | "in" | "gte" | "lte" | "lt" | "notnull"; value: unknown };
 type Order = { column: string; ascending: boolean };
 
 // ---------------------------------------------------------------------------
@@ -337,6 +337,14 @@ class DemoQuery implements PromiseLike<Result<unknown>> {
     return this;
   }
 
+  /** Solo las formas que usa la app: `.not(col, "is", null)` y `.not(col, "eq", valor)`. */
+  not(column: string, operator: string, value: unknown) {
+    if (operator === "is" && value === null) this.filters.push({ column, op: "notnull", value: null });
+    else if (operator === "eq") this.filters.push({ column, op: "neq", value });
+    else throw new Error(`El cliente de demo no soporta not("${column}", "${operator}", …).`);
+    return this;
+  }
+
   gte(column: string, value: unknown) {
     this.filters.push({ column, op: "gte", value });
     return this;
@@ -411,6 +419,8 @@ class DemoQuery implements PromiseLike<Result<unknown>> {
           return cell !== null && cell !== undefined && compare(cell, f.value) <= 0;
         case "lt":
           return cell !== null && cell !== undefined && compare(cell, f.value) < 0;
+        case "notnull":
+          return cell !== null && cell !== undefined;
       }
     });
   }

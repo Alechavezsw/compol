@@ -48,6 +48,7 @@ export function ReportLibrary({
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
+            aria-label="Buscar en la biblioteca"
             placeholder="Buscar por título, tema, encuesta o nota"
             className="h-full w-full bg-transparent text-sm text-[var(--foreground)] outline-none placeholder:text-[var(--muted)]"
           />

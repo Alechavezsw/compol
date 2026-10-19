@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "node --no-warnings --experimental-strip-types --conditions=react-server --import ./tests/register.mjs --test-reporter=spec --test tests/*.test.mts"
   },
   "dependencies": {
     "@google/genai": "^2.19.0",

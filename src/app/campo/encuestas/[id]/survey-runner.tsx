@@ -9,7 +9,7 @@ import { InterviewView } from "@/components/interview/interview-view";
 import { ProgressRing } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { ZoneSearch } from "@/components/zone-search";
-import { enqueueInterview, readQueue, removeQueued } from "@/lib/campo/offline-queue";
+import { enqueueInterview, newClientId, readQueue, removeQueued } from "@/lib/campo/offline-queue";
 import { foldZone } from "@/lib/san-juan-zones";
 import type { QuestionWithOptions } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -79,6 +79,7 @@ export function SurveyRunner({
           latitude: item.latitude,
           longitude: item.longitude,
           collectedAt: item.savedAt,
+          clientId: item.clientId ?? item.id,
         });
         if (!result.ok) {
           // Un rechazo definitivo (encuesta cerrada) no debe trabar las demás: se queda guardada y se sigue.
@@ -140,6 +141,7 @@ export function SurveyRunner({
 
     const payload = {
       surveyId,
+      clientId: newClientId(),
       zone: interview.extra?.zone || zone.trim() || null,
       durationSeconds,
       answers,
@@ -165,7 +167,13 @@ export function SurveyRunner({
         if (result.permanent) blocked = result.error;
       }
 
-      enqueueInterview(surveyorId, payload);
+      if (!enqueueInterview(surveyorId, payload)) {
+        // No hay dónde guardarla: la entrevista sigue abierta en pantalla para no perderla.
+        interview.setError(
+          "No se pudo guardar: sin señal y sin espacio en el teléfono. No cierres esta pantalla; conectate y volvé a enviar.",
+        );
+        return;
+      }
       interview.stop();
       interview.clearDraft();
       setQueued((n) => n + 1);

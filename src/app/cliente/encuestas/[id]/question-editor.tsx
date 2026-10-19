@@ -50,7 +50,7 @@ export function QuestionEditor({
         <input type="hidden" name="id" value={question.id} />
         <input type="hidden" name="survey_id" value={surveyId} />
         <Textarea name="text" defaultValue={question.text} rows={3} required minLength={3} maxLength={500} />
-        <Input name="help_text" defaultValue={question.help_text ?? ""} placeholder="Aclaración (opcional)" maxLength={300} />
+        <Input name="help_text" aria-label="Aclaración de la pregunta" defaultValue={question.help_text ?? ""} placeholder="Aclaración (opcional)" maxLength={300} />
         <Input name="section" defaultValue={question.section ?? ""} placeholder="Sección" maxLength={60} />
         <label className="flex items-center gap-2.5 text-sm text-[var(--foreground)]">
           <input
