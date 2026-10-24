@@ -50,7 +50,7 @@ export default async function NuevoUsuarioPage({
             organizations={(data ?? []) as { id: string; name: string }[]}
             defaultRole={role}
             defaultOrganization={org ?? ""}
-            returnTo={volver === "/admin/encuestadores" ? volver : undefined}
+            returnTo={volver?.startsWith("/admin/") ? volver : undefined}
           />
         </CardContent>
       </Card>

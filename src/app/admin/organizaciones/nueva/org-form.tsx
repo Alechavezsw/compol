@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createOrganizationAction, type ActionState } from "../../actions";
 import { Field, FormMessage, Input, Select, Textarea } from "@/components/ui/field";
 import { SubmitButton } from "@/components/submit-button";
+import { ColorPalette } from "@/components/color-palette";
 
 export function OrgForm() {
   const [state, formAction] = useActionState<ActionState, FormData>(createOrganizationAction, {});
@@ -45,6 +46,10 @@ export function OrgForm() {
 
       <Field label="Correo de contacto" hint="A donde se envían las notificaciones institucionales.">
         <Input name="contact_email" type="email" placeholder="direccion@sanjuan.gob.ar" />
+      </Field>
+
+      <Field label="Color e identidad" hint="Ícono y color del cliente en el panel de administración.">
+        <ColorPalette name="brand_color" defaultValue="#1e40af" />
       </Field>
 
       <Field label="Notas internas" hint="Solo visibles para la administración central.">

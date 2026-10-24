@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
 import { Building2 } from "lucide-react";
@@ -5,10 +6,12 @@ import { PageHeader, EmptyState, TableWrap, Td, Th } from "@/components/ui/misc"
 import { Card, CardContent } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
 import { OrgStatusBadge } from "@/components/ui/badge";
+import { OrgMark } from "@/components/org-mark";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { ORG_TYPE_LABEL, type Organization } from "@/lib/types";
 import { updateOrganizationStatusAction } from "../actions";
+import { DeleteOrganizationButton } from "./delete-organization-button";
 
 export const metadata: Metadata = { title: "Organizaciones" };
 
@@ -67,6 +70,7 @@ export default async function OrganizacionesPage() {
                     <Th className="text-right">Encuestas</Th>
                     <Th>Alta</Th>
                     <Th>Estado</Th>
+                    <Th className="text-right">Acciones</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -76,20 +80,24 @@ export default async function OrganizacionesPage() {
                       className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)]"
                     >
                       <Td>
-                        <div className="flex items-center gap-3">
-                          <span
-                            className="size-8 shrink-0 rounded-lg"
-                            style={{ background: o.brand_color ?? "var(--primary)" }}
-                            aria-hidden
+                        <Link href={`/admin/organizaciones/${o.id}`} className="flex items-center gap-3 group">
+                          <OrgMark
+                            type={o.type}
+                            brandColor={o.brand_color}
+                            name={o.name}
+                            id={o.id}
+                            size="sm"
                           />
                           <div className="min-w-0">
-                            <p className="truncate font-medium">{o.name}</p>
+                            <p className="truncate font-medium text-[var(--foreground)] group-hover:text-[var(--primary)] group-hover:underline">
+                              {o.name}
+                            </p>
                             <p className="truncate text-xs text-[var(--muted)]">
                               {o.region ? `${o.region} · ` : ""}
                               {o.contact_email ?? "sin contacto"}
                             </p>
                           </div>
-                        </div>
+                        </Link>
                       </Td>
                       <Td className="text-[var(--muted)]">{ORG_TYPE_LABEL[o.type]}</Td>
                       <Td className="text-right tabular-nums">
@@ -120,6 +128,9 @@ export default async function OrganizacionesPage() {
                             Aplicar
                           </button>
                         </form>
+                      </Td>
+                      <Td className="text-right">
+                        <DeleteOrganizationButton id={o.id} name={o.name} />
                       </Td>
                     </tr>
                   ))}

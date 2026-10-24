@@ -3,17 +3,9 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
-const SWATCHES = [
-  { hex: "#3d2de0", name: "Violeta" },
-  { hex: "#7c3aed", name: "Lila" },
-  { hex: "#0ea5a4", name: "Turquesa" },
-  { hex: "#0284c7", name: "Azul" },
-  { hex: "#16a34a", name: "Verde" },
-  { hex: "#ca8a04", name: "Oro" },
-  { hex: "#ea580c", name: "Naranja" },
-  { hex: "#e11d48", name: "Rosa" },
-  { hex: "#334155", name: "Pizarra" },
-] as const;
+import { ORG_BRAND_SWATCHES } from "@/lib/org-visual";
+
+const SWATCHES = ORG_BRAND_SWATCHES;
 
 export function ColorPalette({
   name = "color",

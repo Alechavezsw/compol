@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
 import { ButtonLink } from "@/components/ui/button";
 import { OrgStatusBadge, SurveyStatusBadge } from "@/components/ui/badge";
+import { OrgMark } from "@/components/org-mark";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { ORG_TYPE_LABEL, type Organization, type Survey } from "@/lib/types";
@@ -150,18 +151,22 @@ export default async function AdminDashboard() {
               </p>
             ) : (
               orgList.map((o) => (
-                <div
+                <Link
                   key={o.id}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] p-3"
+                  href={`/admin/organizaciones/${o.id}`}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border)] p-3 transition-colors hover:bg-[var(--surface-2)]"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-[var(--foreground)]">{o.name}</p>
-                    <p className="mt-0.5 text-xs text-[var(--muted)]">
-                      {ORG_TYPE_LABEL[o.type]} · alta {formatDate(o.created_at)}
-                    </p>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <OrgMark type={o.type} brandColor={o.brand_color} name={o.name} id={o.id} size="sm" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-[var(--foreground)]">{o.name}</p>
+                      <p className="mt-0.5 text-xs text-[var(--muted)]">
+                        {ORG_TYPE_LABEL[o.type]} · alta {formatDate(o.created_at)}
+                      </p>
+                    </div>
                   </div>
                   <OrgStatusBadge status={o.status} />
-                </div>
+                </Link>
               ))
             )}
           </CardContent>

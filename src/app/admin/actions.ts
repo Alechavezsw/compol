@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requireRole } from "@/lib/auth";
-import { slugify } from "@/lib/utils";
+import { pickOrgBrandColor } from "@/lib/org-visual";
+import { safeInternalPath, slugify } from "@/lib/utils";
 import type { InvoiceStatus, OrgStatus, OrgType, UserRole } from "@/lib/types";
 
 export type ActionState = { error?: string | null; ok?: string | null };
@@ -29,6 +30,8 @@ export async function createOrganizationAction(
   const contactEmail = String(formData.get("contact_email") ?? "").trim() || null;
   const contactPhone = String(formData.get("contact_phone") ?? "").trim() || null;
   const notes = String(formData.get("notes") ?? "").trim() || null;
+  const rawBrand = String(formData.get("brand_color") ?? "").trim();
+  const brandColor = /^#[0-9a-fA-F]{6}$/.test(rawBrand) ? rawBrand.toLowerCase() : null;
 
   if (name.length < 3) return { error: "El nombre de la organización es demasiado corto." };
   if (!ORG_TYPES.includes(type)) return { error: "Tipo de organización inválido." };
@@ -49,6 +52,11 @@ export async function createOrganizationAction(
     slug = `${base}-${Math.random().toString(36).slice(2, 6)}`;
   }
 
+  const { data: usedColors } = await supabase.from("organizations").select("brand_color");
+  const brand =
+    brandColor ??
+    pickOrgBrandColor((usedColors ?? []).map((r) => r.brand_color).filter((c): c is string => Boolean(c)));
+
   const { error } = await supabase.from("organizations").insert({
     name,
     slug,
@@ -57,6 +65,7 @@ export async function createOrganizationAction(
     region,
     contact_email: contactEmail,
     contact_phone: contactPhone,
+    brand_color: brand,
     notes,
   });
 
@@ -77,6 +86,78 @@ export async function updateOrganizationStatusAction(formData: FormData) {
   const supabase = await createClient();
   await supabase.from("organizations").update({ status }).eq("id", id);
   revalidatePath("/admin/organizaciones");
+  revalidatePath(`/admin/organizaciones/${id}`);
+  revalidatePath("/admin");
+}
+
+export async function updateOrganizationAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole(["super_admin"]);
+
+  const id = String(formData.get("id") ?? "").trim();
+  const name = String(formData.get("name") ?? "").trim();
+  const type = String(formData.get("type") ?? "gobierno") as OrgType;
+  const status = String(formData.get("status") ?? "prueba") as OrgStatus;
+  const region = String(formData.get("region") ?? "").trim() || null;
+  const country = String(formData.get("country") ?? "").trim() || null;
+  const contactEmail = String(formData.get("contact_email") ?? "").trim() || null;
+  const contactPhone = String(formData.get("contact_phone") ?? "").trim() || null;
+  const brandColor = String(formData.get("brand_color") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "Organización inválida." };
+  if (name.length < 3) return { error: "El nombre de la organización es demasiado corto." };
+  if (!ORG_TYPES.includes(type)) return { error: "Tipo de organización inválido." };
+  if (!ORG_STATUSES.includes(status)) return { error: "Estado inválido." };
+  if (brandColor && !/^#[0-9a-fA-F]{6}$/.test(brandColor)) {
+    return { error: "Elegí un color de la paleta." };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("organizations")
+    .update({
+      name,
+      type,
+      status,
+      region,
+      country,
+      contact_email: contactEmail,
+      contact_phone: contactPhone,
+      brand_color: brandColor,
+      notes,
+    })
+    .eq("id", id);
+
+  if (error) return { error: `No se pudo guardar: ${error.message}` };
+
+  revalidatePath("/admin/organizaciones");
+  revalidatePath(`/admin/organizaciones/${id}`);
+  revalidatePath("/admin");
+  return { ok: "Datos de la organización actualizados." };
+}
+
+export async function deleteOrganizationAction(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await requireRole(["super_admin"]);
+
+  const id = String(formData.get("id") ?? "").trim();
+  if (!/^[0-9a-f-]{36}$/i.test(id)) return { error: "Organización inválida." };
+
+  const supabase = await createClient();
+  const { data: org } = await supabase.from("organizations").select("id, name").eq("id", id).maybeSingle();
+  if (!org) return { error: "No se encontró la organización." };
+
+  const { error } = await supabase.from("organizations").delete().eq("id", id);
+  if (error) return { error: `No se pudo eliminar: ${error.message}` };
+
+  revalidatePath("/admin/organizaciones");
+  revalidatePath("/admin");
+  redirect("/admin/organizaciones");
 }
 
 export async function createUserAction(
@@ -136,8 +217,9 @@ export async function createUserAction(
 
   revalidatePath("/admin/usuarios");
   revalidatePath("/admin/encuestadores");
-  const back = String(formData.get("volver") ?? "");
-  redirect(back === "/admin/encuestadores" ? back : "/admin/usuarios");
+  if (organizationId) revalidatePath(`/admin/organizaciones/${organizationId}`);
+  const back = safeInternalPath(String(formData.get("volver") ?? ""));
+  redirect(back?.startsWith("/admin/") ? back : "/admin/usuarios");
 }
 
 export async function toggleUserActiveAction(formData: FormData) {
