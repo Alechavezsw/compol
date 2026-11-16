@@ -137,13 +137,18 @@ export function AppShell({
       </div>
 
       <div className="px-5 pb-4">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3.5 py-3">
-          <p className="text-[10px] font-semibold tracking-[0.16em] text-[var(--muted)] uppercase">
-            {areaLabel}
-          </p>
-          {orgName ? (
-            <p className="mt-1 truncate text-sm font-semibold text-[var(--foreground)]">{orgName}</p>
-          ) : null}
+        <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[linear-gradient(135deg,var(--primary-soft),var(--surface-2)_70%)] px-3 py-2.5">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] text-sm font-semibold text-[var(--primary)] shadow-[var(--shadow-card)]">
+            {orgName ? orgName.trim().charAt(0).toUpperCase() : <Gauge className="size-4" />}
+          </span>
+          <div className="min-w-0">
+            <p className="text-[10px] font-semibold tracking-[0.16em] text-[var(--muted)] uppercase">
+              {areaLabel}
+            </p>
+            {orgName ? (
+              <p className="mt-0.5 line-clamp-2 text-sm leading-snug font-semibold text-[var(--foreground)]">{orgName}</p>
+            ) : null}
+          </div>
         </div>
       </div>
 

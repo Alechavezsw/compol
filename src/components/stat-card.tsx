@@ -23,33 +23,36 @@ export function StatCard({
     warning: "bg-[var(--warning-soft)] text-[var(--warning)]",
   }[tone];
 
-  const bar = {
-    primary: "from-[var(--primary)] to-[var(--accent)]",
-    accent: "from-[var(--accent)] to-[var(--primary)]",
-    success: "from-[var(--success)] to-[var(--accent)]",
-    warning: "from-[var(--warning)] to-[var(--primary)]",
+  // Un halo suave del color de la métrica en la esquina, en lugar de una franja.
+  const glow = {
+    primary: "var(--primary)",
+    accent: "var(--accent)",
+    success: "var(--success)",
+    warning: "var(--warning)",
   }[tone];
 
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,transparent)] p-5 shadow-[var(--shadow-card)] backdrop-blur-sm",
+        "lift relative overflow-hidden rounded-[22px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)]",
         className,
       )}
     >
-      <div className={cn("absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r", bar)} />
-      <div className="flex items-start justify-between gap-3">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-16 -right-16 size-40 rounded-full opacity-[0.14] blur-2xl"
+        style={{ background: glow }}
+      />
+      <div className="relative flex items-start justify-between gap-3">
         <p className="text-[13px] font-medium text-[var(--muted)]">{label}</p>
         {icon ? (
-          <span className={cn("flex size-9 items-center justify-center rounded-xl", toneClass)}>
+          <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl [&_svg]:size-[18px]", toneClass)}>
             {icon}
           </span>
         ) : null}
       </div>
-      <p className="display mt-4 text-[32px] leading-none text-[var(--foreground)] tabular-nums">
-        {value}
-      </p>
-      {hint ? <div className="mt-2.5 text-xs text-[var(--muted)]">{hint}</div> : null}
+      <p className="metric relative mt-3 text-[34px] leading-none text-[var(--foreground)]">{value}</p>
+      {hint ? <div className="relative mt-2.5 text-xs text-[var(--muted)]">{hint}</div> : null}
     </div>
   );
 }

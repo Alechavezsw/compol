@@ -9,12 +9,12 @@
    embebida no hereda el tema oscuro del panel de quien la está configurando. */
 :root,
 .force-light {
-  --background: #ebe7f6;
-  --surface: #fffdfb;
-  --surface-2: #f4f1fb;
+  --background: #f0eef8;
+  --surface: #ffffff;
+  --surface-2: #f6f4fc;
   --foreground: #14111f;
   --muted: #5b5570;
-  --border: #ddd6ee;
+  --border: #e3def0;
 
   --primary: #3d2de0;
   --primary-hover: #2c1cc8;
@@ -42,8 +42,8 @@
 
   --ring: #3d2de0;
   --radius: 1rem;
-  --shadow-card: 0 1px 0 color-mix(in oklab, white 70%, transparent) inset,
-    0 14px 36px -22px rgba(32, 20, 72, 0.28);
+  --shadow-card: 0 1px 2px rgba(20, 17, 31, 0.04), 0 12px 32px -20px rgba(40, 24, 110, 0.22);
+  --shadow-lift: 0 2px 4px rgba(20, 17, 31, 0.05), 0 22px 44px -22px rgba(40, 24, 110, 0.32);
 }
 
 .dark:not(.force-light) {
@@ -81,6 +81,8 @@
   --ring: #8b7cff;
   --shadow-card: 0 1px 0 color-mix(in oklab, white 6%, transparent) inset,
     0 18px 40px -20px rgba(0, 0, 0, 0.55);
+  --shadow-lift: 0 1px 0 color-mix(in oklab, white 8%, transparent) inset,
+    0 24px 48px -20px rgba(0, 0, 0, 0.7);
 }
 
 @theme inline {
@@ -189,7 +191,34 @@
 
   .display {
     font-family: var(--font-display);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.02em;
+  }
+
+  /* Cifras de tablero: la serif condensada aprieta los dígitos y los hace
+     difíciles de comparar. Los números van en sans, firmes y con ancho fijo. */
+  .metric,
+  .display.tabular-nums {
+    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .lift {
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease,
+      border-color 0.2s ease;
+  }
+  .lift:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lift);
+    border-color: color-mix(in oklab, var(--primary) 22%, var(--border));
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lift:hover {
+      transform: none;
+    }
   }
 
   .gradient-text {
