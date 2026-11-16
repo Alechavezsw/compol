@@ -9,7 +9,7 @@ import type { UserRole } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Nuevo usuario" };
 
-const ROLES: UserRole[] = ["surveyor", "org_analyst", "org_admin", "super_admin"];
+const ROLES: UserRole[] = ["surveyor", "politico", "org_analyst", "org_admin", "super_admin"];
 
 export default async function NuevoUsuarioPage({
   searchParams,
@@ -28,11 +28,15 @@ export default async function NuevoUsuarioPage({
   return (
     <div className="mx-auto max-w-2xl space-y-7">
       <PageHeader
-        title={role === "surveyor" ? "Nuevo encuestador" : "Nuevo usuario"}
+        title={
+          role === "surveyor" ? "Nuevo encuestador" : role === "politico" ? "Nuevo político" : "Nuevo usuario"
+        }
         description={
           role === "surveyor"
             ? "Los encuestadores los da de alta y los asigna solo la administración central."
-            : "El alta crea la cuenta de acceso y su perfil en la organización elegida."
+            : role === "politico"
+              ? "Creás la cuenta del político. Después cargás las encuestas y generás los informes: con su usuario solo ve eso."
+              : "El alta crea la cuenta de acceso y su perfil en la organización elegida."
         }
       />
 

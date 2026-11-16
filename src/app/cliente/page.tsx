@@ -1,5 +1,6 @@
 import { cache, Suspense } from "react";
 import Link from "next/link";
+import { PoliticoSnapshot } from "./pantallazo";
 import {
   Activity,
   AlertTriangle,
@@ -22,7 +23,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { Badge, SurveyStatusBadge } from "@/components/ui/badge";
 import { FieldTrend } from "@/components/charts/charts";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
 import { loadDashboard } from "@/lib/dashboard";
 import { moodLabel } from "@/lib/social/analytics";
 import { formatDayKey, todayKey } from "@/lib/stats";
@@ -37,8 +38,11 @@ const dashboard = cache(async function dashboard() {
 });
 
 export default async function ClienteDashboard() {
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const firstName = profile.full_name.split(" ")[0] || "equipo";
+  if (profile.role === "politico") {
+    return <PoliticoSnapshot organization={organization} firstName={firstName} />;
+  }
 
   return (
     <div className="space-y-6">
@@ -57,7 +61,7 @@ export default async function ClienteDashboard() {
               <HeroChips />
             </Suspense>
           </div>
-          {profile.role === "org_admin" ? (
+          {operatesClient(profile.role) ? (
             <ButtonLink href="/cliente/encuestas/nueva" className="h-12 bg-cyan-300 text-slate-950 hover:bg-cyan-200">
               Nueva encuesta
             </ButtonLink>
@@ -66,7 +70,7 @@ export default async function ClienteDashboard() {
       </section>
 
       <Suspense fallback={<DashboardFallback />}>
-        <DashboardBody role={profile.role} />
+        <DashboardBody canCreate={operatesClient(profile.role)} />
       </Suspense>
     </div>
   );
@@ -107,7 +111,7 @@ function DashboardFallback() {
   );
 }
 
-async function DashboardBody({ role }: { role: string }) {
+async function DashboardBody({ canCreate }: { canCreate: boolean }) {
   const {
     surveys,
     active,
@@ -205,7 +209,7 @@ async function DashboardBody({ role }: { role: string }) {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--primary)] uppercase">Hoy en campo</p>
-            <h2 className="display mt-1 text-2xl text-[var(--foreground)]">{formatNumber(control.today)} casos</h2>
+            <h2 className="display tabular-nums mt-1 text-2xl text-[var(--foreground)]">{formatNumber(control.today)} casos</h2>
           </div>
           <p className="text-xs text-[var(--muted)]">
             {control.quality.express
@@ -368,7 +372,7 @@ async function DashboardBody({ role }: { role: string }) {
                 icon={<ClipboardList className="size-5" />}
                 title="Todavía no hay encuestas"
                 description="Creá tu primer cuestionario y salí a campo o publicalo en la web."
-                action={role === "org_admin" ? <ButtonLink href="/cliente/encuestas/nueva">Crear encuesta</ButtonLink> : null}
+                action={canCreate ? <ButtonLink href="/cliente/encuestas/nueva">Crear encuesta</ButtonLink> : null}
               />
             ) : (
               <div className="grid gap-3 md:grid-cols-2">

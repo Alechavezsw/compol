@@ -4,13 +4,13 @@ import type { Metadata } from "next";
 import { Building2 } from "lucide-react";
 import { PageHeader, EmptyState, TableWrap, Td, Th } from "@/components/ui/misc";
 import { Card, CardContent } from "@/components/ui/card";
-import { ButtonLink } from "@/components/ui/button";
+import { Button, ButtonLink } from "@/components/ui/button";
 import { OrgStatusBadge } from "@/components/ui/badge";
 import { OrgMark } from "@/components/org-mark";
 import { createClient } from "@/lib/supabase/server";
 import { formatDate, formatNumber } from "@/lib/utils";
 import { ORG_TYPE_LABEL, type Organization } from "@/lib/types";
-import { updateOrganizationStatusAction } from "../actions";
+import { updateOrganizationStatusAction, enterOrganizationAction } from "../actions";
 import { DeleteOrganizationButton } from "./delete-organization-button";
 
 export const metadata: Metadata = { title: "Organizaciones" };
@@ -130,7 +130,15 @@ export default async function OrganizacionesPage() {
                         </form>
                       </Td>
                       <Td className="text-right">
-                        <DeleteOrganizationButton id={o.id} name={o.name} />
+                        <div className="flex items-center justify-end gap-2">
+                          <form action={enterOrganizationAction}>
+                            <input type="hidden" name="id" value={o.id} />
+                            <Button type="submit" size="sm">
+                              Operar
+                            </Button>
+                          </form>
+                          <DeleteOrganizationButton id={o.id} name={o.name} />
+                        </div>
                       </Td>
                     </tr>
                   ))}

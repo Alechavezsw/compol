@@ -5,14 +5,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ButtonLink } from "@/components/ui/button";
 import { ServiceLineBadge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
 import { formatDate, formatNumber } from "@/lib/utils";
 import type { Project } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Proyectos" };
 
 export default async function ProyectosPage() {
-  const { organization } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
   const supabase = await createClient();
 
   const [{ data }, { data: surveyRows }] = await Promise.all([
@@ -37,7 +37,9 @@ export default async function ProyectosPage() {
       <PageHeader
         title="Proyectos"
         description="Agrupá tus encuestas por línea de servicio: tracking, monitor de gestión, estudios puntuales."
-        actions={<ButtonLink href="/cliente/proyectos/nuevo">Nuevo proyecto</ButtonLink>}
+        actions={
+          operatesClient(profile.role) ? <ButtonLink href="/cliente/proyectos/nuevo">Nuevo proyecto</ButtonLink> : null
+        }
       />
 
       {projects.length === 0 ? (
@@ -45,7 +47,11 @@ export default async function ProyectosPage() {
           icon={<FolderKanban className="size-5" />}
           title="Todavía no hay proyectos"
           description="Creá un proyecto para agrupar las olas de una misma línea de servicio."
-          action={<ButtonLink href="/cliente/proyectos/nuevo">Crear el primero</ButtonLink>}
+          action={
+            operatesClient(profile.role) ? (
+              <ButtonLink href="/cliente/proyectos/nuevo">Crear el primero</ButtonLink>
+            ) : null
+          }
         />
       ) : (
         <Card>

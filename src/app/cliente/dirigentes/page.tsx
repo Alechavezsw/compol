@@ -5,7 +5,7 @@ import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { ButtonLink } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/misc";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
 import { formatPercent } from "@/lib/utils";
 import type { Dirigente, DirigenteMedicion } from "@/lib/types";
 
@@ -36,7 +36,7 @@ export default async function DirigentesPage() {
     }
   }
 
-  const canManage = profile.role === "org_admin";
+  const canManage = operatesClient(profile.role);
 
   return (
     <div className="space-y-7">
@@ -80,19 +80,19 @@ export default async function DirigentesPage() {
                   <div className="grid grid-cols-3 gap-2 border-t border-[var(--border)] pt-3">
                     <div>
                       <p className="text-[11px] text-[var(--muted)]">Conocimiento</p>
-                      <p className="display text-lg text-[var(--foreground)]">
+                      <p className="display tabular-nums text-lg text-[var(--foreground)]">
                         {formatPercent(latest.conocimiento)}
                       </p>
                     </div>
                     <div>
                       <p className="text-[11px] text-[var(--muted)]">Imagen +</p>
-                      <p className="display text-lg text-[var(--success)]">
+                      <p className="display tabular-nums text-lg text-[var(--success)]">
                         {formatPercent(latest.imagen_positiva)}
                       </p>
                     </div>
                     <div>
                       <p className="text-[11px] text-[var(--muted)]">Imagen −</p>
-                      <p className="display text-lg text-[var(--danger)]">
+                      <p className="display tabular-nums text-lg text-[var(--danger)]">
                         {formatPercent(latest.imagen_negativa)}
                       </p>
                     </div>

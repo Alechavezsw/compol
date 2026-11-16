@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
-import { ArrowRight, Building2, ClipboardList, LineChart, ShieldCheck } from "lucide-react";
+import { ArrowRight, Building2, ClipboardList, Landmark, LineChart, ShieldCheck } from "lucide-react";
 import { signInDemoAction, type LoginState } from "./actions";
 import { Button } from "@/components/ui/button";
 import { FormMessage } from "@/components/ui/field";
@@ -13,6 +13,7 @@ const ICONS: Record<UserRole, typeof ShieldCheck> = {
   super_admin: ShieldCheck,
   org_admin: Building2,
   org_analyst: LineChart,
+  politico: Landmark,
   surveyor: ClipboardList,
 };
 

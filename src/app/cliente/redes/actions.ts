@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { requireOperator, requireOrganization } from "@/lib/auth";
 import { generateRadarReport, isGeminiConfigured } from "@/lib/ai/gemini";
 import { buildLocalRadarReport } from "@/lib/demo/report";
 import { isDemoMode } from "@/lib/demo/mode";
@@ -363,7 +363,7 @@ async function collectRadarRaw(
 
 /** Busca en internet y muestra las notas. No las guarda hasta que se pulse Guardar. */
 export async function scanRadarAction(query?: string | null): Promise<SocialActionState> {
-  const { organization } = await requireOrganization(["org_admin"]);
+  const { organization } = await requireOperator();
   const supabase = await createClient();
 
   try {
@@ -399,7 +399,7 @@ export async function scanRadarAction(query?: string | null): Promise<SocialActi
  * es confiable: cada campo se vuelve a validar contra los valores permitidos.
  */
 export async function saveRadarAction(candidates: RadarCandidate[]): Promise<SocialActionState> {
-  const { organization } = await requireOrganization(["org_admin"]);
+  const { organization } = await requireOperator();
   if (!Array.isArray(candidates)) return { error: "No hay notas nuevas para guardar." };
   const supabase = await createClient();
   const text = (value: unknown, max: number) => (typeof value === "string" ? value.trim().slice(0, max) || null : null);
@@ -462,7 +462,7 @@ export async function listenNowAction(query?: string | null): Promise<SocialActi
 
 /** Lee la Página de Facebook y el Instagram profesional conectados por Graph API. */
 export async function listenMetaAction(): Promise<SocialActionState> {
-  const { organization } = await requireOrganization(["org_admin"]);
+  const { organization } = await requireOperator();
   if (!isMetaConfigured()) {
     return {
       error:
@@ -495,7 +495,7 @@ export async function listenMetaAction(): Promise<SocialActionState> {
 }
 
 export async function importSocialAction(_prev: SocialActionState, formData: FormData): Promise<SocialActionState> {
-  const { organization } = await requireOrganization(["org_admin"]);
+  const { organization } = await requireOperator();
   const mode = String(formData.get("mode") ?? "csv");
 
   let raw: RawPost[] = [];
@@ -575,7 +575,7 @@ export async function importSocialAction(_prev: SocialActionState, formData: For
 }
 
 export async function createSourceAction(_prev: SocialActionState, formData: FormData): Promise<SocialActionState> {
-  const { organization } = await requireOrganization(["org_admin"]);
+  const { organization } = await requireOperator();
   const kind = String(formData.get("kind") ?? "noticias") === "rss" ? "rss" : "noticias";
   const name = String(formData.get("name") ?? "").trim().slice(0, 80);
   const query = String(formData.get("query") ?? "").trim().slice(0, 200) || null;
@@ -612,7 +612,7 @@ export async function createSourceAction(_prev: SocialActionState, formData: For
 }
 
 export async function createTrackerAction(_prev: SocialActionState, formData: FormData): Promise<SocialActionState> {
-  const { organization } = await requireOrganization(["org_admin"]);
+  const { organization } = await requireOperator();
   const name = String(formData.get("name") ?? "").trim().slice(0, 60);
   const split = (key: string) =>
     String(formData.get(key) ?? "")
@@ -647,7 +647,7 @@ export async function createTrackerAction(_prev: SocialActionState, formData: Fo
 }
 
 export async function deleteTrackerAction(formData: FormData) {
-  const { organization } = await requireOrganization(["org_admin"]);
+  const { organization } = await requireOperator();
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
   await supabase.from("social_trackers").delete().eq("id", id).eq("organization_id", organization.id);
@@ -655,7 +655,7 @@ export async function deleteTrackerAction(formData: FormData) {
 }
 
 export async function deleteSourceAction(formData: FormData) {
-  const { organization } = await requireOrganization(["org_admin"]);
+  const { organization } = await requireOperator();
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
   await supabase.from("social_sources").delete().eq("id", id).eq("organization_id", organization.id);
@@ -663,7 +663,7 @@ export async function deleteSourceAction(formData: FormData) {
 }
 
 export async function reclassifyAction(_prev: SocialActionState, _formData: FormData): Promise<SocialActionState> {
-  const { organization } = await requireOrganization(["org_admin"]);
+  const { organization } = await requireOperator();
   const supabase = await createClient();
   const { data } = await supabase
     .from("social_posts")

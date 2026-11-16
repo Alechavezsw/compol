@@ -7,14 +7,14 @@ import { ButtonLink } from "@/components/ui/button";
 import { SurveyStatusBadge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
-import { requireOrganization } from "@/lib/auth";
+import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
 import { formatDate, formatNumber } from "@/lib/utils";
 import type { Survey } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Encuestas" };
 
 export default async function EncuestasPage() {
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
 
   const [{ data: surveyRows }, { data: responseRows }, { data: questionRows }, { data: assignRows }, { data: projectRows }] =
@@ -49,13 +49,20 @@ export default async function EncuestasPage() {
   const questions = tally(questionRows);
   const assignments = tally(assignRows);
 
-  const canManage = profile.role === "org_admin";
+  const canManage = operatesClient(profile.role);
+  const readOnly = profile.role === "politico";
 
   return (
     <div className="space-y-7">
       <PageHeader
-        title="Encuestas"
-        description="Cada relevamiento con su cuestionario, su equipo de campo y sus resultados."
+        title={readOnly ? "Encuestas en vivo" : canManage ? "Cargar encuestas" : "Encuestas"}
+        description={
+          readOnly
+            ? "El operativo se actualiza solo. Entrá a cada encuesta para ver resultados, gráficos y el margen."
+            : canManage
+              ? "Estas encuestas quedan en la organización del político. Cuando tengan casos, generá el informe para que lo vea con su usuario."
+              : "Cada relevamiento con su cuestionario, su equipo de campo y sus resultados."
+        }
         actions={canManage ? <ButtonLink href="/cliente/encuestas/nueva">Nueva encuesta</ButtonLink> : null}
       />
 
@@ -78,7 +85,7 @@ export default async function EncuestasPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <Link
-                      href={`/cliente/encuestas/${s.id}`}
+                      href={readOnly ? `/cliente/encuestas/${s.id}/resultados` : `/cliente/encuestas/${s.id}`}
                       className="text-[15px] font-semibold tracking-tight text-[var(--foreground)] hover:text-[var(--primary)]"
                     >
                       {s.title}
@@ -103,10 +110,12 @@ export default async function EncuestasPage() {
                     <ClipboardList className="size-3.5" />
                     {formatNumber(questions.get(s.id) ?? 0)} preguntas
                   </div>
+                  {readOnly ? null : (
                   <div className="flex items-center gap-1.5">
                     <Users className="size-3.5" />
                     {formatNumber(assignments.get(s.id) ?? 0)} encuestadores
                   </div>
+                  )}
                   <div className="flex items-center gap-1.5">
                     <MapPin className="size-3.5" />
                     {s.geography ?? "Sin ámbito"}
@@ -143,9 +152,11 @@ export default async function EncuestasPage() {
                         </button>
                       </form>
                     ) : null}
+                    {readOnly ? null : (
                     <ButtonLink href={`/cliente/encuestas/${s.id}`} size="sm" variant="outline">
                       {canManage ? "Editar" : "Ver"}
                     </ButtonLink>
+                    )}
                     <ButtonLink href={`/cliente/encuestas/${s.id}/resultados`} size="sm">
                       <BarChart3 />
                       Resultados

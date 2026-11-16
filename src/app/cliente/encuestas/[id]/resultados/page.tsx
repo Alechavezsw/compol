@@ -32,7 +32,7 @@ import { FieldMap } from "@/components/results/field-map";
 import { caseForAnswers, pickEvaluationQuestion } from "@/lib/case-tone";
 import { LiveRefresh } from "@/components/results/live-refresh";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
 import {
   applyFilters,
   computeAnalytics,
@@ -77,7 +77,7 @@ export default async function ResultadosPage({
 }) {
   const { id } = await params;
   const query = await searchParams;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
 
   const data = await loadSurveyData(supabase, id);
@@ -128,6 +128,7 @@ export default async function ResultadosPage({
     .concat(findings[0] ? [`¿Hay diferencias por ${findings[0].by.kind === "zone" ? "zona" : "edad o perfil"}?`] : []);
 
   const paceInfo = PACE[pace.status];
+  const readOnly = profile.role === "politico";
 
   const evaluation = pickEvaluationQuestion(data.questions);
   const geoPoints = applyFilters(data, data.responses, filters)
@@ -173,10 +174,12 @@ export default async function ResultadosPage({
         }
         actions={
           <>
+            {readOnly ? null : (
             <ButtonLink href={`/cliente/encuestas/${id}`} variant="outline">
               Cuestionario
             </ButtonLink>
-            {hasAnyData ? (
+            )}
+            {!readOnly && hasAnyData ? (
               <a
                 href={`/cliente/encuestas/${id}/exportar${exportQuery ? `?${exportQuery}` : ""}`}
                 className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--foreground)] transition-all hover:border-[color-mix(in_oklab,var(--primary)_28%,var(--border))] hover:bg-[var(--surface-2)]"
@@ -185,7 +188,7 @@ export default async function ResultadosPage({
                 CSV
               </a>
             ) : null}
-            {profile.role === "org_admin" && hasAnyData ? (
+            {operatesClient(profile.role) && hasAnyData ? (
               <ButtonLink href={`/cliente/informes?encuesta=${id}`}>
                 <Sparkles />
                 Generar informe
@@ -205,7 +208,7 @@ export default async function ResultadosPage({
         <>
           <FilterBar
             zones={zones}
-            surveyors={surveyors}
+            surveyors={readOnly ? [] : surveyors}
             segments={variables.filter((v) => v.kind === "question")}
             channels={channels}
             minDay={days[0]}
@@ -218,7 +221,7 @@ export default async function ResultadosPage({
               ["#hallazgos", "Hallazgos"],
               ["#cruces", "Cruces"],
               ["#preguntas", "Pregunta por pregunta"],
-              ...(bySurveyor.length ? [["#equipo", "Equipo y calidad"]] : []),
+              ...(readOnly || !bySurveyor.length ? [] : [["#equipo", "Equipo y calidad"]]),
             ].map(([href, label]) => (
               <a
                 key={href}
@@ -499,7 +502,7 @@ export default async function ResultadosPage({
               </section>
 
               {/* ---------------------------------------------------- equipo */}
-              {bySurveyor.length ? (
+              {bySurveyor.length && !readOnly ? (
               <section id="equipo" className="scroll-mt-28">
                 <Card>
                   <CardHeader>

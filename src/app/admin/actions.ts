@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { requireRole } from "@/lib/auth";
+import { requireRole, setOperatingOrganization } from "@/lib/auth";
 import { pickOrgBrandColor } from "@/lib/org-visual";
 import { safeInternalPath, slugify } from "@/lib/utils";
 import type { InvoiceStatus, OrgStatus, OrgType, UserRole } from "@/lib/types";
@@ -12,7 +12,7 @@ export type ActionState = { error?: string | null; ok?: string | null };
 
 const ORG_TYPES: OrgType[] = ["gobierno", "institucion", "ong", "privado"];
 const ORG_STATUSES: OrgStatus[] = ["activa", "prueba", "suspendida"];
-const ROLES: UserRole[] = ["super_admin", "org_admin", "org_analyst", "surveyor"];
+const ROLES: UserRole[] = ["super_admin", "org_admin", "org_analyst", "politico", "surveyor"];
 const INVOICE_STATUSES: InvoiceStatus[] = ["pendiente", "pagada", "vencida", "anulada"];
 /** Supabase Auth no tiene baja indefinida: cien años equivale a "hasta que se reactive". */
 const BLOCK_DURATION = "876000h";
@@ -218,6 +218,14 @@ export async function createUserAction(
   revalidatePath("/admin/usuarios");
   revalidatePath("/admin/encuestadores");
   if (organizationId) revalidatePath(`/admin/organizaciones/${organizationId}`);
+
+  // El político no carga nada: al crearlo, la administración sigue en su
+  // organización para armar las encuestas y los informes que él va a ver.
+  if (role === "politico" && organizationId) {
+    await setOperatingOrganization(organizationId);
+    redirect("/cliente/encuestas");
+  }
+
   const back = safeInternalPath(String(formData.get("volver") ?? ""));
   redirect(back?.startsWith("/admin/") ? back : "/admin/usuarios");
 }
@@ -438,4 +446,18 @@ export async function updateInvoiceStatusAction(formData: FormData) {
 
   revalidatePath("/admin/facturacion");
   revalidatePath("/admin/contabilidad");
+}
+
+export async function enterOrganizationAction(formData: FormData) {
+  await requireRole(["super_admin"]);
+  const id = String(formData.get("id") ?? "");
+  if (!/^[A-Za-z0-9_-]{1,80}$/.test(id)) return;
+
+  const supabase = await createClient();
+  const { data } = await supabase.from("organizations").select("id").eq("id", id).maybeSingle();
+  if (!data) return;
+
+  await setOperatingOrganization(id);
+  const destino = safeInternalPath(String(formData.get("destino") ?? ""));
+  redirect(destino?.startsWith("/cliente") ? destino : "/cliente");
 }

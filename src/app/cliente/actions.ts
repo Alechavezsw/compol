@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { requireOperator, requireOrganization } from "@/lib/auth";
 import { computeAnalytics, keyFindings, loadSurveyData, type AnalyticsFilters } from "@/lib/analytics";
 import { askAboutSurvey, generateSurveyReport, isGeminiConfigured } from "@/lib/ai/gemini";
 import { answerLocally } from "@/lib/ai/local-answer";
@@ -29,8 +29,6 @@ import type {
 } from "@/lib/types";
 
 export type ActionState = { error?: string | null; ok?: string | null };
-
-const MANAGERS = ["org_admin"] as const;
 const QUESTION_TYPES: QuestionType[] = [
   "texto_corto",
   "texto_largo",
@@ -122,7 +120,7 @@ export async function createProjectAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { organization, profile } = await requireOrganization([...MANAGERS]);
+  const { organization, profile } = await requireOperator();
 
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
@@ -157,7 +155,7 @@ export async function createProjectAction(
 // ---------------------------------------------------------------------------
 
 export async function createSurveyAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization, profile } = await requireOrganization([...MANAGERS]);
+  const { organization, profile } = await requireOperator();
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
@@ -238,7 +236,7 @@ export async function createSurveyAction(_prev: ActionState, formData: FormData)
 }
 
 export async function updateSurveyStatusAction(formData: FormData) {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
 
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "") as SurveyStatus;
@@ -272,7 +270,7 @@ export async function updateSurveyStatusAction(formData: FormData) {
 
 /** Extiende, cambia o quita la fecha de cierre. Sin fecha, la encuesta sigue abierta hasta cerrarla a mano. */
 export async function updateSurveyScheduleAction(formData: FormData) {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
   const id = String(formData.get("id") ?? "");
   const raw = String(formData.get("ends_at") ?? "").trim();
   const supabase = await createClient();
@@ -295,7 +293,7 @@ export async function updateSurveyScheduleAction(formData: FormData) {
 }
 
 export async function duplicateSurveyAction(formData: FormData) {
-  const { organization, profile } = await requireOrganization([...MANAGERS]);
+  const { organization, profile } = await requireOperator();
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
   const source = await ownedSurvey(supabase, id, organization.id);
@@ -389,7 +387,7 @@ async function copyQuestionnaire(
 }
 
 export async function copyQuestionnaireAction(formData: FormData) {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
   const targetId = String(formData.get("survey_id") ?? "");
   const sourceId = String(formData.get("source_id") ?? "");
   const supabase = await createClient();
@@ -418,7 +416,7 @@ function readNumber(formData: FormData, key: string) {
 }
 
 export async function addQuestionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
 
   const surveyId = String(formData.get("survey_id") ?? "");
   const text = String(formData.get("text") ?? "").trim();
@@ -543,7 +541,7 @@ export async function addQuestionAction(_prev: ActionState, formData: FormData):
 }
 
 export async function updateQuestionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
   const id = String(formData.get("id") ?? "");
   const surveyId = String(formData.get("survey_id") ?? "");
   const text = String(formData.get("text") ?? "").trim();
@@ -574,7 +572,7 @@ export async function updateQuestionAction(_prev: ActionState, formData: FormDat
 }
 
 export async function clearLogicAction(formData: FormData) {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
   const id = String(formData.get("id") ?? "");
   const surveyId = String(formData.get("survey_id") ?? "");
   const which = String(formData.get("which") ?? "");
@@ -591,7 +589,7 @@ export async function clearLogicAction(formData: FormData) {
 }
 
 export async function deleteQuestionAction(formData: FormData) {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
   const id = String(formData.get("id") ?? "");
   const surveyId = String(formData.get("survey_id") ?? "");
   const supabase = await createClient();
@@ -615,7 +613,7 @@ export async function deleteQuestionAction(formData: FormData) {
 }
 
 export async function moveQuestionAction(formData: FormData) {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
   const id = String(formData.get("id") ?? "");
   const surveyId = String(formData.get("survey_id") ?? "");
   const direction = String(formData.get("direction") ?? "");
@@ -650,7 +648,7 @@ export async function moveQuestionAction(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function updateWebChannelAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
   const surveyId = String(formData.get("survey_id") ?? "");
   const supabase = await createClient();
   const survey = await ownedSurvey(supabase, surveyId, organization.id);
@@ -699,7 +697,7 @@ export async function updateWebChannelAction(_prev: ActionState, formData: FormD
 }
 
 export async function regenerateTokenAction(formData: FormData) {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
   const surveyId = String(formData.get("survey_id") ?? "");
   const supabase = await createClient();
   const survey = await ownedSurvey(supabase, surveyId, organization.id);
@@ -728,7 +726,7 @@ export async function createDirigenteAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { organization, profile } = await requireOrganization([...MANAGERS]);
+  const { organization, profile } = await requireOperator();
 
   const name = String(formData.get("name") ?? "").trim();
   const role = String(formData.get("role") ?? "").trim() || null;
@@ -761,7 +759,7 @@ export async function createMedicionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { organization, profile } = await requireOrganization([...MANAGERS]);
+  const { organization, profile } = await requireOperator();
 
   const dirigenteId = String(formData.get("dirigente_id") ?? "");
   const projectId = String(formData.get("project_id") ?? "") || null;
@@ -819,7 +817,7 @@ export async function createMedicionAction(
 // ---------------------------------------------------------------------------
 
 export async function generateReportAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization, profile } = await requireOrganization([...MANAGERS]);
+  const { organization, profile } = await requireOperator();
 
   // Sin clave, en modo demo caemos en el redactor local para que el recorrido
   // no quede cortado; fuera de demo es un error de configuración.
@@ -932,7 +930,7 @@ export async function askSurveyAction(payload: {
   question: string;
   filters?: AnalyticsFilters;
 }): Promise<AskResult> {
-  const { organization } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const question = payload.question?.trim() ?? "";
   if (question.length < 4) return { ok: false, error: "Escribí una pregunta más completa." };
   if (question.length > 400) return { ok: false, error: "La pregunta es demasiado larga (máximo 400 caracteres)." };
@@ -973,7 +971,7 @@ export async function askSurveyAction(payload: {
 }
 
 export async function deleteReportAction(formData: FormData) {
-  const { organization } = await requireOrganization([...MANAGERS]);
+  const { organization } = await requireOperator();
 
   const id = String(formData.get("id") ?? "");
   if (!id) return;

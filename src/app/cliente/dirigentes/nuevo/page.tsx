@@ -1,4 +1,4 @@
-import { requireOrganization } from "@/lib/auth";
+import { requireOperator } from "@/lib/auth";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/misc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { DirigenteForm } from "./dirigente-form";
 export const metadata: Metadata = { title: "Nuevo dirigente" };
 
 export default async function NuevoDirigentePage() {
-  await requireOrganization(["org_admin"]);
+  await requireOperator();
   return (
     <div className="mx-auto max-w-2xl space-y-7">
       <PageHeader

@@ -96,7 +96,7 @@ export const DEMO_USERS = [
     full_name: "Martín Robledo",
     role: "org_admin" as const,
     organization_id: ORG_MUNI,
-    description: "Administrador del cliente: crea encuestas e informes",
+    description: "Cliente: mira su panel. La operación la hace la administración",
   },
   {
     id: "usr-analista",
@@ -105,6 +105,14 @@ export const DEMO_USERS = [
     role: "org_analyst" as const,
     organization_id: ORG_MUNI,
     description: "Analista del cliente: solo lectura",
+  },
+  {
+    id: "usr-politico",
+    email: "politico@sanjuan.gob.ar",
+    full_name: "Ana Quiroga",
+    role: "politico" as const,
+    organization_id: ORG_MUNI,
+    description: "Político: pantallazo, resultados en vivo e informes",
   },
   {
     id: "usr-campo-1",

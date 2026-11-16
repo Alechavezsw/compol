@@ -16,7 +16,7 @@ import {
 import { deleteSourceAction, deleteTrackerAction } from "./actions";
 import { persistMissingTopics } from "@/lib/social/persist-topics";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { computeSocial, countCaptured, moodLabel } from "@/lib/social/analytics";
 import { addDays, todayKey } from "@/lib/stats";
@@ -88,7 +88,7 @@ export default async function RedesPage({
     7: countCaptured(tagged, 7, today),
     30: countCaptured(tagged, 30, today),
   };
-  const canManage = profile.role === "org_admin";
+  const canManage = operatesClient(profile.role);
   const pendingLexicon = tagged.filter((p) => p.classified_by === "lexico").length;
   const allTopics = [...new Set(tagged.flatMap((p) => p.topics))].sort((x, y) => x.localeCompare(y, "es"));
   const mood = moodLabel(a.mood);

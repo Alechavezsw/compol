@@ -6,7 +6,7 @@ import { ReportForm } from "./report-form";
 import { ReportLibrary } from "./library";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
-import { requireOrganization } from "@/lib/auth";
+import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
 import { isDemoMode } from "@/lib/demo/mode";
 import { toLibraryReport } from "@/lib/reports/library";
@@ -21,46 +21,50 @@ export default async function InformesPage({
   searchParams: Promise<{ encuesta?: string }>;
 }) {
   const { encuesta } = await searchParams;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
+  const canGenerate = operatesClient(profile.role);
 
-  const [reportRows, { data: surveyRows }, responseRows] = await Promise.all([
-    fetchAll<AiReport & { surveys: { title: string } | null }>((from, to) =>
-      supabase
-        .from("ai_reports")
-        .select("*, surveys(title)")
-        .eq("organization_id", organization.id)
-        .order("created_at", { ascending: false })
-        .order("id")
-        .range(from, to),
-    ),
+  const reportRows = await fetchAll<AiReport & { surveys: { title: string } | null }>((from, to) =>
     supabase
-      .from("surveys")
-      .select("id, title")
+      .from("ai_reports")
+      .select("*, surveys(title)")
       .eq("organization_id", organization.id)
-      .order("updated_at", { ascending: false }),
-    fetchAll<{ survey_id: string }>((from, to) =>
-      supabase
-        .from("responses")
-        .select("survey_id")
-        .eq("organization_id", organization.id)
-        .eq("status", "completada")
-        .order("id")
-        .range(from, to),
-    ),
-  ]);
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to),
+  );
 
   const reports = reportRows.map(toLibraryReport);
-  const counts = new Map<string, number>();
-  for (const r of responseRows) counts.set(r.survey_id, (counts.get(r.survey_id) ?? 0) + 1);
 
-  const surveys = ((surveyRows ?? []) as Pick<Survey, "id" | "title">[]).map((s) => ({
-    id: s.id,
-    title: s.title,
-    completed: counts.get(s.id) ?? 0,
-  }));
+  let surveys: { id: string; title: string; completed: number }[] = [];
+  if (canGenerate) {
+    const [{ data: surveyRows }, responseRows] = await Promise.all([
+      supabase
+        .from("surveys")
+        .select("id, title")
+        .eq("organization_id", organization.id)
+        .order("updated_at", { ascending: false }),
+      fetchAll<{ survey_id: string }>((from, to) =>
+        supabase
+          .from("responses")
+          .select("survey_id")
+          .eq("organization_id", organization.id)
+          .eq("status", "completada")
+          .order("id")
+          .range(from, to),
+      ),
+    ]);
 
-  const canGenerate = profile.role === "org_admin";
+    const counts = new Map<string, number>();
+    for (const r of responseRows) counts.set(r.survey_id, (counts.get(r.survey_id) ?? 0) + 1);
+
+    surveys = ((surveyRows ?? []) as Pick<Survey, "id" | "title">[]).map((s) => ({
+      id: s.id,
+      title: s.title,
+      completed: counts.get(s.id) ?? 0,
+    }));
+  }
   const writer = isGeminiConfigured() ? "gemini" : isDemoMode() ? "local" : "missing";
 
   return (
@@ -72,7 +76,11 @@ export default async function InformesPage({
           </p>
         }
         title="Informes"
-        description="Quedan guardados todos: los de encuesta y los del radar. Buscá por título, tema o fuente."
+        description={
+          canGenerate
+            ? "Generá el informe de una encuesta. Queda en esta organización y el político lo abre con su usuario."
+            : "Quedan guardados todos: los de encuesta y los del radar. Buscá por título, tema o fuente."
+        }
         actions={
           <p className="text-sm text-[var(--muted)]">
             <span className="display text-[28px] leading-none text-[var(--foreground)] tabular-nums">

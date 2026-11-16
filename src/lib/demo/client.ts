@@ -135,6 +135,39 @@ function visibleRows(table: TableName, viewer: Profile | null, tables: DemoTable
 
   const org = viewer.organization_id;
 
+  if (viewer.role === "politico") {
+    const surveyIds = new Set(
+      tables.surveys.filter((s) => s.organization_id === org).map((s) => s.id),
+    );
+    const questionIds = new Set(
+      tables.questions.filter((q) => surveyIds.has(q.survey_id)).map((q) => q.id),
+    );
+    const responseIds = new Set(
+      tables.responses.filter((r) => r.organization_id === org).map((r) => r.id),
+    );
+    switch (table) {
+      case "organizations":
+        return all.filter((r) => r.id === org);
+      case "profiles":
+        return all.filter((r) => r.id === viewer.id);
+      case "ai_reports":
+      case "social_posts":
+        return all.filter((r) => r.organization_id === org);
+      case "surveys":
+        return all.filter((r) => surveyIds.has(r.id as string));
+      case "questions":
+        return all.filter((r) => surveyIds.has(r.survey_id as string));
+      case "question_options":
+        return all.filter((r) => questionIds.has(r.question_id as string));
+      case "responses":
+        return all.filter((r) => responseIds.has(r.id as string));
+      case "answers":
+        return all.filter((r) => responseIds.has(r.response_id as string));
+      default:
+        return [];
+    }
+  }
+
   const assignedSurveyIds = new Set(
     tables.survey_assignments
       .filter((a) => a.surveyor_id === viewer.id)

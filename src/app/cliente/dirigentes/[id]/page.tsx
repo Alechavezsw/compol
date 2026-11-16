@@ -5,7 +5,7 @@ import { EmptyState, PageHeader, Progress, TableWrap, Td, Th } from "@/component
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/misc";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
 import { formatDate, formatPercent } from "@/lib/utils";
 import type { Dirigente, DirigenteMedicion } from "@/lib/types";
 import { MedicionForm } from "./medicion-form";
@@ -37,7 +37,7 @@ export default async function DirigentePage({ params }: { params: Promise<{ id: 
   const mediciones = (medicionesData ?? []) as DirigenteMedicion[];
   const projectName = new Map((projectsData ?? []).map((p) => [p.id, p.name]));
 
-  const canManage = profile.role === "org_admin";
+  const canManage = operatesClient(profile.role);
   const latest = mediciones[0];
 
   return (
@@ -51,7 +51,7 @@ export default async function DirigentePage({ params }: { params: Promise<{ id: 
         <Card>
           <CardContent className="p-5">
             <p className="text-[13px] font-medium text-[var(--muted)]">Conocimiento</p>
-            <p className="display mt-2 text-[32px] leading-none text-[var(--foreground)]">
+            <p className="display tabular-nums mt-2 text-[32px] leading-none text-[var(--foreground)]">
               {formatPercent(latest?.conocimiento)}
             </p>
             <p className="mt-2 text-xs text-[var(--muted)]">Última medición</p>
@@ -60,7 +60,7 @@ export default async function DirigentePage({ params }: { params: Promise<{ id: 
         <Card>
           <CardContent className="p-5">
             <p className="text-[13px] font-medium text-[var(--muted)]">Imagen positiva</p>
-            <p className="display mt-2 text-[32px] leading-none text-[var(--success)]">
+            <p className="display tabular-nums mt-2 text-[32px] leading-none text-[var(--success)]">
               {formatPercent(latest?.imagen_positiva)}
             </p>
             <p className="mt-2 text-xs text-[var(--muted)]">Última medición</p>
@@ -69,7 +69,7 @@ export default async function DirigentePage({ params }: { params: Promise<{ id: 
         <Card>
           <CardContent className="p-5">
             <p className="text-[13px] font-medium text-[var(--muted)]">Imagen negativa</p>
-            <p className="display mt-2 text-[32px] leading-none text-[var(--danger)]">
+            <p className="display tabular-nums mt-2 text-[32px] leading-none text-[var(--danger)]">
               {formatPercent(latest?.imagen_negativa)}
             </p>
             <p className="mt-2 text-xs text-[var(--muted)]">Última medición</p>

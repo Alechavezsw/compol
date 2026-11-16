@@ -3,7 +3,7 @@
 // Espejo de supabase/migrations/*.sql
 // ---------------------------------------------------------------------------
 
-export type UserRole = "super_admin" | "org_admin" | "org_analyst" | "surveyor";
+export type UserRole = "super_admin" | "org_admin" | "org_analyst" | "politico" | "surveyor";
 export type OrgType = "gobierno" | "institucion" | "ong" | "privado";
 export type OrgStatus = "activa" | "suspendida" | "prueba";
 export type SurveyStatus = "borrador" | "activa" | "pausada" | "cerrada";
@@ -484,8 +484,9 @@ export type Database = {
 
 export const ROLE_LABEL: Record<UserRole, string> = {
   super_admin: "Administración central",
-  org_admin: "Administrador de cliente",
+  org_admin: "Cliente",
   org_analyst: "Analista",
+  politico: "Político",
   surveyor: "Encuestador",
 };
 

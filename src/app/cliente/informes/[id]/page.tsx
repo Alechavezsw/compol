@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function InformePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { organization } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -93,7 +93,7 @@ export default async function InformePage({ params }: { params: Promise<{ id: st
               <BarChart3 />
               Ver los datos
             </ButtonLink>
-          ) : isRadar ? (
+          ) : isRadar && profile.role !== "politico" ? (
             <ButtonLink href="/cliente/redes" variant="outline" size="sm">
               <BarChart3 />
               Volver al radar

@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
@@ -15,6 +16,32 @@ export type SessionProfile = {
 
 export { isSupabaseConfigured };
 
+/** Organización que la administración está operando. Los id de demo no son UUID. */
+export const OPERATING_ORG_COOKIE = "compol_org";
+
+export async function operatingOrganizationId() {
+  const store = await cookies();
+  const id = store.get(OPERATING_ORG_COOKIE)?.value ?? "";
+  return /^[A-Za-z0-9_-]{1,80}$/.test(id) ? id : null;
+}
+
+export async function setOperatingOrganization(id: string) {
+  const store = await cookies();
+  store.set(OPERATING_ORG_COOKIE, id, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: 60 * 60 * 12,
+  });
+}
+
+async function loadOrganization(id: string): Promise<Organization | null> {
+  const supabase = await createClient();
+  const { data } = await supabase.from("organizations").select("*").eq("id", id).maybeSingle();
+  return (data as Organization | null) ?? null;
+}
+
 /** Ruta inicial segun el rol. */
 export function homePathFor(role: UserRole) {
   switch (role) {
@@ -22,6 +49,7 @@ export function homePathFor(role: UserRole) {
       return "/admin";
     case "org_admin":
     case "org_analyst":
+    case "politico":
       return "/cliente";
     case "surveyor":
       return "/campo";
@@ -92,17 +120,44 @@ export async function requireRole(roles: UserRole[]): Promise<SessionProfile> {
   return session;
 }
 
-/** Los roles de cliente necesitan una organizacion asignada. */
+/**
+ * Área del cliente. La administración entra con la organización que eligió
+ * operar; el resto necesita el rol y una organización en el perfil.
+ */
 export async function requireOrganization(roles: UserRole[]): Promise<
   SessionProfile & { organization: Organization }
 > {
-  const session = await requireRole(roles);
+  const session = await requireProfile();
+  if (session.profile.role === "super_admin") {
+    const id = await operatingOrganizationId();
+    if (!id) redirect("/admin/organizaciones");
+    const organization = await loadOrganization(id);
+    if (!organization) redirect("/admin/organizaciones");
+    return { ...session, organization };
+  }
+  if (!roles.includes(session.profile.role)) {
+    redirect(`/acceso-denegado?motivo=rol&destino=${homePathFor(session.profile.role)}`);
+  }
   if (!session.organization) {
     redirect("/acceso-denegado?motivo=sin-organizacion");
   }
   return session as SessionProfile & { organization: Organization };
 }
 
+/** Escritura del operativo: solo la administración, sobre el cliente elegido. */
+export async function requireOperator(): Promise<SessionProfile & { organization: Organization }> {
+  const session = await requireProfile();
+  if (session.profile.role !== "super_admin") {
+    redirect(`/acceso-denegado?motivo=rol&destino=${homePathFor(session.profile.role)}`);
+  }
+  const id = await operatingOrganizationId();
+  if (!id) redirect("/admin/organizaciones");
+  const organization = await loadOrganization(id);
+  if (!organization) redirect("/admin/organizaciones");
+  return { ...session, organization };
+}
+
+/** Alta y edición de encuestas, informes, redes, proyectos y dirigentes. */
 export function canManage(role: UserRole) {
-  return role === "super_admin" || role === "org_admin";
+  return role === "super_admin";
 }
