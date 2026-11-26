@@ -41,7 +41,27 @@ export type IncomingAnswer = {
 
 export type PersistResult =
   | { ok: true; status: Extract<ResponseStatus, "completada" | "descartada">; responseId: string }
-  | { ok: false; error: string };
+  | {
+      ok: false;
+      error: string;
+      /** El cuestionario rechaza esta entrevista: reintentarla igual no la arregla. */
+      rejected?: boolean;
+      /** Ya existe una entrevista con la misma huella: un envío repetido o simultáneo. */
+      duplicate?: boolean;
+    };
+
+/** Código de Postgres para una violación de índice único. */
+const UNIQUE_VIOLATION = "23505";
+
+/**
+ * El detalle técnico va al log del servidor. Al usuario (a veces alguien sin
+ * sesión, en la encuesta web) no se le muestran nombres de tablas ni de
+ * restricciones de la base.
+ */
+function failure(context: string, error: { message: string; code?: string } | null): PersistResult {
+  console.error(`[persistInterview] ${context}:`, error?.code, error?.message);
+  return { ok: false, error: "No se pudo guardar la entrevista. Probá de nuevo en un momento." };
+}
 
 /**
  * Valida y guarda una entrevista. Es el único camino de escritura de
@@ -71,16 +91,30 @@ export async function persistInterview(
       longitude?: number | null;
       source_url?: string | null;
       respondent_hash?: string | null;
+      /** Web: huella anónima de la conexión, para el límite de frecuencia. */
+      ip_hash?: string | null;
+      /**
+       * Momento (ms) en que se tomó la entrevista. Las que salen de la cola sin
+       * conexión se sincronizan horas o días después: sin esto quedarían fechadas
+       * en el envío y falsearían los conteos por día y el control de calidad.
+       * Quien llama ya lo acotó (no futuro, no más viejo que el tope offline).
+       */
+      collected_at?: number;
+      /**
+       * Entrevista que quedó abierta (`en_curso`) por un envío anterior que no
+       * llegó a cerrar: se reutiliza en vez de abrir otra o dejarla huérfana.
+       */
+      resume_response_id?: string | null;
     };
   },
 ): Promise<PersistResult> {
   const { survey, questions, answers, meta } = params;
-  if (!questions.length) return { ok: false, error: "La encuesta no tiene preguntas." };
+  if (!questions.length) return { ok: false, rejected: true, error: "La encuesta no tiene preguntas." };
 
   const byId = new Map(questions.map((q) => [q.id, q]));
   const values: AnswerMap = {};
   for (const a of answers) {
-    if (!byId.has(a.question_id)) continue;
+    if (!a || typeof a !== "object" || !byId.has(a.question_id)) continue;
     values[a.question_id] = {
       text: typeof a.value_text === "string" ? a.value_text.slice(0, 4000) : undefined,
       number: typeof a.value_number === "number" && Number.isFinite(a.value_number) ? a.value_number : undefined,
@@ -93,40 +127,58 @@ export async function persistInterview(
   if (check.errors.length) {
     const first = check.errors[0];
     const q = byId.get(first.questionId);
-    return { ok: false, error: `P${q?.position ?? "?"}: ${first.message}` };
+    return { ok: false, rejected: true, error: `P${q?.position ?? "?"}: ${first.message}` };
   }
 
   const status = check.endedAt ? "descartada" : "completada";
   const onPath = check.path.filter((q) => values[q.id]);
 
-  const { data: response, error: responseError } = await supabase
-    .from("responses")
-    .insert({
-      survey_id: survey.id,
-      organization_id: survey.organization_id,
-      surveyor_id: meta.surveyor_id,
-      status: "en_curso",
-      channel: meta.channel,
-      zone: meta.zone?.trim().slice(0, 80) || null,
-      latitude: finiteCoord(meta.latitude),
-      longitude: finiteCoord(meta.longitude),
-      duration_seconds: Math.max(0, Math.round(meta.duration_seconds)),
-      source_url: meta.source_url ?? null,
-      respondent_hash: meta.respondent_hash ?? null,
-    })
-    .select("id")
-    .single();
+  const durationSeconds = Math.max(0, Math.round(meta.duration_seconds));
+  const collectedAt = meta.collected_at ?? Date.now();
+  const startedAt = new Date(collectedAt - durationSeconds * 1000).toISOString();
+  const submittedAt = new Date(collectedAt).toISOString();
 
-  if (responseError || !response) {
-    return { ok: false, error: `No se pudo abrir la entrevista: ${responseError?.message ?? "sin detalle"}` };
+  let responseId: string;
+  if (meta.resume_response_id) {
+    // Está abierta porque un envío anterior no llegó a cerrarla... o porque todavía la está
+    // guardando. Por eso nunca se vacía: se escribe encima y recién después se quita lo que sobra.
+    responseId = meta.resume_response_id;
+  } else {
+    const { data: response, error: responseError } = await supabase
+      .from("responses")
+      .insert({
+        survey_id: survey.id,
+        organization_id: survey.organization_id,
+        surveyor_id: meta.surveyor_id,
+        status: "en_curso",
+        channel: meta.channel,
+        zone: meta.zone?.trim().slice(0, 80) || null,
+        latitude: finiteCoord(meta.latitude),
+        longitude: finiteCoord(meta.longitude),
+        duration_seconds: durationSeconds,
+        started_at: startedAt,
+        source_url: meta.source_url ?? null,
+        respondent_hash: meta.respondent_hash ?? null,
+        // Solo si viene: así el campo no depende de la columna `ip_hash` (migración 17).
+        ...(meta.ip_hash ? { ip_hash: meta.ip_hash } : {}),
+      })
+      .select("id")
+      .single();
+
+    if (responseError?.code === UNIQUE_VIOLATION && meta.respondent_hash) {
+      return { ok: false, duplicate: true, error: "Esta entrevista ya fue recibida." };
+    }
+    if (responseError || !response) return failure("abrir la entrevista", responseError);
+    responseId = response.id;
   }
 
   if (onPath.length) {
-    const { error: answersError } = await supabase.from("answers").insert(
+    // Upsert: si otro envío de la misma entrevista ya escribió estas respuestas, no es un error.
+    const { error: answersError } = await supabase.from("answers").upsert(
       onPath.map((q) => {
         const v = values[q.id]!;
         return {
-          response_id: response.id,
+          response_id: responseId,
           question_id: q.id,
           value_text: v.text ?? null,
           value_number: v.number ?? null,
@@ -134,21 +186,46 @@ export async function persistInterview(
           option_ids: v.optionIds ?? [],
         };
       }),
+      { onConflict: "response_id,question_id" },
     );
 
     if (answersError) {
-      // Sin respuestas la fila no sirve: la descartamos para no ensuciar el conteo.
-      await supabase.from("responses").delete().eq("id", response.id);
-      return { ok: false, error: `No se pudieron guardar las respuestas: ${answersError.message}` };
+      // Sin respuestas la fila no sirve: si se abrió en este envío se intenta borrar para no
+      // ensuciar el conteo (nunca una ya cerrada). Un encuestador no puede borrar por RLS; en
+      // ese caso queda `en_curso` (no cuenta) y el reintento la reutiliza en vez de abrir otra.
+      if (!meta.resume_response_id) {
+        await supabase.from("responses").delete().eq("id", responseId).eq("status", "en_curso");
+      }
+      return failure("guardar las respuestas", answersError);
+    }
+  }
+
+  if (meta.resume_response_id) {
+    // Un intento anterior pudo dejar respuestas de preguntas que ya no están en el recorrido.
+    const { data: stored, error: readError } = await supabase
+      .from("answers")
+      .select("question_id")
+      .eq("response_id", responseId);
+    if (readError) return failure("revisar la entrevista retomada", readError);
+
+    const keep = new Set(onPath.map((q) => q.id));
+    const stale = (stored ?? []).map((a) => a.question_id as string).filter((id) => !keep.has(id));
+    if (stale.length) {
+      const { error: clearError } = await supabase
+        .from("answers")
+        .delete()
+        .eq("response_id", responseId)
+        .in("question_id", stale);
+      if (clearError) return failure("quitar respuestas sobrantes", clearError);
     }
   }
 
   const { error: closeError } = await supabase
     .from("responses")
-    .update({ status, submitted_at: new Date().toISOString() })
-    .eq("id", response.id);
+    .update({ status, submitted_at: submittedAt })
+    .eq("id", responseId);
 
-  if (closeError) return { ok: false, error: `No se pudo cerrar la entrevista: ${closeError.message}` };
+  if (closeError) return failure("cerrar la entrevista", closeError);
 
-  return { ok: true, status, responseId: response.id };
+  return { ok: true, status, responseId };
 }

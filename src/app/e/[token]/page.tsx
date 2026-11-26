@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { WebSurvey } from "./web-survey";
-import { acceptsResponses } from "@/lib/survey-status";
-import { loadPublicSurvey } from "@/lib/web";
+import { loadPublicSurvey, publicAcceptsResponses } from "@/lib/web";
+import { issueFormToken } from "@/lib/web-guard";
 
 // Página pública: depende del estado de la encuesta, nunca se prerenderiza.
 export const dynamic = "force-dynamic";
@@ -52,7 +52,8 @@ export default async function PublicSurveyPage({
         embed={embed}
         closable={embed && (mode === "flotante" || mode === "emergente")}
         sourceUrl={first("ref") ?? null}
-        open={acceptsResponses(data.survey)}
+        open={publicAcceptsResponses(data)}
+        formToken={issueFormToken(data.survey.public_token ?? token)}
       />
     </>
   );

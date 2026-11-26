@@ -21,9 +21,14 @@ import { StatCard } from "@/components/stat-card";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge, SurveyStatusBadge } from "@/components/ui/badge";
 import { FieldTrend } from "@/components/charts/charts";
+import { PulseBoard } from "@/components/pulse/pulse-board";
+import { LiveRefresh } from "@/components/results/live-refresh";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
+import { loadSurveyData } from "@/lib/analytics";
 import { loadDashboard } from "@/lib/dashboard";
+import { signed } from "@/lib/pulse";
+import { buildPulse } from "@/lib/pulse-build";
 import { moodLabel } from "@/lib/social/analytics";
 import { formatDayKey, todayKey } from "@/lib/stats";
 import { cn, formatDate, formatNumber, formatPercent } from "@/lib/utils";
@@ -36,9 +41,15 @@ const dashboard = cache(async function dashboard() {
   return loadDashboard(supabase, organization.id, todayKey());
 });
 
-export default async function ClienteDashboard() {
+export default async function ClienteDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ encuesta?: string | string[] }>;
+}) {
   const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
   const firstName = profile.full_name.split(" ")[0] || "equipo";
+  const { encuesta } = await searchParams;
+  const selected = Array.isArray(encuesta) ? encuesta[0] : encuesta;
 
   return (
     <div className="space-y-6">
@@ -51,7 +62,7 @@ export default async function ClienteDashboard() {
             <p className="text-[12px] font-semibold tracking-[0.18em] text-cyan-200/80 uppercase">Hola, {firstName}</p>
             <h1 className="display mt-2 text-[34px] leading-none text-white sm:text-[42px]">{organization.name}</h1>
             <p className="mt-3 max-w-xl text-sm text-slate-400">
-              Estado de tus relevamientos, el humor en redes y lo que necesita atención hoy.
+              El territorio en un mapa, lo que opina la gente y lo que necesita atención hoy.
             </p>
             <Suspense fallback={<div className="mt-5 h-8 w-72 animate-pulse rounded-full bg-white/10" />}>
               <HeroChips />
@@ -65,10 +76,75 @@ export default async function ClienteDashboard() {
         </div>
       </section>
 
-      <Suspense fallback={<DashboardFallback />}>
-        <DashboardBody role={profile.role} />
+      <Suspense key={selected ?? "principal"} fallback={<DashboardFallback />}>
+        <Territory selected={selected} />
       </Suspense>
+
+      <section aria-labelledby="operativo" className="space-y-4 pt-4">
+        <h2 id="operativo" className="display text-3xl text-[var(--foreground)]">
+          El operativo hoy
+        </h2>
+        <Suspense fallback={<DashboardFallback />}>
+          <DashboardBody role={profile.role} />
+        </Suspense>
+      </section>
     </div>
+  );
+}
+
+/** Mapa y gráficos de una encuesta: la lectura política del territorio. */
+async function Territory({ selected }: { selected?: string }) {
+  const { surveys, countBySurvey, socialDays } = await dashboard();
+  const withCases = surveys
+    .filter((s) => (countBySurvey.get(s.id) ?? 0) > 0)
+    .sort(
+      (a, b) =>
+        Number(b.status === "activa") - Number(a.status === "activa") ||
+        (countBySurvey.get(b.id) ?? 0) - (countBySurvey.get(a.id) ?? 0),
+    );
+  const current = withCases.find((s) => s.id === selected) ?? withCases[0];
+  if (!current) return null;
+
+  const data = await loadSurveyData(await createClient(), current.id);
+  const pulse = data ? buildPulse(data) : null;
+  if (!pulse) return null;
+
+  return (
+    <section aria-labelledby="territorio" className="space-y-4">
+      {current.status === "activa" ? <LiveRefresh intervalMs={60_000} /> : null}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="territorio" className="display text-3xl text-balance text-[var(--foreground)]">
+            Pulso del territorio
+          </h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">{current.title}</p>
+        </div>
+        <Link href={`/cliente/encuestas/${current.id}/resultados`} className="text-sm font-medium text-[var(--primary)] hover:underline">
+          Ver resultados completos
+        </Link>
+      </div>
+      {withCases.length > 1 ? (
+        <nav aria-label="Encuesta" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+          {withCases.map((s) => (
+            <Link
+              key={s.id}
+              href={`/cliente?encuesta=${encodeURIComponent(s.id)}`}
+              scroll={false}
+              aria-current={s.id === current.id ? "page" : undefined}
+              className={cn(
+                "max-w-80 shrink-0 truncate rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                s.id === current.id
+                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                  : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)]",
+              )}
+            >
+              {s.title}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+      <PulseBoard key={current.id} data={pulse} social={socialDays} target={current.target_responses} />
+    </section>
   );
 }
 
@@ -85,10 +161,10 @@ async function HeroChips() {
         {formatNumber(active.length)} en campo
       </span>
       <Link
-        href="/cliente/redes"
+        href="/cliente/redes?dias=7"
         className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1.5 text-[12px] text-cyan-100 hover:bg-cyan-400/15"
       >
-        Radar {social.total ? `${social.mood > 0 ? "+" : ""}${Math.round(social.mood)}` : "en espera"}
+        Radar {social.total ? signed(social.mood) : "en espera"}
       </Link>
     </div>
   );
@@ -195,7 +271,7 @@ async function DashboardBody({ role }: { role: string }) {
       icon: <Radar className="size-4" />,
       title: al.title,
       detail: al.detail,
-      href: `/cliente/redes${al.topic ? `?tema=${encodeURIComponent(al.topic)}` : ""}`,
+      href: `/cliente/redes?dias=7${al.topic ? `&tema=${encodeURIComponent(al.topic)}` : ""}`,
     });
   }
 
@@ -284,13 +360,13 @@ async function DashboardBody({ role }: { role: string }) {
           tone="accent"
           hint={`${formatNumber(activeDone)} de ${formatNumber(totalTarget)} casos`}
         />
-        <Link href="/cliente/redes" className="block transition-transform hover:-translate-y-0.5">
+        <Link href="/cliente/redes?dias=7" className="block transition-transform hover:-translate-y-0.5">
           <StatCard
             label="Radar de conversación (7 días)"
-            value={social.total ? `${social.mood > 0 ? "+" : ""}${Math.round(social.mood)}` : "—"}
+            value={social.total ? signed(social.mood) : "—"}
             icon={<Radar className="size-4" />}
             tone={socialLabel?.tone === "success" ? "success" : "warning"}
-            hint={social.total && socialLabel ? `${socialLabel.text} · ${formatNumber(social.total)} publicaciones` : "Sin publicaciones importadas"}
+            hint={social.total && socialLabel ? `${socialLabel.text} · ${formatNumber(social.total)} ${social.total === 1 ? "nota" : "notas"}` : "Sin notas esta semana"}
             className="h-full"
           />
         </Link>

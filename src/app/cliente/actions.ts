@@ -470,6 +470,15 @@ export async function addQuestionAction(_prev: ActionState, formData: FormData):
   if (!survey) return { error: "No se encontró la encuesta." };
   if (survey.status === "cerrada") return { error: "La encuesta está cerrada: reabrila para modificar el cuestionario." };
 
+  // Con la encuesta ya en campo, los teléfonos tienen cargado el cuestionario anterior: una
+  // pregunta obligatoria o un filtro nuevos harían que el servidor rechace las entrevistas que
+  // ellos toman (o que tienen en cola sin señal). Por eso, fuera de borrador, las preguntas
+  // nuevas son siempre opcionales y no admiten filtro.
+  const live = survey.status !== "borrador";
+  if (live && endIfValues.length) {
+    return { error: "Una pregunta filtro solo se puede agregar con la encuesta en borrador: los encuestadores ya tienen el cuestionario cargado." };
+  }
+
   const existing = await loadQuestions(supabase, surveyId);
   const position = (existing.at(-1)?.position ?? 0) + 1;
 
@@ -506,7 +515,7 @@ export async function addQuestionAction(_prev: ActionState, formData: FormData):
       text,
       help_text: helpText,
       section,
-      is_required: logic.end_if ? true : isRequired,
+      is_required: logic.end_if ? true : live ? false : isRequired,
       min_value: minValue,
       max_value: maxValue,
       logic: Object.keys(logic).length ? logic : null,
@@ -535,10 +544,12 @@ export async function addQuestionAction(_prev: ActionState, formData: FormData):
 
   revalidatePath(`/cliente/encuestas/${surveyId}`);
   const answered = await completedCount(supabase, surveyId);
+  const optionalNote = live && isRequired ? " Quedó como opcional: la encuesta ya está en campo y los encuestadores tienen cargado el cuestionario anterior." : "";
   return {
-    ok: answered
-      ? `P${position} agregada. Las ${answered} entrevistas ya cargadas no la tienen: su base va a ser menor.`
-      : `P${position} agregada.`,
+    ok:
+      (answered
+        ? `P${position} agregada. Las ${answered} entrevistas ya cargadas no la tienen: su base va a ser menor.`
+        : `P${position} agregada.`) + optionalNote,
   };
 }
 
@@ -554,9 +565,19 @@ export async function updateQuestionAction(_prev: ActionState, formData: FormDat
   if (text.length < 3 || text.length > 500) return { error: "El enunciado tiene que tener entre 3 y 500 caracteres." };
 
   const supabase = await createClient();
-  if (!(await ownedSurvey(supabase, surveyId, organization.id))) return { error: "No se encontró la encuesta." };
-  const { data: question } = await supabase.from("questions").select("id, logic").eq("id", id).eq("survey_id", surveyId).maybeSingle();
+  const survey = await ownedSurvey(supabase, surveyId, organization.id);
+  if (!survey) return { error: "No se encontró la encuesta." };
+  const { data: question } = await supabase
+    .from("questions")
+    .select("id, logic, is_required")
+    .eq("id", id)
+    .eq("survey_id", surveyId)
+    .maybeSingle();
   if (!question) return { error: "No se encontró la pregunta." };
+
+  // Fuera de borrador una pregunta puede dejar de ser obligatoria, pero no pasar a serlo: los
+  // teléfonos con el cuestionario anterior verían rechazadas las entrevistas que ya tomaron.
+  const required = survey.status === "borrador" ? isRequired : question.is_required && isRequired;
 
   await supabase
     .from("questions")
@@ -565,7 +586,7 @@ export async function updateQuestionAction(_prev: ActionState, formData: FormDat
       help_text: helpText,
       section,
       // Una pregunta filtro siempre es obligatoria: si se saltea, el filtro no filtra.
-      is_required: (question.logic as QuestionLogic | null)?.end_if?.length ? true : isRequired,
+      is_required: (question.logic as QuestionLogic | null)?.end_if?.length ? true : required,
     })
     .eq("id", id);
 

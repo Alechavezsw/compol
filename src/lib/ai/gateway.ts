@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isSupabaseConfigured } from "@/lib/demo/mode";
 import type { GeneratedReport } from "@/lib/ai/gemini";
 import type { TypesafeRow } from "@/lib/ai/typesafe";
+import type { TopicHint } from "../../../supabase/functions/_shared/jev";
 
 export function isAiGatewayConfigured() {
   return isSupabaseConfigured();
@@ -36,14 +37,30 @@ export async function getAiLayerStatus(): Promise<AiLayerStatus> {
   return invokeAiLayer<AiLayerStatus>({ action: "status" });
 }
 
-export async function classifyViaGateway(texts: string[], topics: string[], organizationId?: string) {
-  const data = await invokeAiLayer<{ rows: (TypesafeRow | null)[] }>({
-    action: "classify",
-    texts,
-    topics,
-    organization_id: organizationId ?? null,
-  });
-  return data.rows;
+/** La función Edge acepta hasta 250 textos por pedido (ver supabase/functions/ai). */
+const CLASSIFY_CHUNK = 200;
+
+export async function classifyViaGateway(
+  texts: string[],
+  topics: string[],
+  organizationId?: string,
+  /** Qué entra en cada tema: ayuda a JEV a reconocerlos. */
+  topicHints: TopicHint[] = [],
+) {
+  // Las importaciones grandes se mandan en tandas: la función rechaza pedidos más
+  // grandes, y la fila `i` de la respuesta tiene que seguir siendo la del texto `i`.
+  const rows: (TypesafeRow | null)[] = [];
+  for (let start = 0; start < texts.length; start += CLASSIFY_CHUNK) {
+    const data = await invokeAiLayer<{ rows: (TypesafeRow | null)[] }>({
+      action: "classify",
+      texts: texts.slice(start, start + CLASSIFY_CHUNK),
+      topics,
+      topic_hints: topicHints,
+      organization_id: organizationId ?? null,
+    });
+    rows.push(...data.rows);
+  }
+  return rows;
 }
 
 export async function generateReportViaGateway(params: {

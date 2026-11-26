@@ -119,7 +119,7 @@ export function FilterBar({
   }));
 
   return (
-    <div className="sticky top-2 z-20 rounded-[20px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_86%,transparent)] p-3 shadow-[0_18px_40px_-26px_rgba(30,20,70,.45)] backdrop-blur-xl lg:top-4">
+    <div className="relative z-20 rounded-[20px] lg:sticky border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_86%,transparent)] p-3 shadow-[0_18px_40px_-26px_rgba(30,20,70,.45)] backdrop-blur-xl lg:top-4">
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex h-9 items-center gap-2 self-end pr-1 text-sm font-medium text-[var(--foreground)]">
           <span

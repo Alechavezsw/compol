@@ -80,6 +80,11 @@ export async function requireProfile(): Promise<SessionProfile> {
   const session = await getSessionProfile();
   if (!session) redirect("/login");
   if (!session.profile.is_active) redirect("/acceso-denegado?motivo=inactivo");
+  // Una organización suspendida pierde el acceso de todo su equipo (clientes y
+  // encuestadores). La administración central entra siempre: es quien la reactiva.
+  if (session.profile.role !== "super_admin" && session.organization?.status === "suspendida") {
+    redirect("/acceso-denegado?motivo=suspendida");
+  }
   return session;
 }
 

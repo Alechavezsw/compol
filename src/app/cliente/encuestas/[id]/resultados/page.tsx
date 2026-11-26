@@ -9,9 +9,7 @@ import {
   Download,
   Filter as FilterIcon,
   GitBranch,
-  Globe,
   Layers,
-  MapPin,
   Sparkles,
   Target,
   Timer,
@@ -28,7 +26,12 @@ import { DistributionBars, NetBar, ScaleColumns } from "@/components/results/dis
 import { CrosstabTable } from "@/components/results/crosstab-table";
 import { CrosstabPicker, FilterBar } from "@/components/results/controls";
 import { AskBox } from "@/components/results/ask-box";
-import { FieldMap } from "@/components/results/field-map";
+import { CrosstabView } from "@/components/results/crosstab-view";
+import { TerritoryExplorer, type ZoneView } from "@/components/results/territory-explorer";
+import { AnimatedNumber } from "@/components/pulse/motion";
+import type { LikertRow } from "@/components/pulse/bars";
+import { distribution, filterCases, zoneCenters, zoneSummaries } from "@/lib/pulse";
+import { buildPulse, evalToneOf } from "@/lib/pulse-build";
 import { caseForAnswers, pickEvaluationQuestion } from "@/lib/case-tone";
 import { LiveRefresh } from "@/components/results/live-refresh";
 import { createClient } from "@/lib/supabase/server";
@@ -42,12 +45,13 @@ import {
   keyFindings,
   loadSurveyData,
   segmentVariables,
+  type Crosstab,
   type Pace,
   type QuestionAnalytics,
 } from "@/lib/analytics";
 import { filtersFromParams, filtersToQuery } from "@/lib/filters";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
-import { SMALL_BASE, dayKey, formatDayKey, scaleBoxes } from "@/lib/stats";
+import { SMALL_BASE, dayKey, formatDayKey, scaleBoxes, valence } from "@/lib/stats";
 import { cn, formatDuration, formatNumber, formatPercent } from "@/lib/utils";
 import { QUESTION_TYPE_LABEL } from "@/lib/types";
 
@@ -85,7 +89,7 @@ export default async function ResultadosPage({
 
   const filters = filtersFromParams(query);
   const analytics = computeAnalytics(data, filters);
-  const { survey, totals, daily, pace, byZone, bySurveyor, quality, questions } = analytics;
+  const { survey, totals, daily, pace, bySurveyor, quality, questions } = analytics;
   const findings = keyFindings(data, filters, 6);
   const variables = segmentVariables(data);
   const hasAnyData = totals.completedAll > 0;
@@ -148,6 +152,29 @@ export default async function ResultadosPage({
         toneLabel: tone.label,
       };
     });
+
+  // --- Territorio: cada zona con todos los filtros puestos menos el de zona, para poder compararlas.
+  const everything = buildPulse(data);
+  const completed = data.responses.filter((r) => r.status === "completada");
+  const comparable = new Set(applyFilters(data, completed, { ...filters, zone: null }).map((r) => r.id));
+  const acrossZones = buildPulse(data, undefined, comparable);
+  const evaluationIndex = acrossZones?.roles.evaluation ?? null;
+  const zoneViews: ZoneView[] = acrossZones
+    ? zoneSummaries(acrossZones, acrossZones.cases).map((z) => {
+        const inZone = filterCases(acrossZones.cases, { zone: z.index, segments: {}, day: null });
+        const answers = evaluationIndex === null ? null : distribution(inZone, evaluationIndex, acrossZones.questions[evaluationIndex]);
+        return {
+          index: z.index,
+          name: z.name,
+          count: z.count,
+          net: z.balance?.net ?? null,
+          average: z.average,
+          shares: answers?.shares ?? [],
+          base: answers?.base ?? z.count,
+        };
+      })
+    : [];
+  const evaluationNet = questions.find((q) => q.question.id === evaluation?.id)?.net ?? null;
 
   return (
     <div className="space-y-6">
@@ -238,8 +265,8 @@ export default async function ResultadosPage({
           ) : null}
 
           {/* ------------------------------------------------------ KPIs */}
-          <section id="campo" className="grid scroll-mt-28 gap-4 lg:grid-cols-4">
-            <div className="relative overflow-hidden rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,transparent)] p-5 shadow-[var(--shadow-card)] lg:col-span-2">
+          <section id="campo" className={cn("animate-rise grid scroll-mt-28 gap-4 sm:grid-cols-2", evaluationNet ? "xl:grid-cols-5" : "xl:grid-cols-4")}>
+            <div className="relative overflow-hidden rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,transparent)] p-5 shadow-[var(--shadow-card)] sm:col-span-2">
               <div className="orb -top-20 -right-16 size-48 bg-[var(--primary)] opacity-10" />
               <div className="relative flex items-center gap-5">
                 <ProgressRing value={totals.completedAll} max={totals.target} size={112} stroke={11} tone={pace.status === "atrasada" ? "warning" : "primary"}>
@@ -254,7 +281,7 @@ export default async function ResultadosPage({
                     </Badge>
                   </div>
                   <p className="display mt-1 text-[34px] leading-none tabular-nums">
-                    {formatNumber(totals.completedAll)}
+                    <AnimatedNumber value={totals.completedAll} />
                     <span className="ml-1.5 text-lg text-[var(--muted)]">/ {formatNumber(totals.target)}</span>
                   </p>
                   <p className="mt-2 text-sm leading-snug text-[var(--muted)]">
@@ -279,9 +306,34 @@ export default async function ResultadosPage({
               </div>
             </div>
 
+            {evaluationNet ? (
+              <Card className="p-5">
+                <p className="text-sm text-[var(--muted)]">Saldo de la gestión</p>
+                <p className="mt-2 text-4xl font-semibold tracking-tight text-[var(--foreground)]">
+                  <AnimatedNumber value={evaluationNet.net} as="saldo" />
+                </p>
+                <div className="mt-3 flex h-2 gap-0.5 overflow-hidden rounded-full" aria-hidden>
+                  {[
+                    [evaluationNet.negative, "var(--eval-neg)"],
+                    [Math.max(0, 100 - evaluationNet.positive - evaluationNet.negative), "var(--eval-neutro)"],
+                    [evaluationNet.positive, "var(--eval-pos)"],
+                  ].map(([width, color]) => (
+                    <span
+                      key={color}
+                      className="h-full transition-[width] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)]"
+                      style={{ width: `${width}%`, background: String(color) }}
+                    />
+                  ))}
+                </div>
+                <p className="mt-2 text-xs text-[var(--muted)]">
+                  {Math.round(evaluationNet.positive)}% a favor · {Math.round(evaluationNet.negative)}% en contra
+                </p>
+              </Card>
+            ) : null}
+
             <StatCard
               label="Incidencia del filtro"
-              value={totals.incidence === null ? "—" : formatPercent(totals.incidence)}
+              value={totals.incidence === null ? "—" : <AnimatedNumber value={totals.incidence} as="porcentaje" />}
               icon={<UserX className="size-4" />}
               tone="warning"
               hint={`${formatNumber(totals.discarded)} descartadas · ${formatNumber(totals.inProgress)} en curso`}
@@ -303,87 +355,53 @@ export default async function ResultadosPage({
             />
           </section>
 
-          <div className="grid gap-4 xl:grid-cols-5">
-            <Card className="xl:col-span-3">
-              <CardHeader>
-                <div>
-                  <CardTitle>Evolución del campo</CardTitle>
-                  <p className="mt-1 text-sm text-[var(--muted)]">Casos por día y acumulado contra la meta</p>
-                </div>
-                <div className="flex gap-4 text-xs text-[var(--muted)]">
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="size-2.5 rounded-sm bg-[var(--chart-1)]" /> Día
-                  </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="h-0.5 w-3 rounded bg-[var(--chart-2)]" /> Acumulado
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-2">
-                {daily.length ? (
-                  <FieldTrend data={daily} target={analytics.filtered ? undefined : totals.target} />
-                ) : (
-                  <p className="py-16 text-center text-sm text-[var(--muted)]">Sin casos en el recorte elegido.</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="xl:col-span-2">
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  {byZone.length ? <MapPin className="size-4 text-[var(--muted)]" /> : <Globe className="size-4 text-[var(--muted)]" />}
-                  <CardTitle>{byZone.length ? "Distribución por zona" : "Desde dónde responden"}</CardTitle>
-                </div>
-                <span className="text-xs text-[var(--muted)]">n = {formatNumber(totals.completed)}</span>
-              </CardHeader>
-              <CardContent className="space-y-5 pt-5">
-                {analytics.byChannel.length > 1 ? (
-                  <div className="flex h-9 overflow-hidden rounded-xl text-xs font-semibold">
-                    {analytics.byChannel.map((c) => (
-                      <div
-                        key={c.key}
-                        className={cn("flex items-center justify-center px-2 text-white", c.key === "web" ? "bg-[var(--accent)]" : "bg-[var(--primary)]")}
-                        style={{ width: `${Math.max(12, c.percent)}%` }}
-                        title={`${c.name}: ${formatNumber(c.value)}`}
-                      >
-                        {c.key === "web" ? "Web" : "Campo"} {Math.round(c.percent)}%
-                      </div>
-                    ))}
+          <TerritoryExplorer
+            zones={zoneViews}
+            centers={everything ? zoneCenters(everything) : []}
+            selected={filters.zone ?? null}
+            points={geoPoints}
+            hasEvaluation={evaluationIndex !== null}
+            hasAverage={(acrossZones?.roles.scale ?? null) !== null}
+            note={evaluationIndex === null ? null : (acrossZones?.questions[evaluationIndex].text ?? null)}
+          >
+            {analytics.byChannel.length > 1 ? (
+              <div className="flex h-9 gap-0.5 overflow-hidden rounded-xl text-xs font-semibold">
+                {analytics.byChannel.map((c) => (
+                  <div
+                    key={c.key}
+                    className={cn("flex items-center justify-center px-2 text-white", c.key === "web" ? "bg-[var(--accent)]" : "bg-[var(--primary)]")}
+                    style={{ width: `${Math.max(12, c.percent)}%` }}
+                    title={`${c.name}: ${formatNumber(c.value)}`}
+                  >
+                    {c.key === "web" ? "Web" : "Campo"} {Math.round(c.percent)}%
                   </div>
-                ) : null}
-                {byZone.length ? (
-                  <DistributionBars data={byZone} showMoe={false} multiple />
-                ) : analytics.bySource.length ? (
-                  <DistributionBars data={analytics.bySource} showMoe={false} multiple />
-                ) : null}
-                {byZone.length && analytics.bySource.length ? (
-                  <div>
-                    <p className="mb-2 text-xs font-semibold tracking-wide text-[var(--muted)] uppercase">Origen web</p>
-                    <DistributionBars data={analytics.bySource.slice(0, 4)} showMoe={false} multiple />
-                  </div>
-                ) : null}
-              </CardContent>
-            </Card>
-          </div>
+                ))}
+              </div>
+            ) : null}
+            {analytics.bySource.length ? (
+              <div>
+                <p className="mb-2 text-xs font-semibold tracking-wide text-[var(--muted)] uppercase">Origen web</p>
+                <DistributionBars data={analytics.bySource.slice(0, 5)} showMoe={false} multiple />
+              </div>
+            ) : null}
+          </TerritoryExplorer>
 
-          {geoPoints.length ? (
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <MapPin className="size-4 text-[var(--muted)]" />
-                  <CardTitle>Mapa de campo</CardTitle>
-                </div>
-                <span className="text-xs text-[var(--muted)]">n = {formatNumber(geoPoints.length)}</span>
-              </CardHeader>
-              <CardContent className="pt-4">
-                <FieldMap points={geoPoints} />
-                <p className="mt-3 text-xs text-[var(--muted)]">
-                  Cada punto es un caso. El color es la evaluación de la gestión: muy buena, buena,
-                  regular, mala o muy mala. La ubicación es aproximada por zona.
-                </p>
-              </CardContent>
-            </Card>
-          ) : null}
+          <Card className="animate-rise [animation-delay:120ms]">
+            <CardHeader>
+              <div>
+                <CardTitle>Evolución del campo</CardTitle>
+                <p className="mt-1 text-sm text-[var(--muted)]">Cómo se fue juntando la muestra, día por día</p>
+              </div>
+              <span className="text-xs text-[var(--muted)]">n = {formatNumber(totals.completed)}</span>
+            </CardHeader>
+            <CardContent className="pt-2">
+              {daily.length ? (
+                <FieldTrend data={daily} target={analytics.filtered ? undefined : totals.target} />
+              ) : (
+                <p className="py-16 text-center text-sm text-[var(--muted)]">Sin casos en el recorte elegido.</p>
+              )}
+            </CardContent>
+          </Card>
 
           <AskBox surveyId={id} filters={filters} suggestions={suggestions} withModel={isGeminiConfigured()} />
 
@@ -438,7 +456,24 @@ export default async function ResultadosPage({
                             <span className="display text-xl tabular-nums">{formatPercent(h.percent)}</span> en{" "}
                             <strong className="font-semibold">{h.column}</strong>
                           </p>
-                          <p className="mt-1 text-xs text-[var(--muted)]">
+                          <span className="mt-3 block space-y-2" aria-hidden>
+                            {[
+                              [h.column, h.percent, "var(--chart-1)"],
+                              ["Resto", h.rest, "var(--eval-neutro)"],
+                            ].map(([label, value, color], row) => (
+                              <span key={row} className="grid grid-cols-[5.5rem_1fr_3rem] items-center gap-2 text-xs">
+                                <span className="truncate text-[var(--muted)]">{label}</span>
+                                <span className="h-2 rounded-full bg-[var(--surface-2)]">
+                                  <span
+                                    className="animate-grow-x block h-full rounded-full"
+                                    style={{ width: `${value}%`, background: String(color), animationDelay: `${row * 120}ms` }}
+                                  />
+                                </span>
+                                <span className="text-right font-semibold text-[var(--foreground)] tabular-nums">{Math.round(Number(value))}%</span>
+                              </span>
+                            ))}
+                          </span>
+                          <p className="mt-2 text-xs text-[var(--muted)]">
                             vs {formatPercent(h.rest)} en el resto · {up ? "+" : "−"}
                             {Math.abs(h.percent - h.rest).toFixed(1).replace(".", ",")} pp · n={formatNumber(h.base)}
                           </p>
@@ -474,7 +509,13 @@ export default async function ResultadosPage({
                       by={by ?? ""}
                     />
                     {crosstab && crosstab.totalBase > 0 ? (
-                      <CrosstabTable ct={crosstab} />
+                      evaluationRows(crosstab) ? (
+                        <CrosstabView key={`${target}-${by}`} rows={evaluationRows(crosstab)!}>
+                          <CrosstabTable ct={crosstab} />
+                        </CrosstabView>
+                      ) : (
+                        <CrosstabTable ct={crosstab} />
+                      )
                     ) : (
                       <p className="rounded-xl border border-dashed border-[var(--border)] p-6 text-center text-sm text-[var(--muted)]">
                         Elegí una pregunta y una variable distinta para ver el cruce.
@@ -598,6 +639,28 @@ export default async function ResultadosPage({
       )}
     </div>
   );
+}
+
+/**
+ * Filas para dibujar un cruce como barras divergentes, solo si la pregunta tiene
+ * respuestas a favor y en contra. Si no, el cruce se lee en la tabla.
+ */
+function evaluationRows(ct: Crosstab): LikertRow[] | null {
+  if (ct.target.type !== "opcion_unica") return null;
+  const side = ct.rows.map((row) => valence(row.label));
+  if (!side.includes(1) || !side.includes(-1)) return null;
+  return ct.columns.flatMap((column, j) => {
+    if (!column.base) return [];
+    const shares = ct.rows.map((row, i) => ({
+      index: i,
+      label: row.label,
+      tone: evalToneOf(row.label),
+      count: row.cells[j].value,
+      percent: row.cells[j].percent,
+    }));
+    const net = shares.reduce((sum, share, i) => sum + share.percent * side[i], 0);
+    return [{ key: column.key, label: column.label, shares, base: column.base, net }];
+  });
 }
 
 function SectionTitle({ icon, title, description }: { icon: React.ReactNode; title: string; description?: string }) {

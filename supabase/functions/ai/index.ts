@@ -1,5 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+import { type JevContext, cleanTopicHints, jevRequest, jevRow } from "../_shared/jev.ts";
 
 const GEMINI_MODEL = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-pro";
 const GEMINI_FALLBACK = Deno.env.get("GEMINI_FALLBACK_MODEL") || "gemini-2.5-flash";
@@ -117,6 +118,35 @@ function isTransient(error: unknown) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// --- Topes ------------------------------------------------------------------
+// Esta función corre con las claves pagas de Gemini y JEV, y cualquier usuario de
+// un cliente puede llamarla directo con su sesión (no solo a través de la app).
+// Sin topes serviría de proxy gratuito al modelo: se acota cuánto puede pedir.
+const MAX_TEXTS = 250;
+const MAX_TEXT_CHARS = 2000;
+const MAX_TOPICS = 60;
+const MAX_BRIEFING_CHARS = 80_000;
+/** Llamadas de IA por usuario y por hora (informes, preguntas y clasificaciones). */
+const MAX_CALLS_PER_HOUR = 60;
+
+const clip = (value: unknown, max: number) => String(value ?? "").slice(0, max);
+
+async function overQuota(userId: string) {
+  const url = Deno.env.get("SUPABASE_URL");
+  const key = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !key) return false;
+  const admin = createClient(url, key, { auth: { persistSession: false } });
+  const since = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const { count, error } = await admin
+    .from("ai_calls")
+    .select("id", { count: "exact", head: true })
+    .eq("created_by", userId)
+    .gte("created_at", since);
+  // Si no se puede contar no se bloquea: una falla de la base no debe apagar la IA.
+  if (error) return false;
+  return (count ?? 0) >= MAX_CALLS_PER_HOUR;
+}
+
 async function geminiGenerate(opts: {
   model: string;
   prompt: string;
@@ -184,39 +214,11 @@ async function mapWithConcurrency<T, R>(
   return out;
 }
 
-async function classifyWithJev(texts: string[], topics: string[]) {
+async function classifyWithJev(texts: string[], topics: string[], context: JevContext) {
   const apiKey = jevKey();
   if (!apiKey) throw new Error("Falta TYPESAFE_API_KEY en los secretos de Supabase.");
 
   return mapWithConcurrency(texts, 8, async (text, index) => {
-    const questions: Json = {
-      sentiment: {
-        type: "choice",
-        instructions: "Sentimiento del posteo hacia la gestión o el tema, no hacia quien escribe.",
-        criteria: {
-          positivo: "Valora favorablemente la gestión o el tema del posteo.",
-          neutral: "Informa o pregunta sin una carga de valor clara.",
-          negativo: "Critica, se queja o expresa malestar. La ironía cuenta como negativa.",
-        },
-      },
-      emotion: {
-        type: "choice",
-        instructions: "Emoción dominante que expresa el posteo.",
-        criteria: {
-          enojo: "Bronca, indignación o hartazgo.",
-          miedo: "Temor o sensación de inseguridad.",
-          tristeza: "Pena, resignación o abandono.",
-          alegria: "Satisfacción o entusiasmo.",
-          confianza: "Agradecimiento o respaldo a la gestión.",
-          sorpresa: "Sorpresa o incredulidad.",
-          ninguna: "No se expresa una emoción clara.",
-        },
-      },
-    };
-    for (const topic of topics) {
-      questions[`topic:${topic}`] = { type: "noul", instructions: `¿El posteo habla de "${topic}"?` };
-    }
-
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 8000);
@@ -224,32 +226,12 @@ async function classifyWithJev(texts: string[], topics: string[]) {
         method: "POST",
         signal: controller.signal,
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
-        body: JSON.stringify({ model: JEV_MODEL, state: text.slice(0, 1500), questions }),
+        body: JSON.stringify(jevRequest(JEV_MODEL, text, topics, context)),
       });
       clearTimeout(timer);
       if (!res.ok) return null;
-      const payload = await res.json();
-      const sentimentAnswer = payload?.answers?.sentiment;
-      const emotionAnswer = payload?.answers?.emotion;
-      if (!sentimentAnswer?.choice) return null;
-      const label = sentimentAnswer.choice as "positivo" | "neutral" | "negativo";
-      const sentiment = label === "positivo"
-        ? sentimentAnswer.confidence
-        : label === "negativo"
-        ? -sentimentAnswer.confidence
-        : 0;
-      const emotion = emotionAnswer?.choice && emotionAnswer.choice !== "ninguna"
-        ? emotionAnswer.choice
-        : null;
-      const matchedTopics = topics.filter((t) => (payload?.answers?.[`topic:${t}`]?.noul ?? 0) >= 0.5);
-      return {
-        index,
-        sentiment: Math.round(sentiment * 1000) / 1000,
-        label,
-        emotion,
-        topics: matchedTopics,
-        provider: "jev" as const,
-      };
+      const row = jevRow(index, await res.json(), topics);
+      return row ? { ...row, provider: "jev" as const } : null;
     } catch {
       return null;
     }
@@ -380,6 +362,10 @@ Deno.serve(async (req) => {
   const action = String(body.action ?? "");
   const organizationId: string | null = caller.organization_id ?? null;
 
+  if (action !== "status" && (await overQuota(auth.user.id))) {
+    return json({ error: "Alcanzaste el límite de consultas de IA por hora. Probá de nuevo más tarde." }, 429);
+  }
+
   try {
     if (action === "status") {
       return json({
@@ -391,8 +377,12 @@ Deno.serve(async (req) => {
     }
 
     if (action === "classify") {
-      const texts = Array.isArray(body.texts) ? body.texts.map((t) => String(t)) : [];
-      const topics = Array.isArray(body.topics) ? body.topics.map((t) => String(t)) : [];
+      const rawTexts = Array.isArray(body.texts) ? body.texts : [];
+      if (rawTexts.length > MAX_TEXTS) {
+        return json({ error: `Se pueden clasificar hasta ${MAX_TEXTS} textos por pedido.` }, 400);
+      }
+      const texts = rawTexts.map((t) => clip(t, MAX_TEXT_CHARS));
+      const topics = (Array.isArray(body.topics) ? body.topics : []).slice(0, MAX_TOPICS).map((t) => clip(t, 80));
       if (!texts.length) return json({ error: "No hay textos para clasificar." }, 400);
 
       const rows: Array<Json | null> = texts.map(() => null);
@@ -400,7 +390,15 @@ Deno.serve(async (req) => {
       let model: string | null = null;
 
       if (jevKey()) {
-        const jevRows = await classifyWithJev(texts, topics);
+        // JEV no conoce a quién se está evaluando: el nombre sale de la organización de quien pide.
+        const { data: organization } = organizationId
+          ? await userClient.from("organizations").select("name, region, country").eq("id", organizationId).maybeSingle()
+          : { data: null };
+        const jevRows = await classifyWithJev(texts, topics, {
+          organization: organization?.name ?? undefined,
+          place: [organization?.region, organization?.country].filter(Boolean).join(", ") || undefined,
+          topics: cleanTopicHints(body.topic_hints),
+        });
         jevRows.forEach((row, i) => {
           if (row) rows[i] = row;
         });
@@ -442,12 +440,12 @@ Deno.serve(async (req) => {
       if (!geminiKey()) {
         return json({ error: "Falta GEMINI_API_KEY en los secretos de la función ai." }, 503);
       }
-      const kind = String(body.kind ?? "ejecutivo");
-      const organizationName = String(body.organizationName ?? "Organismo");
-      const briefing = String(body.briefing ?? "");
-      const audience = body.audience ? String(body.audience) : "";
-      const focus = body.focus ? String(body.focus) : "";
-      const socialSummary = body.socialSummary ? String(body.socialSummary) : "";
+      const kind = clip(body.kind ?? "ejecutivo", 30);
+      const organizationName = clip(body.organizationName ?? "Organismo", 200);
+      const briefing = clip(body.briefing, MAX_BRIEFING_CHARS);
+      const audience = body.audience ? clip(body.audience, 200) : "";
+      const focus = body.focus ? clip(body.focus, 600) : "";
+      const socialSummary = body.socialSummary ? clip(body.socialSummary, 20_000) : "";
       if (briefing.length < 40) return json({ error: "El briefing de la encuesta está vacío." }, 400);
 
       const prompt = [
@@ -506,8 +504,8 @@ Deno.serve(async (req) => {
       if (!geminiKey()) {
         return json({ error: "Falta GEMINI_API_KEY en los secretos de la función ai." }, 503);
       }
-      const briefing = String(body.briefing ?? "");
-      const question = String(body.question ?? "").trim();
+      const briefing = clip(body.briefing, MAX_BRIEFING_CHARS);
+      const question = clip(body.question, 400).trim();
       if (question.length < 4) return json({ error: "Escribí una pregunta más completa." }, 400);
       const { text, model } = await geminiGenerate({
         model: GEMINI_FALLBACK,

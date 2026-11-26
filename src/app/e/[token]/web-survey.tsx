@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ArrowRight, CheckCircle2, Clock, Lock, X } from "lucide-react";
-import { submitWebResponseAction } from "../actions";
+import { submitWebResponseAction, type WebSubmitResult } from "../actions";
 import { useInterview } from "@/components/interview/use-interview";
 import { InterviewView } from "@/components/interview/interview-view";
 import type { QuestionWithOptions } from "@/lib/types";
@@ -38,6 +38,7 @@ export function WebSurvey({
   closable,
   sourceUrl,
   open,
+  formToken,
 }: {
   token: string;
   questions: QuestionWithOptions[];
@@ -47,12 +48,16 @@ export function WebSurvey({
   closable: boolean;
   sourceUrl: string | null;
   open: boolean;
+  /** Firmado por el servidor al cargar la página: fija cuándo se abrió el formulario. */
+  formToken: string;
 }) {
   const interview = useInterview({ questions, storageKey: `consulta:web:${token}` });
   const [stage, setStage] = useState<Stage>("welcome");
   const [pending, startTransition] = useTransition();
   const [website, setWebsite] = useState("");
   const root = useRef<HTMLDivElement>(null);
+  /** Un envío se quedó sin respuesta: puede que el servidor lo haya guardado igual. */
+  const unanswered = useRef(false);
   const doneKey = `consulta:web:respondida:${token}`;
 
   // Si el navegador ya respondió, lo decimos de entrada en vez de al final.
@@ -98,15 +103,26 @@ export function WebSurvey({
       return;
     }
     startTransition(async () => {
-      const result = await submitWebResponseAction({
-        token,
-        answers,
-        durationSeconds,
-        deviceId: deviceId(),
-        sourceUrl,
-        website,
-      });
-      if (!result.ok) {
+      let result: WebSubmitResult;
+      try {
+        result = await submitWebResponseAction({
+          token,
+          answers,
+          durationSeconds,
+          deviceId: deviceId(),
+          sourceUrl,
+          formToken,
+          website,
+        });
+      } catch {
+        // La llamada no volvió (sin señal o falla del servidor): las respuestas quedan en pantalla.
+        unanswered.current = true;
+        interview.setError("No pudimos enviar tus respuestas. Revisá tu conexión y probá de nuevo.");
+        return;
+      }
+      // Después de un envío sin respuesta, "repetida" quiere decir que aquel sí llegó: se da por enviada.
+      const arrived = result.duplicate && unanswered.current;
+      if (!result.ok && !arrived) {
         if (result.duplicate) {
           interview.stop();
           setStage("repeated");

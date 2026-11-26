@@ -153,8 +153,9 @@ function FieldTooltip({
 }
 
 /**
- * Campo día por día (barras) con el acumulado contra la meta (línea). Dos ejes
- * porque las magnitudes no se parecen: 20 casos en un día vs 400 acumulados.
+ * Campo día por día: arriba el acumulado contra la meta, abajo los casos de cada
+ * día. Son dos gráficos alineados porque las magnitudes no se parecen (20 casos
+ * en un día contra 400 acumulados) y dos ejes en uno solo inventan relaciones.
  */
 export function FieldTrend({
   data,
@@ -165,60 +166,39 @@ export function FieldTrend({
   target?: number;
   height?: number;
 }) {
-  const maxCumulative = Math.max(target ?? 0, ...data.map((d) => d.cumulative));
+  const maxCumulative = Math.max(1, target ?? 0, ...data.map((d) => d.cumulative));
+  // Tope redondo apenas por encima de la meta, para que las marcas del eje se lean.
+  const step = 10 ** Math.max(0, Math.floor(Math.log10(maxCumulative * 1.08)) - 1) * 5;
+  const ceiling = Math.ceil((maxCumulative * 1.08) / step) * step;
   return (
-    <ResponsiveContainer width="100%" height={height}>
-      <ComposedChart data={data} margin={{ top: 12, right: 4, bottom: 4, left: -14 }}>
-        <defs>
-          <linearGradient id="fieldBar" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.95} />
-            <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0.35} />
-          </linearGradient>
-          <linearGradient id="fieldArea" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.22} />
-            <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <XAxis dataKey="name" {...axis} minTickGap={18} />
-        <YAxis yAxisId="day" {...axis} width={40} allowDecimals={false} />
-        <YAxis
-          yAxisId="cum"
-          orientation="right"
-          {...axis}
-          width={44}
-          domain={[0, Math.ceil(maxCumulative * 1.05)]}
-          allowDecimals={false}
-        />
-        <Tooltip cursor={{ fill: "var(--surface-2)" }} content={<FieldTooltip target={target} />} />
-        <Area
-          yAxisId="cum"
-          type="monotone"
-          dataKey="cumulative"
-          stroke="none"
-          fill="url(#fieldArea)"
-          isAnimationActive={false}
-        />
-        <Bar yAxisId="day" dataKey="value" fill="url(#fieldBar)" radius={[6, 6, 0, 0]} maxBarSize={22} />
-        <Line
-          yAxisId="cum"
-          type="monotone"
-          dataKey="cumulative"
-          stroke="var(--chart-2)"
-          strokeWidth={2.5}
-          dot={false}
-          activeDot={{ r: 4 }}
-        />
-        {target ? (
-          <ReferenceLine
-            yAxisId="cum"
-            y={target}
-            stroke="var(--chart-3)"
-            strokeDasharray="5 5"
-            label={{ value: `Meta ${formatNumber(target)}`, position: "insideTopRight", fill: "var(--chart-3)", fontSize: 11 }}
-          />
-        ) : null}
-      </ComposedChart>
-    </ResponsiveContainer>
+    <div>
+      <p className="mb-1 text-xs font-medium text-[var(--muted)]">{target ? "Acumulado contra la meta" : "Acumulado"}</p>
+      <ResponsiveContainer width="100%" height={Math.round(height * 0.58)}>
+        <AreaChart data={data} syncId="campo" margin={{ top: 12, right: 8, bottom: 4, left: 0 }}>
+          <XAxis dataKey="name" hide />
+          <YAxis {...axis} width={40} domain={[0, ceiling]} ticks={[0, ceiling / 2, ceiling]} />
+          <Tooltip cursor={{ stroke: "var(--muted)", strokeWidth: 1 }} content={<FieldTooltip target={target} />} />
+          <Area type="monotone" dataKey="cumulative" stroke="var(--chart-2)" strokeWidth={2} fill="var(--chart-2)" fillOpacity={0.1} activeDot={{ r: 5 }} />
+          {target ? (
+            <ReferenceLine
+              y={target}
+              stroke="var(--chart-3)"
+              strokeDasharray="5 5"
+              label={{ value: `Meta ${formatNumber(target)}`, position: "insideTopRight", fill: "var(--muted)", fontSize: 12 }}
+            />
+          ) : null}
+        </AreaChart>
+      </ResponsiveContainer>
+      <p className="mt-3 mb-1 text-xs font-medium text-[var(--muted)]">Casos por día</p>
+      <ResponsiveContainer width="100%" height={Math.round(height * 0.46)}>
+        <BarChart data={data} syncId="campo" margin={{ top: 6, right: 8, bottom: 4, left: 0 }}>
+          <XAxis dataKey="name" {...axis} minTickGap={18} />
+          <YAxis {...axis} width={40} allowDecimals={false} tickCount={3} />
+          <Tooltip cursor={{ fill: "var(--surface-2)" }} content={() => null} />
+          <Bar dataKey="value" fill="var(--chart-1)" radius={[4, 4, 0, 0]} maxBarSize={22} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
   );
 }
 

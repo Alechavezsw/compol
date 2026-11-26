@@ -179,6 +179,8 @@ export type SurveyResponse = {
   source_url: string | null;
   /** Web: hash anónimo del dispositivo, para limitar a una respuesta. */
   respondent_hash: string | null;
+  /** Web: huella anónima de la conexión (hash con sal, no la IP) para limitar envíos. */
+  ip_hash?: string | null;
   zone: string | null;
   latitude: number | null;
   longitude: number | null;

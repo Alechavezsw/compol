@@ -1,8 +1,23 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { STATUS_FLOW, acceptsResponses, isExpired } from "../src/lib/survey-status";
+import { MAX_OFFLINE_AGE_MS, STATUS_FLOW, acceptsResponses, collectedWhen, isExpired } from "../src/lib/survey-status";
 
 const NOW = Date.parse("2026-10-18T15:00:00-03:00");
+
+describe("fecha de una entrevista tomada sin señal", () => {
+  it("respeta la hora en que se tomó si es razonable", () => {
+    const tomada = NOW - 3 * 60 * 60 * 1000;
+    assert.equal(collectedWhen(tomada, NOW), tomada);
+  });
+
+  it("descarta lo que no se puede creer: futuro, más de 14 días, o no numérico", () => {
+    assert.equal(collectedWhen(NOW + 60_000, NOW), NOW);
+    assert.equal(collectedWhen(NOW - MAX_OFFLINE_AGE_MS - 1, NOW), NOW);
+    for (const invalido of [undefined, null, "ayer", Number.NaN, Infinity]) {
+      assert.equal(collectedWhen(invalido, NOW), NOW, String(invalido));
+    }
+  });
+});
 
 describe("cierre por fecha", () => {
   it("una encuesta activa sin fecha o con cierre futuro recibe respuestas", () => {
