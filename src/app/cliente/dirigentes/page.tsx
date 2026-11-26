@@ -12,7 +12,7 @@ import type { Dirigente, DirigenteMedicion } from "@/lib/types";
 export const metadata: Metadata = { title: "Banco de dirigentes" };
 
 export default async function DirigentesPage() {
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
 
   const { data: dirigentesData } = await supabase

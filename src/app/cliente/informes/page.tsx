@@ -21,7 +21,7 @@ export default async function InformesPage({
   searchParams: Promise<{ encuesta?: string }>;
 }) {
   const { encuesta } = await searchParams;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
 
   const [reportRows, { data: surveyRows }, responseRows] = await Promise.all([

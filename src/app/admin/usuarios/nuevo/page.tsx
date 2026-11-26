@@ -9,7 +9,7 @@ import type { UserRole } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Nuevo usuario" };
 
-const ROLES: UserRole[] = ["surveyor", "org_analyst", "org_admin", "super_admin"];
+const ROLES: UserRole[] = ["org_admin", "politico", "surveyor", "super_admin", "org_analyst"];
 
 export default async function NuevoUsuarioPage({
   searchParams,

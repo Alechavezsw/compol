@@ -119,7 +119,7 @@ export function RadarIgnition({
               <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-300/70 to-transparent" />
               <div className="relative w-full max-w-4xl overflow-hidden rounded-[32px] border border-cyan-200/15 bg-[#070b14] px-5 py-7 text-slate-100 shadow-[0_40px_120px_-24px_rgba(45,212,191,0.55)] sm:px-10 sm:py-10">
                 <div className="pointer-events-none absolute -left-20 -top-20 size-72 rounded-full bg-teal-400/20 blur-3xl" />
-                <div className="pointer-events-none absolute -right-16 bottom-0 size-64 rounded-full bg-violet-500/25 blur-3xl" />
+                <div className="pointer-events-none absolute -right-16 bottom-0 size-64 rounded-full bg-sky-500/25 blur-3xl" />
                 {pending ? (
                   <div className="radar-scanline pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-cyan-300/20 to-transparent" />
                 ) : null}
@@ -263,7 +263,7 @@ function RadarScope({
       <div className="absolute inset-[10%] rounded-full border border-teal-400/20" />
       <div className="absolute inset-[22%] rounded-full border border-teal-400/15" />
       <div className="absolute inset-[36%] rounded-full border border-teal-400/12" />
-      <div className="absolute inset-[50%] rounded-full border border-violet-400/20" />
+      <div className="absolute inset-[50%] rounded-full border border-sky-400/20" />
       <div className="absolute left-1/2 top-[8%] h-[84%] w-px -translate-x-1/2 bg-teal-300/15" />
       <div className="absolute top-1/2 left-[8%] h-px w-[84%] -translate-y-1/2 bg-teal-300/15" />
       <div
@@ -279,7 +279,7 @@ function RadarScope({
       {scanning ? (
         <>
           <div className="radar-ping absolute inset-[18%] rounded-full border border-cyan-300/50" />
-          <div className="radar-ping absolute inset-[18%] rounded-full border border-violet-300/40 [animation-delay:800ms]" />
+          <div className="radar-ping absolute inset-[18%] rounded-full border border-sky-300/40 [animation-delay:800ms]" />
         </>
       ) : null}
       <svg viewBox="0 0 200 200" className="absolute inset-0">
@@ -354,7 +354,7 @@ export function RadarHero({
   return (
     <section className="relative overflow-hidden rounded-[28px] bg-[#070b14] text-slate-100 shadow-[0_24px_80px_-28px_rgba(45,212,191,0.35)]">
       <div className="pointer-events-none absolute -left-24 -top-24 size-72 rounded-full bg-teal-400/15 blur-3xl" />
-      <div className="pointer-events-none absolute -right-16 bottom-0 size-64 rounded-full bg-violet-500/20 blur-3xl" />
+      <div className="pointer-events-none absolute -right-16 bottom-0 size-64 rounded-full bg-sky-500/20 blur-3xl" />
       <div className="absolute inset-0 opacity-30 [background-image:radial-gradient(rgba(148,163,184,0.18)_1px,transparent_1px)] [background-size:22px_22px]" />
 
       <div className="relative grid items-center gap-8 p-6 sm:p-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:p-10">

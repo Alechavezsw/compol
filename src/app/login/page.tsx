@@ -24,11 +24,11 @@ export default async function LoginPage({
   return (
     <div className="grid min-h-dvh lg:grid-cols-2">
       <SkipLink />
-      <aside className="relative hidden overflow-hidden bg-[#0c0a16] lg:flex lg:flex-col lg:justify-between lg:p-12">
+      <aside className="relative hidden overflow-hidden bg-[#07131c] lg:flex lg:flex-col lg:justify-between lg:p-12">
         <div className="surface-grid pointer-events-none absolute inset-0 opacity-20 [mask-image:radial-gradient(ellipse_at_center,black,transparent_75%)]" />
-        <div className="orb top-[-60px] left-[-40px] size-80 bg-[#6d5cff] opacity-40" />
+        <div className="orb top-[-60px] left-[-40px] size-80 bg-[#1d6a9a] opacity-40" />
         <div className="orb right-[-40px] bottom-[20%] size-72 bg-[#2dd4bf] opacity-25" />
-        <div className="orb bottom-[-80px] left-[30%] size-64 bg-[#8b5cf6] opacity-20" />
+        <div className="orb bottom-[-80px] left-[30%] size-64 bg-[#0f4c6e] opacity-30" />
 
         <div className="relative">
           <Logo invert />
@@ -41,13 +41,13 @@ export default async function LoginPage({
             El operativo, el tablero y el informe en un solo lugar.
           </h2>
           <p className="mt-5 text-sm leading-relaxed text-white/65">
-            Cada organismo accede únicamente a sus propios relevamientos. El aislamiento se aplica
-            en la base de datos, no en la interfaz.
+            Tres roles claros: Administrador opera, Político lee, Encuestador carga en campo.
+            Cada organismo solo ve lo suyo.
           </p>
 
           <div className="mt-10 grid grid-cols-3 gap-3">
             {[
-              ["4", "roles"],
+              ["3", "roles"],
               ["RLS", "por fila"],
               ["IA", "citada"],
             ].map(([n, l]) => (

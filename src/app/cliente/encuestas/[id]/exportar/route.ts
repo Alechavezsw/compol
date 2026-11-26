@@ -18,7 +18,7 @@ import { slugify } from "@/lib/utils";
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { organization } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
 
   const data = await loadSurveyData(supabase, id);

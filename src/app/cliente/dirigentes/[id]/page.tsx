@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: "Ficha de dirigente" };
 
 export default async function DirigentePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
 
   const { data: dirigenteData } = await supabase

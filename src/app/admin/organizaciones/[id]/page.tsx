@@ -365,14 +365,14 @@ export default async function OrganizacionPerfilPage({ params }: { params: Promi
                   variant="outline"
                   href={`/admin/usuarios/nuevo?org=${id}&rol=org_admin&volver=${encodeURIComponent(returnTo)}`}
                 >
-                  Admin
+                  Administrador
                 </ButtonLink>
                 <ButtonLink
                   size="sm"
                   variant="outline"
-                  href={`/admin/usuarios/nuevo?org=${id}&rol=org_analyst&volver=${encodeURIComponent(returnTo)}`}
+                  href={`/admin/usuarios/nuevo?org=${id}&rol=politico&volver=${encodeURIComponent(returnTo)}`}
                 >
-                  Analista
+                  Político
                 </ButtonLink>
                 <ButtonLink
                   size="sm"

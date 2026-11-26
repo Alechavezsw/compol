@@ -12,7 +12,7 @@ import type { Project } from "@/lib/types";
 export const metadata: Metadata = { title: "Proyectos" };
 
 export default async function ProyectosPage() {
-  const { organization } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization } = await requireOrganization(["org_admin"]);
   const supabase = await createClient();
 
   const [{ data }, { data: surveyRows }] = await Promise.all([

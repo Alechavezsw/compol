@@ -12,7 +12,7 @@ export type ActionState = { error?: string | null; ok?: string | null };
 
 const ORG_TYPES: OrgType[] = ["gobierno", "institucion", "ong", "privado"];
 const ORG_STATUSES: OrgStatus[] = ["activa", "prueba", "suspendida"];
-const ROLES: UserRole[] = ["super_admin", "org_admin", "org_analyst", "surveyor"];
+const ROLES: UserRole[] = ["super_admin", "org_admin", "org_analyst", "politico", "surveyor"];
 const INVOICE_STATUSES: InvoiceStatus[] = ["pendiente", "pagada", "vencida", "anulada"];
 /** Supabase Auth no tiene baja indefinida: cien años equivale a "hasta que se reactive". */
 const BLOCK_DURATION = "876000h";

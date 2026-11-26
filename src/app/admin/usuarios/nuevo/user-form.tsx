@@ -54,9 +54,9 @@ export function UserForm({
             value={role}
             onChange={(e) => setRole(e.target.value as UserRole)}
           >
+            <option value="org_admin">Administrador</option>
+            <option value="politico">Político (solo lectura)</option>
             <option value="surveyor">Encuestador</option>
-            <option value="org_analyst">Analista del cliente</option>
-            <option value="org_admin">Administrador del cliente</option>
             <option value="super_admin">Administración central</option>
           </Select>
         </Field>

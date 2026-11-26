@@ -14,11 +14,11 @@ export const PAPER = {
   muted: "#6a6358",
   line: "#e6ddd0",
   card: "#fffdf8",
-  accent: "#3d2de0",
+  accent: "#0f4c6e",
   teal: "#0d7a6c",
 } as const;
 
-export const PAPER_BARS = ["#3d2de0", "#0d7a6c", "#c2410c", "#7c3aed", "#0284c7", "#b45309"];
+export const PAPER_BARS = ["#0f4c6e", "#0d7a6c", "#c2410c", "#1d6a9a", "#0284c7", "#b45309"];
 
 export type ReportChart = {
   title: string;

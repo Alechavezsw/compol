@@ -953,7 +953,7 @@ export async function askSurveyAction(payload: {
   question: string;
   filters?: AnalyticsFilters;
 }): Promise<AskResult> {
-  const { organization } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const question = payload.question?.trim() ?? "";
   if (question.length < 4) return { ok: false, error: "Escribí una pregunta más completa." };
   if (question.length > 400) return { ok: false, error: "La pregunta es demasiado larga (máximo 400 caracteres)." };

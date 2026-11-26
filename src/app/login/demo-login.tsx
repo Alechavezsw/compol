@@ -13,6 +13,7 @@ const ICONS: Record<UserRole, typeof ShieldCheck> = {
   super_admin: ShieldCheck,
   org_admin: Building2,
   org_analyst: LineChart,
+  politico: LineChart,
   surveyor: ClipboardList,
 };
 

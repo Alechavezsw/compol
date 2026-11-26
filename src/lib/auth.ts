@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isDemoMode, isSupabaseConfigured } from "@/lib/demo/mode";
 import { getDemoProfile } from "@/lib/demo/session";
 import { demoTables } from "@/lib/demo/store";
-import type { Organization, Profile, UserRole } from "@/lib/types";
+import { CLIENT_READ_ROLES, type Organization, type Profile, type UserRole } from "@/lib/types";
 
 export type SessionProfile = {
   user: User;
@@ -22,6 +22,7 @@ export function homePathFor(role: UserRole) {
       return "/admin";
     case "org_admin":
     case "org_analyst":
+    case "politico":
       return "/cliente";
     case "surveyor":
       return "/campo";
@@ -110,4 +111,9 @@ export async function requireOrganization(roles: UserRole[]): Promise<
 
 export function canManage(role: UserRole) {
   return role === "super_admin" || role === "org_admin";
+}
+
+/** Político (y analista legacy): ve el panel del cliente sin mutar. */
+export function isClientReadOnly(role: UserRole) {
+  return CLIENT_READ_ROLES.includes(role);
 }

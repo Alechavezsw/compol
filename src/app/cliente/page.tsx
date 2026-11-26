@@ -24,7 +24,7 @@ import { FieldTrend } from "@/components/charts/charts";
 import { PulseBoard } from "@/components/pulse/pulse-board";
 import { LiveRefresh } from "@/components/results/live-refresh";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { isClientReadOnly, requireOrganization } from "@/lib/auth";
 import { loadSurveyData } from "@/lib/analytics";
 import { loadDashboard } from "@/lib/dashboard";
 import { signed } from "@/lib/pulse";
@@ -32,11 +32,12 @@ import { buildPulse } from "@/lib/pulse-build";
 import { moodLabel } from "@/lib/social/analytics";
 import { formatDayKey, todayKey } from "@/lib/stats";
 import { cn, formatDate, formatNumber, formatPercent } from "@/lib/utils";
+import type { UserRole } from "@/lib/types";
 
 type Attention = { tone: "danger" | "warning" | "primary"; icon: React.ReactNode; title: string; detail: string; href: string };
 
 const dashboard = cache(async function dashboard() {
-  const { organization } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
   return loadDashboard(supabase, organization.id, todayKey());
 });
@@ -46,23 +47,28 @@ export default async function ClienteDashboard({
 }: {
   searchParams: Promise<{ encuesta?: string | string[] }>;
 }) {
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const firstName = profile.full_name.split(" ")[0] || "equipo";
+  const readOnly = isClientReadOnly(profile.role);
   const { encuesta } = await searchParams;
   const selected = Array.isArray(encuesta) ? encuesta[0] : encuesta;
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[28px] bg-[#0b1020] px-6 py-7 text-slate-100 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.55)] sm:px-8 sm:py-8">
-        <div className="pointer-events-none absolute -left-16 -top-20 size-64 rounded-full bg-violet-500/25 blur-3xl" />
+      <section className="relative overflow-hidden rounded-[28px] bg-[#07131c] px-6 py-7 text-slate-100 shadow-[0_28px_70px_-32px_rgba(7,30,45,0.55)] sm:px-8 sm:py-8">
+        <div className="pointer-events-none absolute -left-16 -top-20 size-64 rounded-full bg-sky-500/20 blur-3xl" />
         <div className="pointer-events-none absolute -right-10 bottom-0 size-56 rounded-full bg-teal-400/20 blur-3xl" />
         <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(148,163,184,0.35)_1px,transparent_1px)] [background-size:22px_22px]" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <p className="text-[12px] font-semibold tracking-[0.18em] text-cyan-200/80 uppercase">Hola, {firstName}</p>
+            <p className="text-[12px] font-semibold tracking-[0.18em] text-cyan-200/80 uppercase">
+              {readOnly ? "Lectura política" : `Hola, ${firstName}`}
+            </p>
             <h1 className="display mt-2 text-[34px] leading-none text-white sm:text-[42px]">{organization.name}</h1>
             <p className="mt-3 max-w-xl text-sm text-slate-400">
-              El territorio en un mapa, lo que opina la gente y lo que necesita atención hoy.
+              {readOnly
+                ? "El pulso del territorio y lo que la gente está diciendo, sin pantallas de operación."
+                : "El territorio en un mapa, lo que opina la gente y lo que necesita atención hoy."}
             </p>
             <Suspense fallback={<div className="mt-5 h-8 w-72 animate-pulse rounded-full bg-white/10" />}>
               <HeroChips />
@@ -82,7 +88,7 @@ export default async function ClienteDashboard({
 
       <section aria-labelledby="operativo" className="space-y-4 pt-4">
         <h2 id="operativo" className="display text-3xl text-[var(--foreground)]">
-          El operativo hoy
+          {readOnly ? "Panorama" : "El operativo hoy"}
         </h2>
         <Suspense fallback={<DashboardFallback />}>
           <DashboardBody role={profile.role} />
@@ -183,7 +189,8 @@ function DashboardFallback() {
   );
 }
 
-async function DashboardBody({ role }: { role: string }) {
+async function DashboardBody({ role }: { role: UserRole }) {
+  const readOnly = isClientReadOnly(role);
   const {
     surveys,
     active,
@@ -277,6 +284,7 @@ async function DashboardBody({ role }: { role: string }) {
 
   return (
     <div className="space-y-6">
+      {!readOnly ? (
       <section className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,transparent)] p-5 shadow-[var(--shadow-card)]">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
@@ -338,6 +346,7 @@ async function DashboardBody({ role }: { role: string }) {
           </div>
         </div>
       </section>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -495,10 +504,14 @@ async function DashboardBody({ role }: { role: string }) {
             {reports.length === 0 ? (
               <div className="py-6 text-center">
                 <Sparkles className="mx-auto size-5 text-[var(--muted)]" />
-                <p className="mt-2 text-sm text-[var(--muted)]">Todavía no generaste informes con IA.</p>
-                <ButtonLink href="/cliente/informes" size="sm" variant="secondary" className="mt-3">
-                  Generar el primero
-                </ButtonLink>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  {readOnly ? "Todavía no hay informes en la biblioteca." : "Todavía no generaste informes con IA."}
+                </p>
+                {!readOnly ? (
+                  <ButtonLink href="/cliente/informes" size="sm" variant="secondary" className="mt-3">
+                    Generar el primero
+                  </ButtonLink>
+                ) : null}
               </div>
             ) : (
               reports.map((r) => (

@@ -13,7 +13,7 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#3d2de0",
+          background: "#0f4c6e",
         }}
       >
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 96 }}>

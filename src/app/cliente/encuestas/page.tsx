@@ -14,7 +14,7 @@ import type { Survey } from "@/lib/types";
 export const metadata: Metadata = { title: "Encuestas" };
 
 export default async function EncuestasPage() {
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
 
   const [{ data: surveyRows }, { data: responseRows }, { data: questionRows }, { data: assignRows }, { data: projectRows }] =

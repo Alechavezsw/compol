@@ -81,7 +81,7 @@ export default async function ResultadosPage({
 }) {
   const { id } = await params;
   const query = await searchParams;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
 
   const data = await loadSurveyData(supabase, id);

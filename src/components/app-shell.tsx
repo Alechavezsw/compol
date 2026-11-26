@@ -137,8 +137,8 @@ export function AppShell({
       </div>
 
       <div className="px-5 pb-4">
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-2)] px-3.5 py-3">
-          <p className="text-[10px] font-semibold tracking-[0.16em] text-[var(--muted)] uppercase">
+        <div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--primary-soft)_55%,var(--surface-2))] px-3.5 py-3">
+          <p className="text-[10px] font-semibold tracking-[0.16em] text-[var(--primary)] uppercase">
             {areaLabel}
           </p>
           {orgName ? (

@@ -696,7 +696,7 @@ export async function reclassifyAction(_prev: SocialActionState, _formData: Form
 }
 
 export async function analyzeRadarAction(_prev: SocialActionState, formData: FormData): Promise<SocialActionState> {
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const useLocalWriter = !isGeminiConfigured() && isDemoMode();
   if (!isGeminiConfigured() && !useLocalWriter) {
     return { error: "Falta la capa de IA. Cargá las claves de JEV o Gemini en Supabase." };

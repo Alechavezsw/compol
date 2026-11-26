@@ -69,7 +69,7 @@ export default async function EncuestaDetallePage({
 }) {
   const { id } = await params;
   const { aviso } = await searchParams;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
 
   const { data: surveyRow } = await supabase

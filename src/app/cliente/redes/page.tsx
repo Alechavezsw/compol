@@ -68,7 +68,7 @@ export default async function RedesPage({
   searchParams: Promise<{ dias?: string; red?: string; tema?: string; q?: string }>;
 }) {
   const query = await searchParams;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
   const days = [1, 7, 30].includes(Number(query.dias)) ? Number(query.dias) : 1;
   const today = todayKey();

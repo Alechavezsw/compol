@@ -10,7 +10,7 @@ export const WIDGET_MODES: WidgetMode[] = ["inline", "flotante", "emergente"];
 /** Valores por defecto de la experiencia web, para no guardar nulos en la base. */
 export function resolveWebSettings(survey: Pick<Survey, "title" | "description" | "web_settings">) {
   const s: WebSettings = survey.web_settings ?? {};
-  const accent = /^#[0-9a-f]{6}$/i.test(s.accent ?? "") ? (s.accent as string) : "#3d2de0";
+  const accent = /^#[0-9a-f]{6}$/i.test(s.accent ?? "") ? (s.accent as string) : "#0f4c6e";
   return {
     accent,
     welcomeTitle: s.welcome_title?.trim() || survey.title,
