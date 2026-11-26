@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { isDemoMode } from "@/lib/demo/mode";
 import { requireRole } from "@/lib/auth";
 import { pickOrgBrandColor } from "@/lib/org-visual";
 import { safeInternalPath, slugify } from "@/lib/utils";
@@ -181,38 +182,45 @@ export async function createUserAction(
     return { error: "Los roles de cliente y de campo necesitan una organización." };
   }
 
-  let admin;
-  try {
-    admin = createAdminClient();
-  } catch (e) {
-    return { error: e instanceof Error ? e.message : "Falta la service role key." };
-  }
-
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { full_name: fullName, role },
-  });
-
-  if (error || !data.user) {
-    return { error: `No se pudo crear el usuario: ${error?.message ?? "error desconocido"}` };
-  }
-
-  // El trigger `on_auth_user_created` ya creó el perfil; completamos el resto.
-  const { error: profileError } = await admin
-    .from("profiles")
-    .update({
-      full_name: fullName,
+  if (isDemoMode()) {
+    const admin = createAdminClient();
+    const { data, error } = await admin.auth.admin.createUser({
       email,
-      phone,
-      role,
-      organization_id: role === "super_admin" ? null : organizationId,
-    })
-    .eq("id", data.user.id);
-
-  if (profileError) {
-    return { error: `El usuario se creó pero no se pudo completar el perfil: ${profileError.message}` };
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: fullName, role },
+    });
+    if (error || !data.user) {
+      return { error: `No se pudo crear el usuario: ${error?.message ?? "error desconocido"}` };
+    }
+    const { error: profileError } = await admin
+      .from("profiles")
+      .update({
+        full_name: fullName,
+        email,
+        phone,
+        role,
+        organization_id: role === "super_admin" ? null : organizationId,
+      })
+      .eq("id", data.user.id);
+    if (profileError) {
+      return { error: `El usuario se creó pero no se pudo completar el perfil: ${profileError.message}` };
+    }
+  } else {
+    // La sesión del super_admin alcanza: la función admin_create_user escribe
+    // en Auth y en el perfil. No depende de SUPABASE_SERVICE_ROLE_KEY.
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("admin_create_user", {
+      p_email: email,
+      p_password: password,
+      p_full_name: fullName,
+      p_role: role,
+      p_organization_id: role === "super_admin" ? null : organizationId,
+      p_phone: phone,
+    });
+    if (error) {
+      return { error: `No se pudo crear el usuario: ${error.message}` };
+    }
   }
 
   revalidatePath("/admin/usuarios");

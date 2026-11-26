@@ -467,7 +467,19 @@ export type Database = {
       >;
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      admin_create_user: {
+        Args: {
+          p_email: string;
+          p_password: string;
+          p_full_name: string;
+          p_role: string;
+          p_organization_id: string | null;
+          p_phone: string | null;
+        };
+        Returns: string;
+      };
+    };
     Enums: {
       user_role: UserRole;
       org_type: OrgType;

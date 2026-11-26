@@ -38,9 +38,9 @@ export default async function NuevoUsuarioPage({
 
       {!hasServiceKey ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--warning)]">
-          <strong className="font-semibold">Falta la service role key.</strong> Para crear cuentas de acceso hay que
-          cargar <code className="font-mono">SUPABASE_SERVICE_ROLE_KEY</code> en{" "}
-          <code className="font-mono">.env.local</code>.
+          <strong className="font-semibold">Falta la service role key.</strong> El alta de usuarios funciona igual.
+          Esa clave hace falta para el canal web y para cerrar la sesión al bloquear una cuenta. Cargala en{" "}
+          <code className="font-mono">.env.local</code> como <code className="font-mono">SUPABASE_SERVICE_ROLE_KEY</code>.
         </div>
       ) : null}
 
