@@ -66,6 +66,8 @@ export type NavItem = {
   label: string;
   icon: IconName;
   exact?: boolean;
+  /** Agrupa ítems bajo un encabezado en el menú lateral. */
+  section?: string;
 };
 
 export type ShellUser = {
@@ -137,53 +139,55 @@ export function AppShell({
       </div>
 
       <div className="px-5 pb-4">
-        <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[linear-gradient(135deg,var(--primary-soft),var(--surface-2)_70%)] px-3 py-2.5">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] text-sm font-semibold text-[var(--primary)] shadow-[var(--shadow-card)]">
-            {orgName ? orgName.trim().charAt(0).toUpperCase() : <Gauge className="size-4" />}
-          </span>
-          <div className="min-w-0">
-            <p className="text-[10px] font-semibold tracking-[0.16em] text-[var(--muted)] uppercase">
-              {areaLabel}
-            </p>
-            {orgName ? (
-              <p className="mt-0.5 line-clamp-2 text-sm leading-snug font-semibold text-[var(--foreground)]">{orgName}</p>
-            ) : null}
-          </div>
+        <div className="rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--primary-soft)_55%,var(--surface-2))] px-3.5 py-3">
+          <p className="text-[10px] font-semibold tracking-[0.16em] text-[var(--primary)] uppercase">
+            {areaLabel}
+          </p>
+          {orgName ? (
+            <p className="mt-1 truncate text-sm font-semibold text-[var(--foreground)]">{orgName}</p>
+          ) : null}
         </div>
       </div>
 
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4">
-        {nav.map((item) => {
+        {nav.map((item, index) => {
           const Icon = ICONS[item.icon];
           const active = isActive(item);
+          const showSection = Boolean(item.section && (index === 0 || nav[index - 1]?.section !== item.section));
           return (
-            <Link
-              key={item.href}
-              href={item.href}
-              prefetch
-              onClick={(event) => {
-                setOpen(false);
-                if (pathname === item.href) {
-                  event.preventDefault();
-                  setPendingHref(null);
-                  return;
-                }
-                setPendingHref(item.href);
-              }}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
-                active
-                  ? "bg-[var(--primary-soft)] text-[var(--primary)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--primary)_18%,transparent)]"
-                  : "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
-              )}
-            >
-              {active ? (
-                <span className="absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-full bg-[var(--primary)]" />
+            <div key={item.href}>
+              {showSection ? (
+                <p className="px-3 pt-4 pb-1.5 text-[10px] font-semibold tracking-[0.16em] text-[var(--muted)] uppercase first:pt-1">
+                  {item.section}
+                </p>
               ) : null}
-              <Icon className="size-[18px] shrink-0" />
-              <span className="truncate">{item.label}</span>
-            </Link>
+              <Link
+                href={item.href}
+                prefetch
+                onClick={(event) => {
+                  setOpen(false);
+                  if (pathname === item.href) {
+                    event.preventDefault();
+                    setPendingHref(null);
+                    return;
+                  }
+                  setPendingHref(item.href);
+                }}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all",
+                  active
+                    ? "bg-[var(--primary-soft)] text-[var(--primary)] shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--primary)_18%,transparent)]"
+                    : "text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]",
+                )}
+              >
+                {active ? (
+                  <span className="absolute top-1/2 left-0 h-5 w-1 -translate-y-1/2 rounded-full bg-[var(--primary)]" />
+                ) : null}
+                <Icon className="size-[18px] shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </Link>
+            </div>
           );
         })}
       </nav>

@@ -13,6 +13,21 @@ export function isExpired(survey: { ends_at: string | null }, now = Date.now()) 
   return Boolean(survey.ends_at) && new Date(survey.ends_at as string).getTime() < now;
 }
 
+/** Cuánto tiempo puede esperar una entrevista guardada sin señal antes de enviarse. */
+export const MAX_OFFLINE_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * Una entrevista guardada sin señal vale con la fecha en que se tomó, no con la
+ * del envío: si el encuestador la hizo antes del cierre y la sincroniza después,
+ * no se pierde, y los conteos por día y el control de calidad la ven en su día.
+ * La hora la manda el teléfono, así que se acota: sin futuro ni más de 14 días atrás.
+ */
+export function collectedWhen(collectedAt: unknown, now = Date.now()) {
+  if (typeof collectedAt !== "number" || !Number.isFinite(collectedAt)) return now;
+  if (collectedAt > now || now - collectedAt > MAX_OFFLINE_AGE_MS) return now;
+  return collectedAt;
+}
+
 /** Una encuesta recibe respuestas si está activa y no venció: lo exigen el campo y la web. */
 export function acceptsResponses(survey: { status: string; ends_at: string | null }, now = Date.now()) {
   return survey.status === "activa" && !isExpired(survey, now);

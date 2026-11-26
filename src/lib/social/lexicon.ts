@@ -51,19 +51,19 @@ const EMOTIONS: [Emotion, string[]][] = [
 ];
 
 /** Temas por defecto; los trackers de cada organización se suman a estos. */
-export const DEFAULT_TOPICS: { name: string; keywords: string[] }[] = [
-  { name: "Seguridad", keywords: ["seguridad", "insegur", "robo", "robaron", "asalt", "policia", "patrull", "camaras", "delito"] },
-  { name: "Salud", keywords: ["salud", "hospital", "turno", "guardia", "medic", "centro de salud", "vacun"] },
-  { name: "Empleo", keywords: ["empleo", "trabajo", "desocup", "changa", "laburo", "capacitacion"] },
-  { name: "Calles y obras", keywords: ["calle", "bache", "asfalt", "pavimento", "obra", "vereda", "cordon"] },
-  { name: "Transporte", keywords: ["colectivo", "transporte", "micro", "frecuencia", "parada", "boleto"] },
-  { name: "Agua y servicios", keywords: ["agua", "cloaca", "corte", "luz", "electricidad", "gas", "servicio"] },
-  { name: "Residuos", keywords: ["basura", "residuos", "recoleccion", "contenedor", "mugre", "limpieza"] },
-  { name: "Tasas e impuestos", keywords: ["tasa", "impuesto", "tarifazo", "aumento", "boleta", "cobr"] },
-  { name: "Presupuesto participativo", keywords: ["presupuesto participativo", "presupuesto 2027", "consulta vecinal", "audiencia publica"] },
-  { name: "Gestión municipal", keywords: ["intendent", "municipio", "municipalidad", "gestion", "concejo", "gobierno", "asistencia al vecino"] },
-  { name: "Niñez y familia", keywords: ["unicef", "muna", "ninez", "infancia", "adolescen", "ninos", "familia"] },
-  { name: "Espacios públicos", keywords: ["plaza", "espacios verdes", "feria", "feriant", "parque"] },
+export const DEFAULT_TOPICS: { name: string; /** Qué entra en el tema, en palabras, para el clasificador. */ hint: string; keywords: string[] }[] = [
+  { name: "Seguridad", hint: "robos, asaltos, hurtos, policía, patrullaje, cámaras, delitos", keywords: ["seguridad", "insegur", "robo", "robaron", "asalt", "policia", "patrull", "camaras", "delito"] },
+  { name: "Salud", hint: "hospitales, centros de salud, turnos, guardias, médicos, vacunas", keywords: ["salud", "hospital", "turno", "guardia", "medic", "centro de salud", "vacun"] },
+  { name: "Empleo", hint: "trabajo o «laburo», desocupación, changas, capacitación laboral", keywords: ["empleo", "trabajo", "desocup", "changa", "laburo", "capacitacion"] },
+  { name: "Calles y obras", hint: "calles, baches o pozos, asfalto, pavimento, veredas, cordón cuneta, acequias, obras públicas", keywords: ["calle", "bache", "asfalt", "pavimento", "obra", "vereda", "cordon"] },
+  { name: "Transporte", hint: "colectivos o «bondis», micros, frecuencias, paradas, boleto", keywords: ["colectivo", "transporte", "micro", "frecuencia", "parada", "boleto"] },
+  { name: "Agua y servicios", hint: "agua, cloacas, cortes de luz o de gas, servicios públicos", keywords: ["agua", "cloaca", "corte", "luz", "electricidad", "gas", "servicio"] },
+  { name: "Residuos", hint: "basura, recolección, contenedores, mugre, limpieza urbana", keywords: ["basura", "residuos", "recoleccion", "contenedor", "mugre", "limpieza"] },
+  { name: "Tasas e impuestos", hint: "tasas municipales, impuestos, tarifazos, aumentos en las boletas, cobros", keywords: ["tasa", "impuesto", "tarifazo", "aumento", "boleta", "cobr"] },
+  { name: "Presupuesto participativo", hint: "presupuesto participativo, consulta vecinal, audiencia pública", keywords: ["presupuesto participativo", "presupuesto 2027", "consulta vecinal", "audiencia publica"] },
+  { name: "Gestión municipal", hint: "el intendente, el municipio, el concejo deliberante, decisiones del gobierno local", keywords: ["intendent", "municipio", "municipalidad", "gestion", "concejo", "gobierno", "asistencia al vecino"] },
+  { name: "Niñez y familia", hint: "infancia, adolescencia, programas para chicos y familias, iniciativas con UNICEF", keywords: ["unicef", "muna", "ninez", "infancia", "adolescen", "ninos", "familia"] },
+  { name: "Espacios públicos", hint: "plazas, parques, espacios verdes, ferias en la vía pública", keywords: ["plaza", "espacios verdes", "feria", "feriant", "parque"] },
 ];
 
 export type Classification = {
@@ -134,4 +134,19 @@ export function matchesTrackers(raw: string, trackers: Pick<SocialTracker, "keyw
   return trackers.some(
     (t) => t.keywords.some((k) => text.includes(norm(k))) && !t.exclude.some((x) => text.includes(norm(x))),
   );
+}
+
+/**
+ * Lo que se le explica al clasificador sobre cada tema: la descripción de los
+ * temas base más las palabras clave y exclusiones que cargó la organización.
+ */
+export function topicHints(trackers: Pick<SocialTracker, "name" | "keywords" | "exclude">[]) {
+  const hints = new Map<string, { name: string; includes: string; excludes?: string[] }>(
+    DEFAULT_TOPICS.map((t) => [t.name, { name: t.name, includes: t.hint }]),
+  );
+  for (const tracker of trackers) {
+    const includes = [hints.get(tracker.name)?.includes, tracker.keywords.join(", ")].filter(Boolean).join("; ");
+    hints.set(tracker.name, { name: tracker.name, includes, excludes: tracker.exclude });
+  }
+  return [...hints.values()];
 }

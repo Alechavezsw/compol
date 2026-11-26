@@ -3,6 +3,8 @@
 // Espejo de supabase/migrations/*.sql
 // ---------------------------------------------------------------------------
 
+/** Roles de producto: Administrador (org_admin), Político (politico), Encuestador (surveyor).
+ *  super_admin = administración central Compol. org_analyst queda por compatibilidad (= lectura). */
 export type UserRole = "super_admin" | "org_admin" | "org_analyst" | "politico" | "surveyor";
 export type OrgType = "gobierno" | "institucion" | "ong" | "privado";
 export type OrgStatus = "activa" | "suspendida" | "prueba";
@@ -179,6 +181,8 @@ export type SurveyResponse = {
   source_url: string | null;
   /** Web: hash anónimo del dispositivo, para limitar a una respuesta. */
   respondent_hash: string | null;
+  /** Web: huella anónima de la conexión (hash con sal, no la IP) para limitar envíos. */
+  ip_hash?: string | null;
   zone: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -484,11 +488,17 @@ export type Database = {
 
 export const ROLE_LABEL: Record<UserRole, string> = {
   super_admin: "Administración central",
-  org_admin: "Cliente",
-  org_analyst: "Analista",
+  org_admin: "Administrador",
+  org_analyst: "Político",
   politico: "Político",
   surveyor: "Encuestador",
 };
+
+/** Roles del panel del organismo (lectura o gestión). */
+export const CLIENT_ROLES: UserRole[] = ["org_admin", "org_analyst", "politico"];
+
+/** Roles de solo lectura en el panel del organismo. */
+export const CLIENT_READ_ROLES: UserRole[] = ["politico", "org_analyst"];
 
 export const SURVEY_STATUS_LABEL: Record<SurveyStatus, string> = {
   borrador: "Borrador",

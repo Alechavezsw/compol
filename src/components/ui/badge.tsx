@@ -80,7 +80,7 @@ const roleTone: Record<UserRole, Tone> = {
   super_admin: "primary",
   org_admin: "accent",
   org_analyst: "neutral",
-  politico: "primary",
+  politico: "neutral",
   surveyor: "neutral",
 };
 

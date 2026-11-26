@@ -12,7 +12,7 @@ import type { Profile } from "@/lib/types";
 export const metadata: Metadata = { title: "Equipo" };
 
 export default async function EquipoPage() {
-  const { organization } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization } = await requireOrganization(["org_admin"]);
   const supabase = await createClient();
 
   const [{ data: teamRows }, { data: assignmentRows }, { data: responseRows }] = await Promise.all([

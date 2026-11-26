@@ -24,7 +24,7 @@ const SCRIPT = String.raw`(function () {
 
   var base = new URL(script.src).origin;
   var mode = d.modo === "inline" || d.modo === "emergente" ? d.modo : "flotante";
-  var color = /^#[0-9a-f]{6}$/i.test(d.color || "") ? d.color : "#3d2de0";
+  var color = /^#[0-9a-f]{6}$/i.test(d.color || "") ? d.color : "#0f4c6e";
   var label = d.texto || "Responder encuesta";
   var side = d.posicion === "izquierda" ? "left" : "right";
   var delay = Math.max(0, Math.min(120, Number(d.demora || 6))) * 1000;

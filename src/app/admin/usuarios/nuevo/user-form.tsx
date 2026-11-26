@@ -48,25 +48,15 @@ export function UserForm({
       </div>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field
-          label="Rol"
-          hint={
-            role === "politico"
-              ? "Ve el pantallazo, las encuestas en vivo, los resultados y los informes. No edita el operativo."
-              : role === "org_admin"
-                ? "Mira el panel de su organización. La operación la hace la administración central."
-                : undefined
-          }
-        >
+        <Field label="Rol">
           <Select
             name="role"
             value={role}
             onChange={(e) => setRole(e.target.value as UserRole)}
           >
+            <option value="org_admin">Administrador</option>
+            <option value="politico">Político (solo lectura)</option>
             <option value="surveyor">Encuestador</option>
-            <option value="politico">Político</option>
-            <option value="org_analyst">Analista del cliente</option>
-            <option value="org_admin">Cliente (solo lectura)</option>
             <option value="super_admin">Administración central</option>
           </Select>
         </Field>
@@ -118,9 +108,7 @@ export function UserForm({
       {state.error ? <FormMessage>{state.error}</FormMessage> : null}
 
       <div className="flex flex-wrap items-center gap-3 pt-2">
-        <SubmitButton pendingLabel="Creando…">
-          {role === "politico" ? "Crear y cargar encuestas" : "Crear usuario"}
-        </SubmitButton>
+        <SubmitButton pendingLabel="Creando…">Crear usuario</SubmitButton>
         <Link
           href={returnTo ?? "/admin/usuarios"}
           className="text-sm font-medium text-[var(--muted)] hover:text-[var(--foreground)]"

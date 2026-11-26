@@ -1,6 +1,7 @@
 import { requireRole } from "@/lib/auth";
 import type { Metadata } from "next";
-import { ClipboardList } from "lucide-react";
+import Link from "next/link";
+import { BarChart3, ClipboardList, Pencil } from "lucide-react";
 import { EmptyState, PageHeader, Progress, TableWrap, Td, Th } from "@/components/ui/misc";
 import { Card, CardContent } from "@/components/ui/card";
 import { SurveyStatusBadge } from "@/components/ui/badge";
@@ -22,7 +23,8 @@ export default async function AdminEncuestasPage() {
       .from("surveys")
       .select("*, organizations(name)")
       .order("updated_at", { ascending: false }),
-    fetchAll<{ survey_id: string; surveyor_id: string | null; submitted_at: string | null }>((from, to) =>supabase.from("responses").select("survey_id").eq("status", "completada").order("id").range(from, to),
+    fetchAll<{ survey_id: string; surveyor_id: string | null; submitted_at: string | null }>((from, to) =>
+      supabase.from("responses").select("survey_id").eq("status", "completada").order("id").range(from, to),
     ).then((data) => ({ data })),
   ]);
 
@@ -58,6 +60,7 @@ export default async function AdminEncuestasPage() {
                     <Th>Estado</Th>
                     <Th className="w-52">Avance</Th>
                     <Th>Cierre</Th>
+                    <Th className="text-right">Acceso</Th>
                   </tr>
                 </thead>
                 <tbody>
@@ -70,12 +73,28 @@ export default async function AdminEncuestasPage() {
                         className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--surface-2)]"
                       >
                         <Td>
-                          <p className="font-medium">{s.title}</p>
+                          <Link
+                            href={`/cliente/encuestas/${s.id}`}
+                            className="font-medium text-[var(--foreground)] hover:text-[var(--primary)] hover:underline"
+                          >
+                            {s.title}
+                          </Link>
                           <p className="mt-0.5 text-xs text-[var(--muted)]">
                             {s.geography ?? "Sin ámbito definido"}
                           </p>
                         </Td>
-                        <Td className="text-[var(--muted)]">{s.organizations?.name ?? "—"}</Td>
+                        <Td className="text-[var(--muted)]">
+                          {s.organization_id ? (
+                            <Link
+                              href={`/admin/organizaciones/${s.organization_id}`}
+                              className="hover:text-[var(--primary)] hover:underline"
+                            >
+                              {s.organizations?.name ?? "—"}
+                            </Link>
+                          ) : (
+                            (s.organizations?.name ?? "—")
+                          )}
+                        </Td>
                         <Td>
                           <SurveyStatusBadge status={s.status} endsAt={s.ends_at} />
                         </Td>
@@ -89,6 +108,24 @@ export default async function AdminEncuestasPage() {
                           <p className="mt-1 text-xs text-[var(--muted)]">{pct.toFixed(0)}%</p>
                         </Td>
                         <Td className="text-[var(--muted)]">{formatDate(s.ends_at)}</Td>
+                        <Td>
+                          <div className="flex flex-wrap justify-end gap-2">
+                            <Link
+                              href={`/cliente/encuestas/${s.id}`}
+                              className="inline-flex items-center gap-1 rounded-lg border border-[var(--border)] px-2.5 py-1.5 text-xs font-medium text-[var(--foreground)] transition-colors hover:bg-[var(--surface-2)]"
+                            >
+                              <Pencil className="size-3.5" />
+                              Encuesta
+                            </Link>
+                            <Link
+                              href={`/cliente/encuestas/${s.id}/resultados`}
+                              className="inline-flex items-center gap-1 rounded-lg bg-[var(--primary-soft)] px-2.5 py-1.5 text-xs font-medium text-[var(--primary)] transition-colors hover:bg-[color-mix(in_oklab,var(--primary-soft)_80%,var(--primary))]"
+                            >
+                              <BarChart3 className="size-3.5" />
+                              Resultados
+                            </Link>
+                          </div>
+                        </Td>
                       </tr>
                     );
                   })}

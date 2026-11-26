@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { requireOperator, requireOrganization } from "@/lib/auth";
+import { requireClientViewer, requireOrganization } from "@/lib/auth";
+import { resolveClientOrganization } from "@/lib/admin-org";
 import { computeAnalytics, keyFindings, loadSurveyData, type AnalyticsFilters } from "@/lib/analytics";
 import { askAboutSurvey, generateSurveyReport, isGeminiConfigured } from "@/lib/ai/gemini";
+import { humanizeAiError, isGeminiBillingError } from "@/lib/ai/gateway";
 import { answerLocally } from "@/lib/ai/local-answer";
 import { isDemoMode } from "@/lib/demo/mode";
 import { buildLocalReport } from "@/lib/demo/report";
@@ -29,6 +31,8 @@ import type {
 } from "@/lib/types";
 
 export type ActionState = { error?: string | null; ok?: string | null };
+
+const MANAGERS = ["org_admin"] as const;
 const QUESTION_TYPES: QuestionType[] = [
   "texto_corto",
   "texto_largo",
@@ -120,7 +124,7 @@ export async function createProjectAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { organization, profile } = await requireOperator();
+  const { organization, profile } = await requireOrganization([...MANAGERS]);
 
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
@@ -155,7 +159,7 @@ export async function createProjectAction(
 // ---------------------------------------------------------------------------
 
 export async function createSurveyAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization, profile } = await requireOperator();
+  const { organization, profile } = await requireOrganization([...MANAGERS]);
 
   const title = String(formData.get("title") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
@@ -236,7 +240,7 @@ export async function createSurveyAction(_prev: ActionState, formData: FormData)
 }
 
 export async function updateSurveyStatusAction(formData: FormData) {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
 
   const id = String(formData.get("id") ?? "");
   const status = String(formData.get("status") ?? "") as SurveyStatus;
@@ -270,7 +274,7 @@ export async function updateSurveyStatusAction(formData: FormData) {
 
 /** Extiende, cambia o quita la fecha de cierre. Sin fecha, la encuesta sigue abierta hasta cerrarla a mano. */
 export async function updateSurveyScheduleAction(formData: FormData) {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
   const id = String(formData.get("id") ?? "");
   const raw = String(formData.get("ends_at") ?? "").trim();
   const supabase = await createClient();
@@ -293,7 +297,7 @@ export async function updateSurveyScheduleAction(formData: FormData) {
 }
 
 export async function duplicateSurveyAction(formData: FormData) {
-  const { organization, profile } = await requireOperator();
+  const { organization, profile } = await requireOrganization([...MANAGERS]);
   const id = String(formData.get("id") ?? "");
   const supabase = await createClient();
   const source = await ownedSurvey(supabase, id, organization.id);
@@ -387,7 +391,7 @@ async function copyQuestionnaire(
 }
 
 export async function copyQuestionnaireAction(formData: FormData) {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
   const targetId = String(formData.get("survey_id") ?? "");
   const sourceId = String(formData.get("source_id") ?? "");
   const supabase = await createClient();
@@ -416,7 +420,7 @@ function readNumber(formData: FormData, key: string) {
 }
 
 export async function addQuestionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
 
   const surveyId = String(formData.get("survey_id") ?? "");
   const text = String(formData.get("text") ?? "").trim();
@@ -468,6 +472,15 @@ export async function addQuestionAction(_prev: ActionState, formData: FormData):
   if (!survey) return { error: "No se encontró la encuesta." };
   if (survey.status === "cerrada") return { error: "La encuesta está cerrada: reabrila para modificar el cuestionario." };
 
+  // Con la encuesta ya en campo, los teléfonos tienen cargado el cuestionario anterior: una
+  // pregunta obligatoria o un filtro nuevos harían que el servidor rechace las entrevistas que
+  // ellos toman (o que tienen en cola sin señal). Por eso, fuera de borrador, las preguntas
+  // nuevas son siempre opcionales y no admiten filtro.
+  const live = survey.status !== "borrador";
+  if (live && endIfValues.length) {
+    return { error: "Una pregunta filtro solo se puede agregar con la encuesta en borrador: los encuestadores ya tienen el cuestionario cargado." };
+  }
+
   const existing = await loadQuestions(supabase, surveyId);
   const position = (existing.at(-1)?.position ?? 0) + 1;
 
@@ -504,7 +517,7 @@ export async function addQuestionAction(_prev: ActionState, formData: FormData):
       text,
       help_text: helpText,
       section,
-      is_required: logic.end_if ? true : isRequired,
+      is_required: logic.end_if ? true : live ? false : isRequired,
       min_value: minValue,
       max_value: maxValue,
       logic: Object.keys(logic).length ? logic : null,
@@ -533,15 +546,17 @@ export async function addQuestionAction(_prev: ActionState, formData: FormData):
 
   revalidatePath(`/cliente/encuestas/${surveyId}`);
   const answered = await completedCount(supabase, surveyId);
+  const optionalNote = live && isRequired ? " Quedó como opcional: la encuesta ya está en campo y los encuestadores tienen cargado el cuestionario anterior." : "";
   return {
-    ok: answered
-      ? `P${position} agregada. Las ${answered} entrevistas ya cargadas no la tienen: su base va a ser menor.`
-      : `P${position} agregada.`,
+    ok:
+      (answered
+        ? `P${position} agregada. Las ${answered} entrevistas ya cargadas no la tienen: su base va a ser menor.`
+        : `P${position} agregada.`) + optionalNote,
   };
 }
 
 export async function updateQuestionAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
   const id = String(formData.get("id") ?? "");
   const surveyId = String(formData.get("survey_id") ?? "");
   const text = String(formData.get("text") ?? "").trim();
@@ -552,9 +567,19 @@ export async function updateQuestionAction(_prev: ActionState, formData: FormDat
   if (text.length < 3 || text.length > 500) return { error: "El enunciado tiene que tener entre 3 y 500 caracteres." };
 
   const supabase = await createClient();
-  if (!(await ownedSurvey(supabase, surveyId, organization.id))) return { error: "No se encontró la encuesta." };
-  const { data: question } = await supabase.from("questions").select("id, logic").eq("id", id).eq("survey_id", surveyId).maybeSingle();
+  const survey = await ownedSurvey(supabase, surveyId, organization.id);
+  if (!survey) return { error: "No se encontró la encuesta." };
+  const { data: question } = await supabase
+    .from("questions")
+    .select("id, logic, is_required")
+    .eq("id", id)
+    .eq("survey_id", surveyId)
+    .maybeSingle();
   if (!question) return { error: "No se encontró la pregunta." };
+
+  // Fuera de borrador una pregunta puede dejar de ser obligatoria, pero no pasar a serlo: los
+  // teléfonos con el cuestionario anterior verían rechazadas las entrevistas que ya tomaron.
+  const required = survey.status === "borrador" ? isRequired : question.is_required && isRequired;
 
   await supabase
     .from("questions")
@@ -563,7 +588,7 @@ export async function updateQuestionAction(_prev: ActionState, formData: FormDat
       help_text: helpText,
       section,
       // Una pregunta filtro siempre es obligatoria: si se saltea, el filtro no filtra.
-      is_required: (question.logic as QuestionLogic | null)?.end_if?.length ? true : isRequired,
+      is_required: (question.logic as QuestionLogic | null)?.end_if?.length ? true : required,
     })
     .eq("id", id);
 
@@ -572,7 +597,7 @@ export async function updateQuestionAction(_prev: ActionState, formData: FormDat
 }
 
 export async function clearLogicAction(formData: FormData) {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
   const id = String(formData.get("id") ?? "");
   const surveyId = String(formData.get("survey_id") ?? "");
   const which = String(formData.get("which") ?? "");
@@ -589,7 +614,7 @@ export async function clearLogicAction(formData: FormData) {
 }
 
 export async function deleteQuestionAction(formData: FormData) {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
   const id = String(formData.get("id") ?? "");
   const surveyId = String(formData.get("survey_id") ?? "");
   const supabase = await createClient();
@@ -613,7 +638,7 @@ export async function deleteQuestionAction(formData: FormData) {
 }
 
 export async function moveQuestionAction(formData: FormData) {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
   const id = String(formData.get("id") ?? "");
   const surveyId = String(formData.get("survey_id") ?? "");
   const direction = String(formData.get("direction") ?? "");
@@ -648,7 +673,7 @@ export async function moveQuestionAction(formData: FormData) {
 // ---------------------------------------------------------------------------
 
 export async function updateWebChannelAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
   const surveyId = String(formData.get("survey_id") ?? "");
   const supabase = await createClient();
   const survey = await ownedSurvey(supabase, surveyId, organization.id);
@@ -697,7 +722,7 @@ export async function updateWebChannelAction(_prev: ActionState, formData: FormD
 }
 
 export async function regenerateTokenAction(formData: FormData) {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
   const surveyId = String(formData.get("survey_id") ?? "");
   const supabase = await createClient();
   const survey = await ownedSurvey(supabase, surveyId, organization.id);
@@ -726,7 +751,7 @@ export async function createDirigenteAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { organization, profile } = await requireOperator();
+  const { organization, profile } = await requireOrganization([...MANAGERS]);
 
   const name = String(formData.get("name") ?? "").trim();
   const role = String(formData.get("role") ?? "").trim() || null;
@@ -759,7 +784,7 @@ export async function createMedicionAction(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { organization, profile } = await requireOperator();
+  const { organization, profile } = await requireOrganization([...MANAGERS]);
 
   const dirigenteId = String(formData.get("dirigente_id") ?? "");
   const projectId = String(formData.get("project_id") ?? "") || null;
@@ -817,7 +842,15 @@ export async function createMedicionAction(
 // ---------------------------------------------------------------------------
 
 export async function generateReportAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization, profile } = await requireOperator();
+  const viewer = await requireClientViewer();
+  if (viewer.profile.role !== "org_admin" && !viewer.isCentralAdmin) {
+    return { error: "Solo la administración puede generar informes." };
+  }
+  const organization = await resolveClientOrganization(viewer, String(formData.get("org") ?? "") || undefined);
+  if (!organization) {
+    return { error: "Elegí un organismo para generar el informe." };
+  }
+  const { profile } = viewer;
 
   // Sin clave, en modo demo caemos en el redactor local para que el recorrido
   // no quede cortado; fuera de demo es un error de configuración.
@@ -886,9 +919,21 @@ export async function generateReportAction(_prev: ActionState, formData: FormDat
   const social = socialPosts.length >= 20 ? computeSocial(socialPosts, { days: 30 }, today) : null;
 
   try {
-    const generated = useLocalWriter
-      ? buildLocalReport({ analytics, findings, social, organizationName: organization.name, kind, audience, focus })
-      : await generateSurveyReport({
+    const localParams = {
+      analytics,
+      findings,
+      social,
+      organizationName: organization.name,
+      kind,
+      audience,
+      focus,
+    };
+    let generated;
+    if (useLocalWriter) {
+      generated = buildLocalReport(localParams);
+    } else {
+      try {
+        generated = await generateSurveyReport({
           analytics,
           findings,
           socialSummary: social ? socialBriefing(social) : undefined,
@@ -898,6 +943,17 @@ export async function generateReportAction(_prev: ActionState, formData: FormDat
           focus,
           organizationId: organization.id,
         });
+      } catch (modelError) {
+        const raw = modelError instanceof Error ? modelError.message : "";
+        // Sin crédito de Gemini, igual entregamos el informe con la plantilla
+        // sobre las mismas cifras agregadas para no dejar el flujo cortado.
+        if (isGeminiBillingError(raw)) {
+          generated = buildLocalReport(localParams);
+        } else {
+          throw modelError;
+        }
+      }
+    }
 
     await supabase
       .from("ai_reports")
@@ -910,13 +966,14 @@ export async function generateReportAction(_prev: ActionState, formData: FormDat
       })
       .eq("id", report.id);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Error desconocido del modelo.";
+    const message = humanizeAiError(e instanceof Error ? e.message : "Error desconocido del modelo.");
     await supabase.from("ai_reports").update({ status: "error", error_message: message }).eq("id", report.id);
     return { error: `El modelo no pudo generar el informe: ${message}` };
   }
 
   revalidatePath("/cliente/informes");
-  redirect(`/cliente/informes/${report.id}`);
+  const orgQs = viewer.isCentralAdmin ? `?org=${organization.id}` : "";
+  redirect(`/cliente/informes/${report.id}${orgQs}`);
 }
 
 export type AskResult = { ok: boolean; answer?: string; source?: string; error?: string };
@@ -971,7 +1028,7 @@ export async function askSurveyAction(payload: {
 }
 
 export async function deleteReportAction(formData: FormData) {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization([...MANAGERS]);
 
   const id = String(formData.get("id") ?? "");
   if (!id) return;

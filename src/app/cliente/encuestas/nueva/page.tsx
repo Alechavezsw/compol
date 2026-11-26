@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/misc";
 import { Card, CardContent } from "@/components/ui/card";
 import { SurveyForm } from "./survey-form";
-import { requireOperator } from "@/lib/auth";
+import { requireOrganization } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Nueva encuesta" };
 
 export default async function NuevaEncuestaPage() {
-  const { organization } = await requireOperator();
+  const { organization } = await requireOrganization(["org_admin"]);
   const supabase = await createClient();
 
   const [{ data: surveys }, { data: projects }] = await Promise.all([

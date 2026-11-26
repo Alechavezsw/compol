@@ -1,12 +1,11 @@
 import { cache } from "react";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { isDemoMode, isSupabaseConfigured } from "@/lib/demo/mode";
 import { getDemoProfile } from "@/lib/demo/session";
 import { demoTables } from "@/lib/demo/store";
-import type { Organization, Profile, UserRole } from "@/lib/types";
+import { CLIENT_READ_ROLES, CLIENT_ROLES, type Organization, type Profile, type UserRole } from "@/lib/types";
 
 export type SessionProfile = {
   user: User;
@@ -15,32 +14,6 @@ export type SessionProfile = {
 };
 
 export { isSupabaseConfigured };
-
-/** Organización que la administración está operando. Los id de demo no son UUID. */
-export const OPERATING_ORG_COOKIE = "compol_org";
-
-export async function operatingOrganizationId() {
-  const store = await cookies();
-  const id = store.get(OPERATING_ORG_COOKIE)?.value ?? "";
-  return /^[A-Za-z0-9_-]{1,80}$/.test(id) ? id : null;
-}
-
-export async function setOperatingOrganization(id: string) {
-  const store = await cookies();
-  store.set(OPERATING_ORG_COOKIE, id, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 12,
-  });
-}
-
-async function loadOrganization(id: string): Promise<Organization | null> {
-  const supabase = await createClient();
-  const { data } = await supabase.from("organizations").select("*").eq("id", id).maybeSingle();
-  return (data as Organization | null) ?? null;
-}
 
 /** Ruta inicial segun el rol. */
 export function homePathFor(role: UserRole) {
@@ -108,6 +81,11 @@ export async function requireProfile(): Promise<SessionProfile> {
   const session = await getSessionProfile();
   if (!session) redirect("/login");
   if (!session.profile.is_active) redirect("/acceso-denegado?motivo=inactivo");
+  // Una organización suspendida pierde el acceso de todo su equipo (clientes y
+  // encuestadores). La administración central entra siempre: es quien la reactiva.
+  if (session.profile.role !== "super_admin" && session.organization?.status === "suspendida") {
+    redirect("/acceso-denegado?motivo=suspendida");
+  }
   return session;
 }
 
@@ -120,20 +98,27 @@ export async function requireRole(roles: UserRole[]): Promise<SessionProfile> {
   return session;
 }
 
-/**
- * Área del cliente. La administración entra con la organización que eligió
- * operar; el resto necesita el rol y una organización en el perfil.
- */
+/** Los roles de cliente necesitan una organizacion asignada. */
 export async function requireOrganization(roles: UserRole[]): Promise<
   SessionProfile & { organization: Organization }
 > {
+  const session = await requireRole(roles);
+  if (!session.organization) {
+    redirect("/acceso-denegado?motivo=sin-organizacion");
+  }
+  return session as SessionProfile & { organization: Organization };
+}
+
+/**
+ * Panel del organismo o administración central mirando un cliente.
+ * `organization` puede ser null solo para `super_admin` (hay que cargarla del recurso).
+ */
+export async function requireClientViewer(roles: UserRole[] = CLIENT_ROLES): Promise<
+  SessionProfile & { organization: Organization | null; isCentralAdmin: boolean }
+> {
   const session = await requireProfile();
   if (session.profile.role === "super_admin") {
-    const id = await operatingOrganizationId();
-    if (!id) redirect("/admin/organizaciones");
-    const organization = await loadOrganization(id);
-    if (!organization) redirect("/admin/organizaciones");
-    return { ...session, organization };
+    return { ...session, organization: null, isCentralAdmin: true };
   }
   if (!roles.includes(session.profile.role)) {
     redirect(`/acceso-denegado?motivo=rol&destino=${homePathFor(session.profile.role)}`);
@@ -141,23 +126,14 @@ export async function requireOrganization(roles: UserRole[]): Promise<
   if (!session.organization) {
     redirect("/acceso-denegado?motivo=sin-organizacion");
   }
-  return session as SessionProfile & { organization: Organization };
+  return { ...session, organization: session.organization, isCentralAdmin: false };
 }
 
-/** Escritura del operativo: solo la administración, sobre el cliente elegido. */
-export async function requireOperator(): Promise<SessionProfile & { organization: Organization }> {
-  const session = await requireProfile();
-  if (session.profile.role !== "super_admin") {
-    redirect(`/acceso-denegado?motivo=rol&destino=${homePathFor(session.profile.role)}`);
-  }
-  const id = await operatingOrganizationId();
-  if (!id) redirect("/admin/organizaciones");
-  const organization = await loadOrganization(id);
-  if (!organization) redirect("/admin/organizaciones");
-  return { ...session, organization };
-}
-
-/** Alta y edición de encuestas, informes, redes, proyectos y dirigentes. */
 export function canManage(role: UserRole) {
-  return role === "super_admin";
+  return role === "super_admin" || role === "org_admin";
+}
+
+/** Político (y analista legacy): ve el panel del cliente sin mutar. */
+export function isClientReadOnly(role: UserRole) {
+  return CLIENT_READ_ROLES.includes(role);
 }

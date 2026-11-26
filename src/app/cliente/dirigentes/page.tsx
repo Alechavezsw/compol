@@ -5,14 +5,33 @@ import { EmptyState, PageHeader } from "@/components/ui/misc";
 import { ButtonLink } from "@/components/ui/button";
 import { Avatar } from "@/components/ui/misc";
 import { createClient } from "@/lib/supabase/server";
-import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
+import { canManage, requireClientViewer } from "@/lib/auth";
+import { listOrganizationsForPicker, resolveClientOrganization } from "@/lib/admin-org";
+import { AdminOrgPicker } from "@/components/admin-org-picker";
 import { formatPercent } from "@/lib/utils";
 import type { Dirigente, DirigenteMedicion } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Banco de dirigentes" };
 
-export default async function DirigentesPage() {
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+export default async function DirigentesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ org?: string }>;
+}) {
+  const { org } = await searchParams;
+  const viewer = await requireClientViewer();
+  const organization = await resolveClientOrganization(viewer, org);
+  if (!organization) {
+    return (
+      <AdminOrgPicker
+        title="Banco de dirigentes"
+        description="Elegí el organismo cuyo banco de dirigentes querés abrir."
+        nextPath="/cliente/dirigentes"
+        organizations={await listOrganizationsForPicker()}
+      />
+    );
+  }
+  const { profile } = viewer;
   const supabase = await createClient();
 
   const { data: dirigentesData } = await supabase
@@ -36,7 +55,7 @@ export default async function DirigentesPage() {
     }
   }
 
-  const canManage = operatesClient(profile.role);
+  const canManage = profile.role === "org_admin";
 
   return (
     <div className="space-y-7">
@@ -80,19 +99,19 @@ export default async function DirigentesPage() {
                   <div className="grid grid-cols-3 gap-2 border-t border-[var(--border)] pt-3">
                     <div>
                       <p className="text-[11px] text-[var(--muted)]">Conocimiento</p>
-                      <p className="display tabular-nums text-lg text-[var(--foreground)]">
+                      <p className="display text-lg text-[var(--foreground)]">
                         {formatPercent(latest.conocimiento)}
                       </p>
                     </div>
                     <div>
                       <p className="text-[11px] text-[var(--muted)]">Imagen +</p>
-                      <p className="display tabular-nums text-lg text-[var(--success)]">
+                      <p className="display text-lg text-[var(--success)]">
                         {formatPercent(latest.imagen_positiva)}
                       </p>
                     </div>
                     <div>
                       <p className="text-[11px] text-[var(--muted)]">Imagen −</p>
-                      <p className="display tabular-nums text-lg text-[var(--danger)]">
+                      <p className="display text-lg text-[var(--danger)]">
                         {formatPercent(latest.imagen_negativa)}
                       </p>
                     </div>

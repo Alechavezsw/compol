@@ -1,27 +1,20 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
-import { Monitor, Moon, Sun } from "lucide-react";
+import { useSyncExternalStore } from "react";
+import { Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-type Mode = "light" | "dark" | "system";
+type Mode = "light" | "dark";
 
 const OPTIONS: { value: Mode; label: string; Icon: typeof Sun }[] = [
   { value: "light", label: "Claro", Icon: Sun },
-  { value: "system", label: "Sistema", Icon: Monitor },
   { value: "dark", label: "Oscuro", Icon: Moon },
 ];
 
 export function applyTheme(mode: Mode) {
-  const dark =
-    mode === "dark" ||
-    (mode === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.classList.toggle("dark", dark);
+  document.documentElement.classList.toggle("dark", mode === "dark");
 }
 
-// La preferencia vive en localStorage, que es un store externo a React. Leerla
-// con useSyncExternalStore evita el setState-en-effect y mantiene sincronizadas
-// todas las instancias del toggle (hay una en la sidebar y otra en el footer).
 const listeners = new Set<() => void>();
 
 function subscribe(listener: () => void) {
@@ -35,14 +28,17 @@ function subscribe(listener: () => void) {
 
 function getSnapshot(): Mode {
   try {
-    return (localStorage.getItem("tema") as Mode | null) ?? "system";
+    const stored = localStorage.getItem("tema");
+    if (stored === "dark" || stored === "light") return stored;
+    // Preferencia vieja "system" o sin valor: usamos lo que ya está pintado.
+    return document.documentElement.classList.contains("dark") ? "dark" : "light";
   } catch {
-    return "system";
+    return "light";
   }
 }
 
 function getServerSnapshot(): Mode {
-  return "system";
+  return "light";
 }
 
 function setMode(mode: Mode) {
@@ -57,16 +53,6 @@ function setMode(mode: Mode) {
 
 export function ThemeToggle({ className }: { className?: string }) {
   const mode = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
-
-  // Si el usuario eligió "sistema", seguimos los cambios del sistema operativo.
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const onChange = () => {
-      if (getSnapshot() === "system") applyTheme("system");
-    };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
 
   return (
     <div

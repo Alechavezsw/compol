@@ -1,15 +1,16 @@
 import "server-only";
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/server";
 import { loadQuestions } from "@/lib/questions";
-import type { QuestionWithOptions, Survey, WebSettings, WidgetMode } from "@/lib/types";
+import { acceptsResponses } from "@/lib/survey-status";
+import type { OrgStatus, QuestionWithOptions, Survey, WebSettings, WidgetMode } from "@/lib/types";
 
 export const WIDGET_MODES: WidgetMode[] = ["inline", "flotante", "emergente"];
 
 /** Valores por defecto de la experiencia web, para no guardar nulos en la base. */
 export function resolveWebSettings(survey: Pick<Survey, "title" | "description" | "web_settings">) {
   const s: WebSettings = survey.web_settings ?? {};
-  const accent = /^#[0-9a-f]{6}$/i.test(s.accent ?? "") ? (s.accent as string) : "#3d2de0";
+  const accent = /^#[0-9a-f]{6}$/i.test(s.accent ?? "") ? (s.accent as string) : "#0f4c6e";
   return {
     accent,
     welcomeTitle: s.welcome_title?.trim() || survey.title,
@@ -30,7 +31,16 @@ export type PublicSurvey = {
   questions: QuestionWithOptions[];
   settings: ResolvedWebSettings;
   organizationName: string | null;
+  organizationStatus: OrgStatus | null;
 };
+
+/**
+ * La encuesta web recibe respuestas si la encuesta está en campo y vigente y su
+ * organización no está suspendida. Lo usan la página y el envío por igual.
+ */
+export function publicAcceptsResponses(data: Pick<PublicSurvey, "survey" | "organizationStatus">) {
+  return acceptsResponses(data.survey) && data.organizationStatus !== "suspendida";
+}
 
 /**
  * Busca una encuesta por su token público. Corre con la service role porque
@@ -50,14 +60,16 @@ export async function loadPublicSurvey(token: string): Promise<PublicSurvey | nu
 
   const [questions, { data: org }] = await Promise.all([
     loadQuestions(admin, survey.id),
-    admin.from("organizations").select("name").eq("id", survey.organization_id).maybeSingle(),
+    admin.from("organizations").select("name, status").eq("id", survey.organization_id).maybeSingle(),
   ]);
+  const orgRow = org as { name: string; status: OrgStatus } | null;
 
   return {
     survey: survey as Survey,
     questions,
     settings: resolveWebSettings(survey as Survey),
-    organizationName: (org as { name: string } | null)?.name ?? null,
+    organizationName: orgRow?.name ?? null,
+    organizationStatus: orgRow?.status ?? null,
   };
 }
 
@@ -108,7 +120,11 @@ export function rateLimited(key: string) {
   return false;
 }
 
-/** Token corto y difícil de adivinar para publicar una encuesta. */
+/**
+ * Token para publicar una encuesta: el título es solo para que el link se lea
+ * bien; lo que lo hace imposible de adivinar son los 12 bytes aleatorios del
+ * generador criptográfico (96 bits), no `Math.random`.
+ */
 export function newPublicToken(title: string) {
   const slug = title
     .normalize("NFD")
@@ -117,6 +133,29 @@ export function newPublicToken(title: string) {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 24);
-  const random = createHash("sha256").update(`${title}${Date.now()}${Math.random()}`).digest("base64url").slice(0, 8);
-  return `${slug || "encuesta"}-${random}`;
+  return `${slug || "encuesta"}-${randomBytes(12).toString("base64url")}`;
+}
+
+const DB_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Límite por conexión contado en la base: sirve entre instancias y reinicios,
+ * a diferencia del de memoria. Cuenta las respuestas web ya cerradas desde esa
+ * conexión en la ventana. Si la consulta falla no se bloquea a nadie: el límite
+ * en memoria sigue actuando y una caída de la base no debe cerrar la encuesta.
+ */
+export async function connectionLimited(
+  admin: ReturnType<typeof createAdminClient>,
+  surveyId: string,
+  ipHash: string,
+) {
+  const since = new Date(Date.now() - DB_WINDOW_MS).toISOString();
+  const { count, error } = await admin
+    .from("responses")
+    .select("id", { count: "exact", head: true })
+    .eq("survey_id", surveyId)
+    .eq("ip_hash", ipHash)
+    .gte("submitted_at", since);
+  if (error) return false;
+  return (count ?? 0) >= MAX_PER_WINDOW;
 }

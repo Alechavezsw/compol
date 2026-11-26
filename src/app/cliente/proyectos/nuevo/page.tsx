@@ -1,4 +1,4 @@
-import { requireOperator } from "@/lib/auth";
+import { requireOrganization } from "@/lib/auth";
 import type { Metadata } from "next";
 import { PageHeader } from "@/components/ui/misc";
 import { Card, CardContent } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { ProyectoForm } from "./proyecto-form";
 export const metadata: Metadata = { title: "Nuevo proyecto" };
 
 export default async function NuevoProyectoPage() {
-  await requireOperator();
+  await requireOrganization(["org_admin"]);
   return (
     <div className="mx-auto max-w-2xl space-y-7">
       <PageHeader

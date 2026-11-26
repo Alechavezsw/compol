@@ -15,6 +15,10 @@ const MOTIVOS: Record<string, { title: string; text: string }> = {
     title: "Tu usuario está desactivado",
     text: "Un administrador dio de baja este acceso. Contactá a la administración de tu organización para reactivarlo.",
   },
+  suspendida: {
+    title: "El acceso de tu organización está suspendido",
+    text: "La cuenta de tu organización está suspendida, así que nadie de su equipo puede ingresar por ahora. Contactá a la administración central para regularizarla.",
+  },
   "sin-organizacion": {
     title: "Todavía no tenés una organización asignada",
     text: "Tu usuario existe pero no está vinculado a ningún cliente. La administración central tiene que asignarte una organización.",

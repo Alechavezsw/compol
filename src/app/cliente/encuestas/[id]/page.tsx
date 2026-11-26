@@ -44,7 +44,7 @@ import {
   updateSurveyStatusAction,
 } from "../../actions";
 import { createClient } from "@/lib/supabase/server";
-import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
+import { canManage as roleCanManage, requireClientViewer } from "@/lib/auth";
 import { loadQuestions } from "@/lib/questions";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { describeCondition, isBranchable, isExclusiveOption, maxChoices } from "@/lib/survey-logic";
@@ -69,18 +69,20 @@ export default async function EncuestaDetallePage({
 }) {
   const { id } = await params;
   const { aviso } = await searchParams;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { profile, organization, isCentralAdmin } = await requireClientViewer();
   const supabase = await createClient();
 
-  const { data: surveyRow } = await supabase
-    .from("surveys")
-    .select("*")
-    .eq("id", id)
-    .eq("organization_id", organization.id)
-    .maybeSingle();
+  let surveyQuery = supabase.from("surveys").select("*").eq("id", id);
+  if (!isCentralAdmin && organization) {
+    surveyQuery = surveyQuery.eq("organization_id", organization.id);
+  }
+  const { data: surveyRow } = await surveyQuery.maybeSingle();
 
   if (!surveyRow) notFound();
   const survey = surveyRow as Survey;
+
+  const canManage = roleCanManage(profile.role);
+  const orgId = organization?.id ?? survey.organization_id;
 
   const [questions, { data: assignmentRows }, responses, { data: otherSurveys }, h] = await Promise.all([
     loadQuestions(supabase, id),
@@ -91,7 +93,7 @@ export default async function EncuestaDetallePage({
     supabase
       .from("surveys")
       .select("id, title")
-      .eq("organization_id", organization.id)
+      .eq("organization_id", orgId)
       .neq("id", id)
       .order("updated_at", { ascending: false }),
     headers(),
@@ -103,7 +105,6 @@ export default async function EncuestaDetallePage({
   const doneBySurveyor = new Map<string, number>();
   for (const r of completed) if (r.surveyor_id) doneBySurveyor.set(r.surveyor_id, (doneBySurveyor.get(r.surveyor_id) ?? 0) + 1);
 
-  const canManage = operatesClient(profile.role);
   const byId = new Map(questions.map((q) => [q.id, q]));
   const totalQuota = assignments.reduce((s, a) => s + a.quota, 0);
   const notice = aviso ? NOTICES[aviso] : null;

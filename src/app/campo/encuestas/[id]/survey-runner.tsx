@@ -1,22 +1,39 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { unstable_rethrow } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle2, History, MapPin, RotateCcw, Trash2, UserX } from "lucide-react";
-import { submitResponseAction } from "../../actions";
+import { submitResponseAction, type SubmitResult } from "../../actions";
 import { useInterview, type Draft } from "@/components/interview/use-interview";
 import { InterviewView } from "@/components/interview/interview-view";
 import { ProgressRing } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { ZoneSearch } from "@/components/zone-search";
-import { enqueueInterview, newClientId, readQueue, removeQueued } from "@/lib/campo/offline-queue";
+import {
+  enqueueInterview,
+  markRejected,
+  newClientId,
+  pendingOf,
+  readQueue,
+  rejectedOf,
+  removeQueued,
+} from "@/lib/campo/offline-queue";
 import { foldZone } from "@/lib/san-juan-zones";
 import type { QuestionWithOptions } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-type Extra = { zone: string };
-/** `blocked`: el servidor la rechazó sin remedio (encuesta cerrada o pausada); queda guardada en el teléfono. */
-type Outcome = { status: "completada" | "descartada"; queued?: boolean; blocked?: string } | null;
+/** `clientId` identifica la entrevista ante el servidor; va en el borrador para que retomarla no la duplique. */
+type Extra = { zone: string; clientId?: string };
+
+/** Cada cuánto se insiste con la cola mientras no hay una entrevista abierta. */
+const RETRY_MS = 30_000;
+
+/**
+ * `blocked`: el servidor la rechazó sin remedio (encuesta cerrada o pausada); queda guardada en el teléfono.
+ * `rejected`: el cuestionario cambió y ya no la acepta; queda guardada, pero no se reenvía.
+ */
+type Outcome = { status: "completada" | "descartada"; queued?: boolean; blocked?: string; rejected?: string } | null;
 
 function ago(ms: number) {
   const min = Math.round((Date.now() - ms) / 60000);
@@ -60,40 +77,65 @@ export function SurveyRunner({
   const [pending, startTransition] = useTransition();
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [queued, setQueued] = useState(0);
+  const [rejectedCount, setRejectedCount] = useState(0);
 
   // El borrador vive en localStorage: solo se puede leer después de montar.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- lectura única de almacenamiento del navegador
     setDraft(interview.pendingDraft());
-    setQueued(readQueue(surveyorId).length);
+    const all = readQueue(surveyorId);
+    setQueued(pendingOf(all).length);
+    setRejectedCount(rejectedOf(all).length);
   }, [interview.pendingDraft, surveyorId]);
+
+  const flushing = useRef(false);
+  const flushRef = useRef<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     async function flush() {
-      for (const item of readQueue(surveyorId)) {
-        const result = await submitResponseAction({
-          surveyId: item.surveyId,
-          zone: item.zone,
-          durationSeconds: item.durationSeconds,
-          answers: item.answers,
-          latitude: item.latitude,
-          longitude: item.longitude,
-          collectedAt: item.savedAt,
-          clientId: item.clientId ?? item.id,
-        });
-        if (!result.ok) {
-          // Un rechazo definitivo (encuesta cerrada) no debe trabar las demás: se queda guardada y se sigue.
-          if (result.permanent) continue;
-          break;
+      // Un solo recorrido de la cola a la vez: dos juntos mandarían la misma entrevista dos veces.
+      if (flushing.current) return;
+      flushing.current = true;
+      try {
+        for (const item of pendingOf(readQueue(surveyorId))) {
+          const result = await submitResponseAction({
+            surveyId: item.surveyId,
+            zone: item.zone,
+            durationSeconds: item.durationSeconds,
+            answers: item.answers,
+            latitude: item.latitude,
+            longitude: item.longitude,
+            collectedAt: item.savedAt,
+            clientId: item.clientId ?? item.id,
+          });
+          if (!result.ok) {
+            // El cuestionario cambió y ya no acepta esta entrevista: reintentarla no la arregla y,
+            // si se quedara primera de la cola, frenaría a todas las que vienen detrás.
+            if (result.rejected) {
+              markRejected(surveyorId, item.id, result.error ?? "El cuestionario la rechazó.");
+              continue;
+            }
+            // Un rechazo definitivo (encuesta cerrada) no debe trabar las demás: se queda guardada y se sigue.
+            if (result.permanent) continue;
+            break;
+          }
+          removeQueued(surveyorId, item.id);
+          if (result.status === "completada") {
+            setSaved((n) => n + 1);
+            setToday((n) => n + 1);
+          }
         }
-        removeQueued(surveyorId, item.id);
-        if (result.status === "completada") {
-          setSaved((n) => n + 1);
-          setToday((n) => n + 1);
-        }
+      } catch {
+        // La llamada no volvió (red cortada o servidor caído): lo pendiente espera al próximo intento.
+        // Si fue un redirect (sesión vencida), la navegación ya la resuelve el router.
+      } finally {
+        flushing.current = false;
       }
-      setQueued(readQueue(surveyorId).length);
+      const all = readQueue(surveyorId);
+      setQueued(pendingOf(all).length);
+      setRejectedCount(rejectedOf(all).length);
     }
+    flushRef.current = flush;
     const onOnline = () => {
       void flush();
     };
@@ -101,6 +143,17 @@ export function SurveyRunner({
     if (navigator.onLine) void flush();
     return () => window.removeEventListener("online", onOnline);
   }, [surveyorId]);
+
+  // Con mala señal el teléfono puede seguir figurando "en línea" y no avisar nunca que volvió:
+  // mientras haya cola se insiste cada tanto. No durante una entrevista, porque las Server Actions
+  // salen de a una y un reintento colgado demoraría el envío que está por hacer el encuestador.
+  useEffect(() => {
+    if (!queued || interview.active) return;
+    const id = window.setInterval(() => {
+      if (navigator.onLine) void flushRef.current?.();
+    }, RETRY_MS);
+    return () => window.clearInterval(id);
+  }, [queued, interview.active]);
 
   const total = questions.length;
   const quotaDone = saved >= quota;
@@ -119,14 +172,15 @@ export function SurveyRunner({
     setDraft(null);
     interview.clearDraft();
     requestFix();
-    interview.start({ zone: zone.trim() });
+    interview.start({ zone: zone.trim(), clientId: newClientId() });
   }
 
   function resume(d: Draft<Extra>) {
     setZone(d.extra?.zone ?? zone);
     setDraft(null);
     requestFix();
-    interview.restore(d);
+    // Los borradores anteriores no traían id: se les asigna uno al retomarlos.
+    interview.restore({ ...d, extra: { zone: d.extra?.zone ?? zone, clientId: d.extra?.clientId ?? newClientId() } });
   }
 
   const zoneQuota = zoneQuotas.find((q) => foldZone(q.zone) === foldZone(zone));
@@ -141,7 +195,8 @@ export function SurveyRunner({
 
     const payload = {
       surveyId,
-      clientId: newClientId(),
+      // El mismo en todos los intentos de esta entrevista: el servidor no la guarda dos veces.
+      clientId: interview.extra?.clientId ?? newClientId(),
       zone: interview.extra?.zone || zone.trim() || null,
       durationSeconds,
       answers,
@@ -152,32 +207,47 @@ export function SurveyRunner({
     startTransition(async () => {
       const offline = typeof navigator !== "undefined" && !navigator.onLine;
       let blocked: string | undefined;
+      let rejected: string | undefined;
+      let result: SubmitResult | null = null;
+      let failure: unknown;
       if (!offline) {
-        const result = await submitResponseAction(payload);
-        if (result.ok) {
-          interview.stop();
-          if (result.status === "completada") {
-            setSaved((n) => n + 1);
-            setToday((n) => n + 1);
-          }
-          setOutcome({ status: result.status ?? (ended ? "descartada" : "completada") });
-          return;
+        try {
+          result = await submitResponseAction(payload);
+        } catch (error) {
+          // La llamada no volvió: se cortó la red con el teléfono figurando "en línea", o falló el
+          // servidor. Va a la cola igual que sin señal; si llegó a guardarse, el id evita duplicarla.
+          failure = error;
         }
-        // Error pasajero: queda en cola. Si el rechazo es definitivo se avisa por qué.
-        if (result.permanent) blocked = result.error;
       }
+      if (result?.ok) {
+        interview.stop();
+        if (result.status === "completada") {
+          setSaved((n) => n + 1);
+          setToday((n) => n + 1);
+        }
+        setOutcome({ status: result.status ?? (ended ? "descartada" : "completada") });
+        return;
+      }
+      // Error pasajero: queda en cola. Si el rechazo es definitivo se avisa por qué.
+      if (result?.rejected) rejected = result.error ?? "El cuestionario la rechazó.";
+      else if (result?.permanent) blocked = result.error;
 
-      if (!enqueueInterview(surveyorId, payload)) {
+      // Una entrevista rechazada se guarda igual (es trabajo de campo), pero marcada, para que
+      // no se reintente en vano ni frene a las demás.
+      if (enqueueInterview(surveyorId, rejected ? { ...payload, rejected } : payload)) {
+        interview.stop();
+        interview.clearDraft();
+        if (rejected) setRejectedCount((n) => n + 1);
+        else setQueued((n) => n + 1);
+        setOutcome({ status: ended ? "descartada" : "completada", queued: !rejected, blocked, rejected });
+      } else {
         // No hay dónde guardarla: la entrevista sigue abierta en pantalla para no perderla.
         interview.setError(
           "No se pudo guardar: sin señal y sin espacio en el teléfono. No cierres esta pantalla; conectate y volvé a enviar.",
         );
-        return;
       }
-      interview.stop();
-      interview.clearDraft();
-      setQueued((n) => n + 1);
-      setOutcome({ status: ended ? "descartada" : "completada", queued: true, blocked });
+      // Un redirect de Next (sesión vencida, usuario dado de baja) sigue su curso, ya con la entrevista a salvo.
+      if (failure) unstable_rethrow(failure);
     });
   }
 
@@ -201,7 +271,9 @@ export function SurveyRunner({
               </span>
             )}
             <h2 className="display mt-5 text-3xl text-[var(--foreground)]">
-              {outcome.blocked
+              {outcome.rejected
+                ? "El cuestionario la rechazó"
+                : outcome.blocked
                 ? "No se pudo enviar"
                 : outcome.queued
                 ? "Quedó en cola"
@@ -212,10 +284,12 @@ export function SurveyRunner({
                   : "Contacto registrado"}
             </h2>
             <p className="mt-1.5 text-sm text-[var(--muted)]">
-              {outcome.blocked
+              {outcome.rejected
+                ? `${outcome.rejected} El cuestionario cambió mientras la cargabas. La entrevista quedó guardada en este teléfono, pero no se envía sola: avisale a la coordinación.`
+                : outcome.blocked
                 ? `${outcome.blocked} La entrevista quedó guardada en este teléfono y se envía sola si la encuesta vuelve a estar en campo.`
                 : outcome.queued
-                ? "No había señal. Se sube sola cuando el teléfono vuelva a conectarse."
+                ? "No se pudo enviar ahora. Quedó guardada en este teléfono y se sube sola cuando haya señal."
                 : completed
                   ? quotaDone
                     ? `Llegaste a los ${quota} casos asignados. Consultá con la coordinación antes de seguir cargando.`
@@ -312,6 +386,12 @@ export function SurveyRunner({
           {queued ? (
             <p className="relative mt-4 rounded-xl bg-[var(--warning-soft)] px-3.5 py-2.5 text-sm text-[var(--warning)]">
               {queued} entrevista{queued === 1 ? "" : "s"} en cola. Se suben cuando haya señal.
+            </p>
+          ) : null}
+          {rejectedCount ? (
+            <p className="relative mt-4 rounded-xl bg-[var(--danger-soft)] px-3.5 py-2.5 text-sm text-[var(--danger)]">
+              {rejectedCount} entrevista{rejectedCount === 1 ? "" : "s"} rechazada{rejectedCount === 1 ? "" : "s"} por un
+              cambio en el cuestionario. Siguen guardadas en este teléfono: avisale a la coordinación y no borres los datos del navegador.
             </p>
           ) : null}
 

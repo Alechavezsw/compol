@@ -4,14 +4,26 @@ import { useActionState } from "react";
 import { Trash2 } from "lucide-react";
 import { deleteOrganizationAction, type ActionState } from "../actions";
 import { FormMessage } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
 
-export function DeleteOrganizationButton({ id, name }: { id: string; name: string }) {
-  const [state, formAction] = useActionState<ActionState, FormData>(deleteOrganizationAction, {});
+export function DeleteOrganizationButton({
+  id,
+  name,
+  size = "md",
+}: {
+  id: string;
+  name: string;
+  size?: "sm" | "md";
+}) {
+  const [state, formAction, pending] = useActionState<ActionState, FormData>(
+    deleteOrganizationAction,
+    {},
+  );
 
   return (
     <form
       action={formAction}
-      className="space-y-1"
+      className="inline-flex flex-col items-stretch gap-1"
       onSubmit={(e) => {
         const ok = window.confirm(
           `¿Eliminar «${name}»?\n\nSe borran sus encuestas, respuestas, informes y radar. Los usuarios de esa organización quedan sin cliente asignado.`,
@@ -20,14 +32,17 @@ export function DeleteOrganizationButton({ id, name }: { id: string; name: strin
       }}
     >
       <input type="hidden" name="id" value={id} />
-      <button
+      <Button
         type="submit"
+        variant="outline"
+        size={size}
+        disabled={pending}
         aria-label={`Eliminar ${name}`}
-        className="inline-flex h-7 items-center gap-1 rounded-lg px-2 text-xs font-medium text-[var(--danger)] hover:bg-[var(--danger-soft)]"
+        className="border-[color-mix(in_oklab,var(--danger)_35%,var(--border))] text-[var(--danger)] hover:border-[var(--danger)] hover:bg-[var(--danger-soft)]"
       >
-        <Trash2 className="size-3.5" />
-        Eliminar
-      </button>
+        <Trash2 />
+        {pending ? "Eliminando…" : "Eliminar"}
+      </Button>
       {state.error ? <FormMessage>{state.error}</FormMessage> : null}
     </form>
   );

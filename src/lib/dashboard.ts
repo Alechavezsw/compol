@@ -1,10 +1,11 @@
 import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database, Survey } from "@/lib/types";
+import type { Database, SocialPost, Survey } from "@/lib/types";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { addDays, dayKey, daysBetween, formatDayKey, median } from "@/lib/stats";
 import type { Pace } from "@/lib/analytics";
 import { qualityFlags } from "@/lib/quality";
+import { computeSocial } from "@/lib/social/analytics";
 import { foldZone } from "@/lib/san-juan-zones";
 
 type Client = SupabaseClient<Database>;
@@ -16,13 +17,6 @@ export type DashResponse = {
   channel: string | null;
   surveyor_id: string | null;
   zone: string | null;
-};
-
-export type DashSocial = {
-  label: "positivo" | "neutral" | "negativo";
-  engagement: number;
-  topics: string[];
-  published_at: string;
 };
 
 export type DashSurveyor = { id: string; name: string; daysSinceLast: number | null };
@@ -76,38 +70,25 @@ export function expressCount(rows: DashResponse[]) {
   return campo.filter((d) => d < threshold).length;
 }
 
-export function socialPulse(posts: DashSocial[], today: string) {
-  const from = addDays(today, -6);
-  const current = posts.filter((p) => {
-    const k = dayKey(p.published_at);
-    return k >= from && k <= today;
-  });
-  let pos = 0;
-  let neg = 0;
-  let weight = 0;
-  for (const p of current) {
-    const w = 1 + Math.sqrt(Math.max(0, p.engagement));
-    weight += w;
-    if (p.label === "positivo") pos += w;
-    if (p.label === "negativo") neg += w;
-  }
-  const mood = weight ? ((pos - neg) / weight) * 100 : 0;
-  const negatives = current.filter((p) => p.label === "negativo").length;
+/**
+ * El radar de la semana para la portada. Sale de la misma cuenta que la pantalla del
+ * Radar, para que el tono y la cantidad de notas coincidan en las dos.
+ */
+export function socialPulse(posts: SocialPost[], today: string) {
+  const week = computeSocial(posts, { days: 7 }, today);
+  const negatives = week.split.negativo;
   const alerts: { title: string; detail: string; topic?: string }[] = [];
-  if (current.length >= 12 && negatives / current.length >= 0.35) {
-    const topics = new Map<string, number>();
-    for (const p of current) {
-      if (p.label !== "negativo") continue;
-      for (const t of p.topics) topics.set(t, (topics.get(t) ?? 0) + 1);
-    }
-    const topic = [...topics.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
+  if (week.total >= 12 && negatives / week.total >= 0.35) {
+    const topic = week.topics
+      .filter((t) => t.split.negativo > 0)
+      .sort((a, b) => b.split.negativo - a.split.negativo)[0]?.name;
     alerts.push({
       title: "El radar viene negativo",
-      detail: `${negatives} de ${current.length} notas de la semana son críticas${topic ? `, sobre todo por «${topic}»` : ""}.`,
+      detail: `${negatives} de ${week.total} notas de la semana son críticas${topic ? `, sobre todo por «${topic}»` : ""}.`,
       topic,
     });
   }
-  return { mood, total: current.length, alerts };
+  return { mood: week.mood, total: week.total, alerts };
 }
 
 export const loadDashboard = cache(async function loadDashboard(
@@ -118,7 +99,7 @@ export const loadDashboard = cache(async function loadDashboard(
   const since14 = `${addDays(today, -13)}T00:00:00-03:00`;
   const socialSince = `${addDays(today, -13)}T00:00:00-03:00`;
 
-  const [{ data: surveyRows }, completed, { data: reportRows }, { data: socialRows }, { data: assignmentRows }] =
+  const [{ data: surveyRows }, completed, { data: reportRows }, socialRows, { data: assignmentRows }] =
     await Promise.all([
       supabase
         .from("surveys")
@@ -142,13 +123,17 @@ export const loadDashboard = cache(async function loadDashboard(
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })
         .limit(4),
-      supabase
-        .from("social_posts")
-        .select("label, engagement, topics, published_at")
-        .eq("organization_id", organizationId)
-        .gte("published_at", new Date(socialSince).toISOString())
-        .order("published_at", { ascending: false })
-        .limit(200),
+      // Todas las de los 14 días: con un tope, el gráfico por día mostraría de menos los más viejos.
+      fetchAll<SocialPost>((from, to) =>
+        supabase
+          .from("social_posts")
+          .select("*")
+          .eq("organization_id", organizationId)
+          .gte("published_at", new Date(socialSince).toISOString())
+          .order("published_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      ),
       supabase.from("survey_assignments").select("id, survey_id, surveyor_id, zone"),
     ]);
 
@@ -167,7 +152,8 @@ export const loadDashboard = cache(async function loadDashboard(
       ? supabase.from("profiles").select("id, full_name").in("id", surveyorIds)
       : Promise.resolve({ data: [] as { id: string; full_name: string }[] }),
   ]);
-  const socialPosts = (socialRows ?? []) as DashSocial[];
+  // La misma cuenta que el Radar: una noticia repetida por varios portales entra una sola vez.
+  const socialDays = computeSocial(socialRows, { days: 14 }, today).daily;
 
   const names = new Map((profileRows ?? []).map((p) => [p.id, p.full_name]));
   const staleBySurvey = new Map<string, DashSurveyor[]>();
@@ -202,7 +188,7 @@ export const loadDashboard = cache(async function loadDashboard(
 
   const paceBySurvey = new Map(active.map((s) => [s.id, surveyPace(s, completed, today)]));
   const expressBySurvey = new Map(active.map((s) => [s.id, expressCount(completed.filter((r) => r.survey_id === s.id))]));
-  const social = socialPulse(socialPosts, today);
+  const social = socialPulse(socialRows, today);
 
   const todayRows = completed.filter((r) => r.submitted_at && dayKey(r.submitted_at) === today);
   const todayBySurveyor = new Map<string, number>();
@@ -251,6 +237,7 @@ export const loadDashboard = cache(async function loadDashboard(
     staleBySurvey,
     reports: reportRows ?? [],
     social,
+    socialDays,
     control,
   };
 });

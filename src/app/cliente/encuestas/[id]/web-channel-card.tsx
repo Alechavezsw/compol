@@ -14,7 +14,7 @@ const MODES: { value: WidgetMode; label: string; hint: string }[] = [
   { value: "inline", label: "Dentro de la página", hint: "La encuesta queda incrustada en un bloque del sitio." },
 ];
 
-const SWATCHES = ["#3d2de0", "#0d9488", "#0284c7", "#c2410c", "#be185d", "#15803d", "#1f2937"];
+const SWATCHES = ["#0f4c6e", "#0d9488", "#0284c7", "#c2410c", "#be185d", "#15803d", "#1f2937"];
 
 function CopyBlock({ label, code }: { label: string; code: string }) {
   const [copied, setCopied] = useState(false);
@@ -66,7 +66,7 @@ export function WebChannelCard({
   const [state, formAction] = useActionState<ActionState, FormData>(updateWebChannelAction, {});
   const [on, setOn] = useState(enabled);
   const [mode, setMode] = useState<WidgetMode>(settings.mode ?? "flotante");
-  const [accent, setAccent] = useState(settings.accent ?? "#3d2de0");
+  const [accent, setAccent] = useState(settings.accent ?? "#0f4c6e");
   const [tab, setTab] = useState<"codigo" | "config">(enabled && token ? "codigo" : "config");
 
   const link = token ? `${origin}/e/${token}` : null;

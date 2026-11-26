@@ -21,7 +21,7 @@ import { fetchAll } from "@/lib/supabase/fetch-all";
 import { Progress, TableWrap, Td, Th } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatCard } from "@/components/stat-card";
-import { Button, ButtonLink } from "@/components/ui/button";
+import { ButtonLink } from "@/components/ui/button";
 import { Badge, OrgStatusBadge, RoleBadge, SurveyStatusBadge } from "@/components/ui/badge";
 import { cn, formatDate, formatDateTime, formatNumber, formatPercent } from "@/lib/utils";
 import {
@@ -37,7 +37,6 @@ import {
 import { OrgMark } from "@/components/org-mark";
 import { OrgEditForm } from "./org-edit-form";
 import { DeleteOrganizationButton } from "../delete-organization-button";
-import { enterOrganizationAction } from "../../actions";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -224,11 +223,7 @@ export default async function OrganizacionPerfilPage({ params }: { params: Promi
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
-          <form action={enterOrganizationAction}>
-            <input type="hidden" name="id" value={id} />
-            <Button type="submit">Operar cliente</Button>
-          </form>
-          <ButtonLink href={`/admin/usuarios/nuevo?org=${id}&rol=org_analyst&volver=${encodeURIComponent(returnTo)}`}>
+          <ButtonLink href={`/admin/usuarios/nuevo?org=${id}&rol=org_admin&volver=${encodeURIComponent(returnTo)}`}>
             <UserPlus />
             Nuevo usuario
           </ButtonLink>
@@ -370,14 +365,7 @@ export default async function OrganizacionPerfilPage({ params }: { params: Promi
                   variant="outline"
                   href={`/admin/usuarios/nuevo?org=${id}&rol=org_admin&volver=${encodeURIComponent(returnTo)}`}
                 >
-                  Cliente
-                </ButtonLink>
-                <ButtonLink
-                  size="sm"
-                  variant="outline"
-                  href={`/admin/usuarios/nuevo?org=${id}&rol=org_analyst&volver=${encodeURIComponent(returnTo)}`}
-                >
-                  Analista
+                  Administrador
                 </ButtonLink>
                 <ButtonLink
                   size="sm"
@@ -398,7 +386,7 @@ export default async function OrganizacionPerfilPage({ params }: { params: Promi
             <CardContent className="pt-4">
               {users.length === 0 ? (
                 <p className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted)]">
-                  Todavía no hay usuarios. Creá al político y, desde ahí, cargá las encuestas y los informes que va a ver.
+                  Todavía no hay usuarios. Creá el administrador del cliente para que pueda operar el panel.
                 </p>
               ) : (
                 <TableWrap>
@@ -417,15 +405,6 @@ export default async function OrganizacionPerfilPage({ params }: { params: Promi
                           <Td>
                             <p className="font-medium">{u.full_name || "Sin nombre"}</p>
                             <p className="text-xs text-[var(--muted)]">{u.email}</p>
-                            {u.role === "politico" ? (
-                              <form action={enterOrganizationAction} className="mt-2">
-                                <input type="hidden" name="id" value={id} />
-                                <input type="hidden" name="destino" value="/cliente/encuestas" />
-                                <Button type="submit" size="sm" variant="outline">
-                                  Cargar encuestas e informes
-                                </Button>
-                              </form>
-                            ) : null}
                           </Td>
                           <Td>
                             <RoleBadge role={u.role} />

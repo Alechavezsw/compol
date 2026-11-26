@@ -17,7 +17,22 @@ export type QueuedInterview = {
   latitude: number | null;
   longitude: number | null;
   savedAt: number;
+  /**
+   * El servidor rechazó esta entrevista porque el cuestionario cambió y ya no
+   * la acepta. Reintentarla no la arregla: se conserva en el teléfono para que
+   * la coordinación la recupere, pero no se reenvía ni frena a las demás.
+   */
+  rejected?: string;
 };
+
+/** Entrevistas que todavía esperan subirse (las rechazadas no cuentan). */
+export function pendingOf(items: QueuedInterview[]) {
+  return items.filter((item) => !item.rejected);
+}
+
+export function rejectedOf(items: QueuedInterview[]) {
+  return items.filter((item) => item.rejected);
+}
 
 /**
  * Tope de la cola. Es mucho más que una jornada sin señal; se corta por abajo
@@ -67,6 +82,18 @@ export function enqueueInterview(
     return next;
   } catch {
     return null;
+  }
+}
+
+/** Deja la entrevista guardada pero fuera del reenvío automático. */
+export function markRejected(surveyorId: string, id: string, reason: string) {
+  try {
+    writeQueue(
+      surveyorId,
+      readQueue(surveyorId).map((item) => (item.id === id ? { ...item, rejected: reason } : item)),
+    );
+  } catch {
+    /* sin almacenamiento: queda como estaba y se vuelve a intentar */
   }
 }
 

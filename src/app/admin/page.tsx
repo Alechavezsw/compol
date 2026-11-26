@@ -57,6 +57,7 @@ export default async function AdminDashboard() {
           value={formatNumber(orgs.count ?? 0)}
           icon={<Building2 className="size-4" />}
           hint="Clientes dados de alta"
+          href="/admin/organizaciones"
         />
         <StatCard
           label="Usuarios"
@@ -64,6 +65,7 @@ export default async function AdminDashboard() {
           icon={<Users className="size-4" />}
           tone="accent"
           hint="Todos los roles"
+          href="/admin/usuarios"
         />
         <StatCard
           label="Encuestas"
@@ -71,6 +73,7 @@ export default async function AdminDashboard() {
           icon={<ClipboardList className="size-4" />}
           tone="warning"
           hint="Históricas y en curso"
+          href="/admin/encuestas"
         />
         <StatCard
           label="Casos completados"
@@ -78,6 +81,7 @@ export default async function AdminDashboard() {
           icon={<MessagesSquare className="size-4" />}
           tone="success"
           hint="Entrevistas cerradas"
+          href="/admin/encuestas"
         />
       </div>
 

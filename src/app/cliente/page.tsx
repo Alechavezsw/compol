@@ -1,6 +1,5 @@
 import { cache, Suspense } from "react";
 import Link from "next/link";
-import { PoliticoSnapshot } from "./pantallazo";
 import {
   Activity,
   AlertTriangle,
@@ -22,46 +21,60 @@ import { StatCard } from "@/components/stat-card";
 import { ButtonLink } from "@/components/ui/button";
 import { Badge, SurveyStatusBadge } from "@/components/ui/badge";
 import { FieldTrend } from "@/components/charts/charts";
+import { PulseBoard } from "@/components/pulse/pulse-board";
+import { LiveRefresh } from "@/components/results/live-refresh";
 import { createClient } from "@/lib/supabase/server";
-import { canManage as operatesClient, requireOrganization } from "@/lib/auth";
+import { isClientReadOnly, requireOrganization } from "@/lib/auth";
+import { loadSurveyData } from "@/lib/analytics";
 import { loadDashboard } from "@/lib/dashboard";
+import { signed } from "@/lib/pulse";
+import { buildPulse } from "@/lib/pulse-build";
 import { moodLabel } from "@/lib/social/analytics";
 import { formatDayKey, todayKey } from "@/lib/stats";
 import { cn, formatDate, formatNumber, formatPercent } from "@/lib/utils";
+import type { UserRole } from "@/lib/types";
 
 type Attention = { tone: "danger" | "warning" | "primary"; icon: React.ReactNode; title: string; detail: string; href: string };
 
 const dashboard = cache(async function dashboard() {
-  const { organization } = await requireOrganization(["org_admin", "org_analyst"]);
+  const { organization } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const supabase = await createClient();
   return loadDashboard(supabase, organization.id, todayKey());
 });
 
-export default async function ClienteDashboard() {
+export default async function ClienteDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ encuesta?: string | string[] }>;
+}) {
   const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
   const firstName = profile.full_name.split(" ")[0] || "equipo";
-  if (profile.role === "politico") {
-    return <PoliticoSnapshot organization={organization} firstName={firstName} />;
-  }
+  const readOnly = isClientReadOnly(profile.role);
+  const { encuesta } = await searchParams;
+  const selected = Array.isArray(encuesta) ? encuesta[0] : encuesta;
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[28px] bg-[#0b1020] px-6 py-7 text-slate-100 shadow-[0_28px_70px_-32px_rgba(15,23,42,0.55)] sm:px-8 sm:py-8">
-        <div className="pointer-events-none absolute -left-16 -top-20 size-64 rounded-full bg-violet-500/25 blur-3xl" />
+      <section className="relative overflow-hidden rounded-[28px] bg-[#07131c] px-6 py-7 text-slate-100 shadow-[0_28px_70px_-32px_rgba(7,30,45,0.55)] sm:px-8 sm:py-8">
+        <div className="pointer-events-none absolute -left-16 -top-20 size-64 rounded-full bg-sky-500/20 blur-3xl" />
         <div className="pointer-events-none absolute -right-10 bottom-0 size-56 rounded-full bg-teal-400/20 blur-3xl" />
         <div className="absolute inset-0 opacity-20 [background-image:radial-gradient(rgba(148,163,184,0.35)_1px,transparent_1px)] [background-size:22px_22px]" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <p className="text-[12px] font-semibold tracking-[0.18em] text-cyan-200/80 uppercase">Hola, {firstName}</p>
+            <p className="text-[12px] font-semibold tracking-[0.18em] text-cyan-200/80 uppercase">
+              {readOnly ? "Lectura política" : `Hola, ${firstName}`}
+            </p>
             <h1 className="display mt-2 text-[34px] leading-none text-white sm:text-[42px]">{organization.name}</h1>
             <p className="mt-3 max-w-xl text-sm text-slate-400">
-              Estado de tus relevamientos, el humor en redes y lo que necesita atención hoy.
+              {readOnly
+                ? "El pulso del territorio y lo que la gente está diciendo, sin pantallas de operación."
+                : "El territorio en un mapa, lo que opina la gente y lo que necesita atención hoy."}
             </p>
             <Suspense fallback={<div className="mt-5 h-8 w-72 animate-pulse rounded-full bg-white/10" />}>
               <HeroChips />
             </Suspense>
           </div>
-          {operatesClient(profile.role) ? (
+          {profile.role === "org_admin" ? (
             <ButtonLink href="/cliente/encuestas/nueva" className="h-12 bg-cyan-300 text-slate-950 hover:bg-cyan-200">
               Nueva encuesta
             </ButtonLink>
@@ -69,10 +82,75 @@ export default async function ClienteDashboard() {
         </div>
       </section>
 
-      <Suspense fallback={<DashboardFallback />}>
-        <DashboardBody canCreate={operatesClient(profile.role)} />
+      <Suspense key={selected ?? "principal"} fallback={<DashboardFallback />}>
+        <Territory selected={selected} />
       </Suspense>
+
+      <section aria-labelledby="operativo" className="space-y-4 pt-4">
+        <h2 id="operativo" className="display text-3xl text-[var(--foreground)]">
+          {readOnly ? "Panorama" : "El operativo hoy"}
+        </h2>
+        <Suspense fallback={<DashboardFallback />}>
+          <DashboardBody role={profile.role} />
+        </Suspense>
+      </section>
     </div>
+  );
+}
+
+/** Mapa y gráficos de una encuesta: la lectura política del territorio. */
+async function Territory({ selected }: { selected?: string }) {
+  const { surveys, countBySurvey, socialDays } = await dashboard();
+  const withCases = surveys
+    .filter((s) => (countBySurvey.get(s.id) ?? 0) > 0)
+    .sort(
+      (a, b) =>
+        Number(b.status === "activa") - Number(a.status === "activa") ||
+        (countBySurvey.get(b.id) ?? 0) - (countBySurvey.get(a.id) ?? 0),
+    );
+  const current = withCases.find((s) => s.id === selected) ?? withCases[0];
+  if (!current) return null;
+
+  const data = await loadSurveyData(await createClient(), current.id);
+  const pulse = data ? buildPulse(data) : null;
+  if (!pulse) return null;
+
+  return (
+    <section aria-labelledby="territorio" className="space-y-4">
+      {current.status === "activa" ? <LiveRefresh intervalMs={60_000} /> : null}
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 id="territorio" className="display text-3xl text-balance text-[var(--foreground)]">
+            Pulso del territorio
+          </h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">{current.title}</p>
+        </div>
+        <Link href={`/cliente/encuestas/${current.id}/resultados`} className="text-sm font-medium text-[var(--primary)] hover:underline">
+          Ver resultados completos
+        </Link>
+      </div>
+      {withCases.length > 1 ? (
+        <nav aria-label="Encuesta" className="no-scrollbar -mx-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+          {withCases.map((s) => (
+            <Link
+              key={s.id}
+              href={`/cliente?encuesta=${encodeURIComponent(s.id)}`}
+              scroll={false}
+              aria-current={s.id === current.id ? "page" : undefined}
+              className={cn(
+                "max-w-80 shrink-0 truncate rounded-xl border px-3 py-2 text-sm font-medium transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)]",
+                s.id === current.id
+                  ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)]"
+                  : "border-[var(--border)] bg-[var(--surface)] text-[var(--muted)] hover:text-[var(--foreground)]",
+              )}
+            >
+              {s.title}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+      <PulseBoard key={current.id} data={pulse} social={socialDays} target={current.target_responses} />
+    </section>
   );
 }
 
@@ -89,10 +167,10 @@ async function HeroChips() {
         {formatNumber(active.length)} en campo
       </span>
       <Link
-        href="/cliente/redes"
+        href="/cliente/redes?dias=7"
         className="inline-flex items-center gap-2 rounded-full border border-cyan-300/20 bg-cyan-400/10 px-3 py-1.5 text-[12px] text-cyan-100 hover:bg-cyan-400/15"
       >
-        Radar {social.total ? `${social.mood > 0 ? "+" : ""}${Math.round(social.mood)}` : "en espera"}
+        Radar {social.total ? signed(social.mood) : "en espera"}
       </Link>
     </div>
   );
@@ -111,7 +189,8 @@ function DashboardFallback() {
   );
 }
 
-async function DashboardBody({ canCreate }: { canCreate: boolean }) {
+async function DashboardBody({ role }: { role: UserRole }) {
+  const readOnly = isClientReadOnly(role);
   const {
     surveys,
     active,
@@ -199,17 +278,18 @@ async function DashboardBody({ canCreate }: { canCreate: boolean }) {
       icon: <Radar className="size-4" />,
       title: al.title,
       detail: al.detail,
-      href: `/cliente/redes${al.topic ? `?tema=${encodeURIComponent(al.topic)}` : ""}`,
+      href: `/cliente/redes?dias=7${al.topic ? `&tema=${encodeURIComponent(al.topic)}` : ""}`,
     });
   }
 
   return (
     <div className="space-y-6">
+      {!readOnly ? (
       <section className="rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,transparent)] p-5 shadow-[var(--shadow-card)]">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <p className="text-[11px] font-semibold tracking-[0.16em] text-[var(--primary)] uppercase">Hoy en campo</p>
-            <h2 className="display tabular-nums mt-1 text-2xl text-[var(--foreground)]">{formatNumber(control.today)} casos</h2>
+            <h2 className="display mt-1 text-2xl text-[var(--foreground)]">{formatNumber(control.today)} casos</h2>
           </div>
           <p className="text-xs text-[var(--muted)]">
             {control.quality.express
@@ -266,6 +346,7 @@ async function DashboardBody({ canCreate }: { canCreate: boolean }) {
           </div>
         </div>
       </section>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -288,13 +369,13 @@ async function DashboardBody({ canCreate }: { canCreate: boolean }) {
           tone="accent"
           hint={`${formatNumber(activeDone)} de ${formatNumber(totalTarget)} casos`}
         />
-        <Link href="/cliente/redes" className="block transition-transform hover:-translate-y-0.5">
+        <Link href="/cliente/redes?dias=7" className="block transition-transform hover:-translate-y-0.5">
           <StatCard
             label="Radar de conversación (7 días)"
-            value={social.total ? `${social.mood > 0 ? "+" : ""}${Math.round(social.mood)}` : "—"}
+            value={social.total ? signed(social.mood) : "—"}
             icon={<Radar className="size-4" />}
             tone={socialLabel?.tone === "success" ? "success" : "warning"}
-            hint={social.total && socialLabel ? `${socialLabel.text} · ${formatNumber(social.total)} publicaciones` : "Sin publicaciones importadas"}
+            hint={social.total && socialLabel ? `${socialLabel.text} · ${formatNumber(social.total)} ${social.total === 1 ? "nota" : "notas"}` : "Sin notas esta semana"}
             className="h-full"
           />
         </Link>
@@ -372,7 +453,7 @@ async function DashboardBody({ canCreate }: { canCreate: boolean }) {
                 icon={<ClipboardList className="size-5" />}
                 title="Todavía no hay encuestas"
                 description="Creá tu primer cuestionario y salí a campo o publicalo en la web."
-                action={canCreate ? <ButtonLink href="/cliente/encuestas/nueva">Crear encuesta</ButtonLink> : null}
+                action={role === "org_admin" ? <ButtonLink href="/cliente/encuestas/nueva">Crear encuesta</ButtonLink> : null}
               />
             ) : (
               <div className="grid gap-3 md:grid-cols-2">
@@ -423,10 +504,14 @@ async function DashboardBody({ canCreate }: { canCreate: boolean }) {
             {reports.length === 0 ? (
               <div className="py-6 text-center">
                 <Sparkles className="mx-auto size-5 text-[var(--muted)]" />
-                <p className="mt-2 text-sm text-[var(--muted)]">Todavía no generaste informes con IA.</p>
-                <ButtonLink href="/cliente/informes" size="sm" variant="secondary" className="mt-3">
-                  Generar el primero
-                </ButtonLink>
+                <p className="mt-2 text-sm text-[var(--muted)]">
+                  {readOnly ? "Todavía no hay informes en la biblioteca." : "Todavía no generaste informes con IA."}
+                </p>
+                {!readOnly ? (
+                  <ButtonLink href="/cliente/informes" size="sm" variant="secondary" className="mt-3">
+                    Generar el primero
+                  </ButtonLink>
+                ) : null}
               </div>
             ) : (
               reports.map((r) => (

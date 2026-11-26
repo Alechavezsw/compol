@@ -1,5 +1,7 @@
+import { TONE_COLOR } from "@/components/pulse/tone-color";
 import { cn, formatNumber, formatPercent } from "@/lib/utils";
 import type { Distribution } from "@/lib/analytics";
+import { evalToneOf } from "@/lib/pulse-build";
 
 /**
  * Barras horizontales en HTML (no canvas): etiquetas largas legibles, el
@@ -17,21 +19,21 @@ export function DistributionBars({
   const max = Math.max(1, ...data.map((d) => d.percent + (showMoe ? (d.moe ?? 0) : 0)));
   const scale = multiple ? max : Math.max(max, 60);
   const leader = data.reduce((best, d) => (d.value > (best?.value ?? -1) ? d : best), data[0]);
+  // Si la pregunta tiene respuestas a favor y en contra, cada barra toma el tono de su respuesta.
+  const evaluative = data.some((d) => d.valence === 1) && data.some((d) => d.valence === -1);
 
   return (
     <ul className="space-y-2.5">
-      {data.map((d) => {
+      {data.map((d, position) => {
         const width = (d.percent / scale) * 100;
         const lo = Math.max(0, d.percent - (d.moe ?? 0));
         const hi = d.percent + (d.moe ?? 0);
         const tint =
           d.exclusive || /^(no sabe|ns\/nc|otro)/i.test(d.name)
             ? "var(--muted)"
-            : d.valence === 1
-              ? "var(--success)"
-              : d.valence === -1
-                ? "var(--danger)"
-                : "var(--primary)";
+            : evaluative
+              ? TONE_COLOR[evalToneOf(d.name)]
+              : "var(--chart-1)";
         const isLeader = d === leader && d.value > 0;
 
         return (
@@ -56,11 +58,8 @@ export function DistributionBars({
             </div>
             <div className="relative mt-1.5 h-2.5 rounded-full bg-[var(--surface-2)]">
               <div
-                className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-700"
-                style={{
-                  width: `${Math.min(100, width)}%`,
-                  background: `linear-gradient(90deg, color-mix(in oklab, ${tint} 70%, transparent), ${tint})`,
-                }}
+                className="animate-grow-x absolute inset-y-0 left-0 rounded-full transition-[width] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:brightness-110"
+                style={{ width: `${Math.min(100, width)}%`, background: tint, animationDelay: `${Math.min(position, 8) * 60}ms` }}
               />
               {showMoe && d.moe !== null && d.value > 0 ? (
                 <div
@@ -96,25 +95,22 @@ export function ScaleColumns({
   return (
     <div>
       <div className="flex h-40 items-end gap-1.5">
-        {data.map((d) => {
+        {data.map((d, position) => {
           const n = Number(d.key);
           const tone =
             topFrom !== undefined && n >= topFrom
-              ? "var(--success)"
+              ? "var(--eval-pos)"
               : bottomTo !== undefined && n <= bottomTo
-                ? "var(--danger)"
-                : "var(--primary)";
+                ? "var(--eval-neg)"
+                : "var(--chart-1)";
           return (
             <div key={d.key} className="group relative flex h-full flex-1 flex-col justify-end">
               <span className="pointer-events-none absolute -top-1 left-1/2 -translate-x-1/2 -translate-y-full rounded-md bg-[var(--foreground)] px-1.5 py-0.5 text-[10px] font-semibold whitespace-nowrap text-[var(--background)] opacity-0 transition-opacity group-hover:opacity-100">
                 {formatPercent(d.percent)} · {formatNumber(d.value)}
               </span>
               <div
-                className="w-full rounded-t-lg transition-[height] duration-700"
-                style={{
-                  height: `${Math.max(2, (d.percent / max) * 100)}%`,
-                  background: `linear-gradient(180deg, ${tone}, color-mix(in oklab, ${tone} 55%, transparent))`,
-                }}
+                className="animate-grow-y w-full rounded-t-[4px] transition-[height] duration-700 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:brightness-110"
+                style={{ height: `${Math.max(2, (d.percent / max) * 100)}%`, background: tone, animationDelay: `${position * 45}ms` }}
               />
             </div>
           );
@@ -150,7 +146,7 @@ export function NetBar({
           <p
             className={cn(
               "display text-3xl leading-none tabular-nums",
-              net >= 0 ? "text-[var(--success)]" : "text-[var(--danger)]",
+              "text-[var(--foreground)]",
             )}
           >
             {net >= 0 ? "+" : "−"}
@@ -160,19 +156,25 @@ export function NetBar({
         </div>
         <div className="flex gap-4 text-right text-xs">
           <div>
-            <p className="text-[var(--muted)]">Positivas</p>
-            <p className="font-semibold tabular-nums text-[var(--success)]">{formatPercent(positive)}</p>
+            <p className="inline-flex items-center gap-1.5 text-[var(--muted)]">
+              <span className="size-2 rounded-sm bg-[var(--eval-neg)]" />
+              Negativas
+            </p>
+            <p className="font-semibold tabular-nums text-[var(--foreground)]">{formatPercent(negative)}</p>
           </div>
           <div>
-            <p className="text-[var(--muted)]">Negativas</p>
-            <p className="font-semibold tabular-nums text-[var(--danger)]">{formatPercent(negative)}</p>
+            <p className="inline-flex items-center gap-1.5 text-[var(--muted)]">
+              <span className="size-2 rounded-sm bg-[var(--eval-pos)]" />
+              Positivas
+            </p>
+            <p className="font-semibold tabular-nums text-[var(--foreground)]">{formatPercent(positive)}</p>
           </div>
         </div>
       </div>
-      <div className="mt-3 flex h-2.5 overflow-hidden rounded-full">
-        <div style={{ width: `${positive}%` }} className="bg-[var(--success)]" />
-        <div style={{ width: `${neutral}%` }} className="bg-[color-mix(in_oklab,var(--muted)_30%,transparent)]" />
-        <div style={{ width: `${negative}%` }} className="bg-[var(--danger)]" />
+      <div className="animate-grow-x mt-3 flex h-2.5 gap-0.5 overflow-hidden rounded-full">
+        <div style={{ width: `${negative}%` }} className="bg-[var(--eval-neg)]" title={`Negativas ${formatPercent(negative)}`} />
+        <div style={{ width: `${neutral}%` }} className="bg-[var(--eval-neutro)]" />
+        <div style={{ width: `${positive}%` }} className="bg-[var(--eval-pos)]" title={`Positivas ${formatPercent(positive)}`} />
       </div>
     </div>
   );

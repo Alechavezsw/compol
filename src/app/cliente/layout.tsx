@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
 import { AppShell, type NavItem } from "@/components/app-shell";
-import { requireOrganization } from "@/lib/auth";
-import type { UserRole } from "@/lib/types";
+import { getSessionProfile, isClientReadOnly, requireOrganization, requireProfile } from "@/lib/auth";
+import { CLIENT_ROLES } from "@/lib/types";
 import { isDemoMode } from "@/lib/demo/mode";
 import { DemoBanner } from "@/components/demo-banner";
-import Link from "next/link";
 
 // Estas areas dependen de la sesion: nunca deben prerenderizarse.
 export const dynamic = "force-dynamic";
@@ -14,52 +13,73 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const NAV: NavItem[] = [
+const NAV_FULL: NavItem[] = [
   { href: "/cliente", label: "Resumen", icon: "dashboard", exact: true },
   { href: "/cliente/proyectos", label: "Proyectos", icon: "projects" },
   { href: "/cliente/encuestas", label: "Encuestas", icon: "surveys" },
+  { href: "/cliente/dirigentes", label: "Dirigentes", icon: "leaders" },
   { href: "/cliente/informes", label: "Biblioteca", icon: "ai" },
   { href: "/cliente/redes", label: "Radar de conversación", icon: "social" },
   { href: "/cliente/equipo", label: "Equipo", icon: "users" },
 ];
 
-const POLITICO_NAV: NavItem[] = [
-  { href: "/cliente", label: "Pantallazo", icon: "dashboard", exact: true },
-  { href: "/cliente/encuestas", label: "En vivo", icon: "surveys" },
-  { href: "/cliente/informes", label: "Informes", icon: "ai" },
+/** Político: solo lectura política (tablero, resultados, radar, biblioteca). */
+const NAV_POLITICO: NavItem[] = [
+  { href: "/cliente", label: "Resumen", icon: "dashboard", exact: true },
+  { href: "/cliente/encuestas", label: "Encuestas", icon: "surveys" },
+  { href: "/cliente/dirigentes", label: "Dirigentes", icon: "leaders" },
+  { href: "/cliente/informes", label: "Biblioteca", icon: "ai" },
+  { href: "/cliente/redes", label: "Radar de conversación", icon: "social" },
 ];
 
-function navFor(role: UserRole) {
-  if (role === "politico") return POLITICO_NAV;
-  if (role === "super_admin") {
-    return [...NAV, { href: "/cliente/dirigentes", label: "Dirigentes", icon: "leaders" as const }];
-  }
-  return NAV;
-}
+const NAV_ADMIN_VIEW: NavItem[] = [
+  { href: "/admin", label: "Panel general", icon: "dashboard", exact: true, section: "Operación" },
+  { href: "/admin/organizaciones", label: "Organizaciones", icon: "orgs", section: "Operación" },
+  { href: "/admin/usuarios", label: "Usuarios", icon: "users", section: "Operación" },
+  { href: "/admin/encuestadores", label: "Encuestadores", icon: "field", section: "Operación" },
+  { href: "/admin/proyectos", label: "Proyectos", icon: "projects", section: "Operación" },
+  { href: "/admin/encuestas", label: "Encuestas", icon: "surveys", section: "Operación" },
+  { href: "/admin/resultados", label: "Resultados", icon: "results", section: "Mediciones" },
+  { href: "/cliente/informes", label: "Biblioteca", icon: "ai", section: "Mediciones" },
+  { href: "/cliente/redes", label: "Radar", icon: "social", section: "Mediciones" },
+  { href: "/cliente/dirigentes", label: "Dirigentes", icon: "leaders", section: "Mediciones" },
+  { href: "/admin/facturacion", label: "Facturación", icon: "billing", section: "Administración" },
+  { href: "/admin/contabilidad", label: "Contabilidad", icon: "accounting", section: "Administración" },
+];
 
 export default async function ClienteLayout({ children }: { children: React.ReactNode }) {
-  const { profile, organization } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
+  const session = await getSessionProfile();
+  await requireProfile();
+
+  // La administración central entra al panel del cliente solo para mirar
+  // resultados / encuesta de un organismo (sin org propia).
+  if (session?.profile.role === "super_admin") {
+    return (
+      <AppShell
+        nav={NAV_ADMIN_VIEW}
+        banner={isDemoMode() ? <DemoBanner /> : null}
+        areaLabel="Vista de administración"
+        orgName="Consulta · cliente"
+        user={{
+          name: session.profile.full_name || "Administrador",
+          email: session.profile.email,
+          role: session.profile.role,
+          avatarUrl: session.profile.avatar_url,
+        }}
+      >
+        {children}
+      </AppShell>
+    );
+  }
+
+  const { profile, organization } = await requireOrganization([...CLIENT_ROLES]);
+  const readOnly = isClientReadOnly(profile.role);
 
   return (
     <AppShell
-      nav={navFor(profile.role)}
-      banner={
-        <>
-          {isDemoMode() ? <DemoBanner /> : null}
-          {profile.role === "super_admin" ? (
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--primary-soft)] px-4 py-3 text-sm text-[var(--foreground)]">
-              <p>
-                Operando <strong>{organization.name}</strong>. Cargá las encuestas y generá los informes
-                acá: el político de esta organización los ve con su usuario.
-              </p>
-              <Link href="/admin/organizaciones" className="font-medium text-[var(--primary)]">
-                Volver a administración
-              </Link>
-            </div>
-          ) : null}
-        </>
-      }
-      areaLabel={profile.role === "super_admin" ? "Operación del cliente" : "Panel del cliente"}
+      nav={readOnly ? NAV_POLITICO : NAV_FULL}
+      banner={isDemoMode() ? <DemoBanner /> : null}
+      areaLabel={readOnly ? "Lectura política" : "Panel del cliente"}
       orgName={organization.name}
       user={{
         name: profile.full_name || "Usuario",

@@ -6,7 +6,7 @@ import { classifyViaGateway, isAiGatewayConfigured } from "@/lib/ai/gateway";
 import { UnsafeUrlError, fetchPublic } from "@/lib/net-safety";
 import { cleanHeadline } from "@/lib/social/headline";
 import { fetchMetaOEmbed, isMetaUrl } from "@/lib/social/meta";
-import { DEFAULT_TOPICS, classifyText } from "@/lib/social/lexicon";
+import { DEFAULT_TOPICS, classifyText, topicHints } from "@/lib/social/lexicon";
 import type { Emotion, SentimentLabel, SocialNetwork, SocialPost, SocialTracker } from "@/lib/types";
 
 export type RawPost = {
@@ -371,9 +371,11 @@ export async function classifyPosts(
   const topicNames = [...new Set([...DEFAULT_TOPICS.map((t) => t.name), ...trackers.map((t) => t.name)])];
   const out = classifyPostsLocal(posts, trackers);
 
+  const hints = topicHints(trackers);
+
   if (isAiGatewayConfigured()) {
     try {
-      const rows = await classifyViaGateway(out.map((p) => p.text), topicNames, organizationId);
+      const rows = await classifyViaGateway(out.map((p) => p.text), topicNames, organizationId, hints);
       rows.forEach((r, i) => {
         if (!r) return;
         const source = r.provider === "gemini" ? "gemini" : "jev";
@@ -387,7 +389,7 @@ export async function classifyPosts(
 
   if (hasLocalTypesafeKey()) {
     try {
-      const rows = await classifySocialBatchTypesafe(out.map((p) => p.text), topicNames);
+      const rows = await classifySocialBatchTypesafe(out.map((p) => p.text), topicNames, { topics: hints });
       rows.forEach((r, i) => {
         if (r) applyExternalRow(out[i], r, "typesafe");
       });

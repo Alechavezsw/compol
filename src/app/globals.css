@@ -9,16 +9,17 @@
    embebida no hereda el tema oscuro del panel de quien la está configurando. */
 :root,
 .force-light {
-  --background: #f0eef8;
-  --surface: #ffffff;
-  --surface-2: #f6f4fc;
-  --foreground: #14111f;
-  --muted: #5b5570;
-  --border: #e3def0;
+  /* Tinta institucional + teal: menos “IA genérica”, más tablero de gobierno. */
+  --background: #e8eef2;
+  --surface: #fbfcfd;
+  --surface-2: #eef3f6;
+  --foreground: #0c1b28;
+  --muted: #5a6b78;
+  --border: #d2dde5;
 
-  --primary: #3d2de0;
-  --primary-hover: #2c1cc8;
-  --primary-soft: #ebe6ff;
+  --primary: #0f4c6e;
+  --primary-hover: #0a3a55;
+  --primary-soft: #d9ebf4;
   --primary-fg: #ffffff;
 
   --accent: #0d9a86;
@@ -31,33 +32,40 @@
   --danger: #b91c1c;
   --danger-soft: #fee2e2;
 
-  --chart-1: #3d2de0;
+  --chart-1: #0f4c6e;
   --chart-2: #0d9a86;
   --chart-3: #c2410c;
-  --chart-4: #7c3aed;
+  --chart-4: #1d6a9a;
   --chart-5: #0284c7;
   --chart-6: #b45309;
   --chart-7: #be185d;
   --chart-8: #4d7c0f;
 
-  --ring: #3d2de0;
+  --ring: #0f4c6e;
+  /* Evaluación (divergente): verde a favor, naranja en contra, gris en el medio. */
+  --eval-muy-pos: #00685a;
+  --eval-pos: #2fae93;
+  --eval-neutro: #c5d0d8;
+  --eval-neg: #e8875a;
+  --eval-muy-neg: #a8340a;
+  --eval-na: #e8eef2;
   --radius: 1rem;
-  --shadow-card: 0 1px 2px rgba(20, 17, 31, 0.04), 0 12px 32px -20px rgba(40, 24, 110, 0.22);
-  --shadow-lift: 0 2px 4px rgba(20, 17, 31, 0.05), 0 22px 44px -22px rgba(40, 24, 110, 0.32);
+  --shadow-card: 0 1px 0 color-mix(in oklab, white 70%, transparent) inset,
+    0 14px 36px -22px rgba(12, 40, 60, 0.22);
 }
 
 .dark:not(.force-light) {
-  --background: #07060f;
-  --surface: #110f1d;
-  --surface-2: #181528;
-  --foreground: #f3effc;
-  --muted: #a89fc0;
-  --border: #2c2742;
+  --background: #070d12;
+  --surface: #0e161d;
+  --surface-2: #152029;
+  --foreground: #e8f0f5;
+  --muted: #91a4b3;
+  --border: #243340;
 
-  --primary: #8b7cff;
-  --primary-hover: #a498ff;
-  --primary-soft: #221c48;
-  --primary-fg: #0b0814;
+  --primary: #5eb3d9;
+  --primary-hover: #7ec4e3;
+  --primary-soft: #123247;
+  --primary-fg: #041018;
 
   --accent: #2dd4bf;
   --accent-soft: #0d2c28;
@@ -69,20 +77,24 @@
   --danger: #f87171;
   --danger-soft: #331414;
 
-  --chart-1: #8b7cff;
+  --chart-1: #5eb3d9;
   --chart-2: #2dd4bf;
   --chart-3: #fb923c;
-  --chart-4: #a78bfa;
+  --chart-4: #7dd3fc;
   --chart-5: #38bdf8;
   --chart-6: #fbbf24;
   --chart-7: #f472b6;
   --chart-8: #a3e635;
 
-  --ring: #8b7cff;
+  --ring: #5eb3d9;
+  --eval-muy-pos: #4cd9bd;
+  --eval-pos: #12806b;
+  --eval-neutro: #3a4a56;
+  --eval-neg: #a64a28;
+  --eval-muy-neg: #f6946b;
+  --eval-na: #1a262f;
   --shadow-card: 0 1px 0 color-mix(in oklab, white 6%, transparent) inset,
     0 18px 40px -20px rgba(0, 0, 0, 0.55);
-  --shadow-lift: 0 1px 0 color-mix(in oklab, white 8%, transparent) inset,
-    0 24px 48px -20px rgba(0, 0, 0, 0.7);
 }
 
 @theme inline {
@@ -191,38 +203,11 @@
 
   .display {
     font-family: var(--font-display);
-    letter-spacing: -0.02em;
-  }
-
-  /* Cifras de tablero: la serif condensada aprieta los dígitos y los hace
-     difíciles de comparar. Los números van en sans, firmes y con ancho fijo. */
-  .metric,
-  .display.tabular-nums {
-    font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-    font-weight: 600;
-    letter-spacing: -0.035em;
-    font-variant-numeric: tabular-nums;
-  }
-
-  .lift {
-    transition:
-      transform 0.2s ease,
-      box-shadow 0.2s ease,
-      border-color 0.2s ease;
-  }
-  .lift:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-lift);
-    border-color: color-mix(in oklab, var(--primary) 22%, var(--border));
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .lift:hover {
-      transform: none;
-    }
+    letter-spacing: -0.03em;
   }
 
   .gradient-text {
-    background: linear-gradient(120deg, var(--primary) 0%, #7c3aed 48%, var(--accent) 120%);
+    background: linear-gradient(120deg, var(--primary) 0%, #1d6a9a 48%, var(--accent) 120%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -338,6 +323,47 @@
 }
 .field-map-tip.leaflet-tooltip::before {
   border-top-color: #0b1220;
+}
+
+/* Tablero territorial: las burbujas del mapa cambian de color y los carteles de
+   zona se leen sobre el mapa oscuro. */
+.field-map path.pulse-bubble {
+  transition:
+    fill 700ms cubic-bezier(0.32, 0.72, 0, 1),
+    fill-opacity 700ms cubic-bezier(0.32, 0.72, 0, 1),
+    stroke 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+.field-map .pulse-tag.leaflet-tooltip {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: rgba(11, 18, 32, 0.92);
+  box-shadow: 0 10px 24px -14px rgba(0, 0, 0, 0.7);
+  color: #e2e8f0;
+  padding: 4px 8px;
+  pointer-events: none;
+}
+.field-map .pulse-tag.leaflet-tooltip::before {
+  display: none;
+}
+
+/* Barras que crecen al aparecer. */
+@keyframes grow-x {
+  from {
+    transform: scaleX(0);
+  }
+}
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+}
+.animate-grow-x {
+  transform-origin: left;
+  animation: grow-x 900ms cubic-bezier(0.32, 0.72, 0, 1) both;
+}
+.animate-grow-y {
+  transform-origin: bottom;
+  animation: grow-y 900ms cubic-bezier(0.32, 0.72, 0, 1) both;
 }
 
 .animate-rise {
@@ -553,6 +579,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .animate-rise,
+  .animate-grow-x,
+  .animate-grow-y,
   .animate-float,
   .animate-pulse-soft,
   .hero-bar,
