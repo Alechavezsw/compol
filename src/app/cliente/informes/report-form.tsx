@@ -53,10 +53,12 @@ export function ReportForm({
   surveys,
   defaultSurveyId,
   writer,
+  organizationId,
 }: {
   surveys: { id: string; title: string; completed: number }[];
   defaultSurveyId?: string;
   writer: WriterMode;
+  organizationId?: string;
 }) {
   const [state, formAction] = useActionState<ActionState, FormData>(generateReportAction, {});
 
@@ -64,6 +66,7 @@ export function ReportForm({
 
   return (
     <form action={formAction} className="space-y-5">
+      {organizationId ? <input type="hidden" name="org" value={organizationId} /> : null}
       {writer === "missing" ? (
         <div className="rounded-xl border border-[var(--border)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--warning)]">
           <strong className="font-semibold">Falta la clave de Gemini.</strong> Cargala como secreto

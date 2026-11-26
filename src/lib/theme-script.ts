@@ -3,4 +3,4 @@
  * Vive fuera del componente cliente porque un modulo "use client" no puede
  * exportar un string plano hacia un Server Component.
  */
-export const themeScript = `(function(){try{var m=localStorage.getItem('tema')||'system';var d=m==='dark'||(m==='system'&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d)}catch(e){}})();`;
+export const themeScript = `(function(){try{var m=localStorage.getItem('tema');var d=m==='dark'||(m!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches);if(m!=='light'&&m!=='dark'){try{localStorage.setItem('tema',d?'dark':'light')}catch(e){}}document.documentElement.classList.toggle('dark',d)}catch(e){}})();`;

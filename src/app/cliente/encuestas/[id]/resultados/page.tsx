@@ -35,7 +35,7 @@ import { buildPulse, evalToneOf } from "@/lib/pulse-build";
 import { caseForAnswers, pickEvaluationQuestion } from "@/lib/case-tone";
 import { LiveRefresh } from "@/components/results/live-refresh";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { requireClientViewer } from "@/lib/auth";
 import {
   applyFilters,
   computeAnalytics,
@@ -81,11 +81,12 @@ export default async function ResultadosPage({
 }) {
   const { id } = await params;
   const query = await searchParams;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
+  const { organization, profile, isCentralAdmin } = await requireClientViewer();
   const supabase = await createClient();
 
   const data = await loadSurveyData(supabase, id);
-  if (!data || data.survey.organization_id !== organization.id) notFound();
+  if (!data) notFound();
+  if (!isCentralAdmin && organization && data.survey.organization_id !== organization.id) notFound();
 
   const filters = filtersFromParams(query);
   const analytics = computeAnalytics(data, filters);
@@ -212,7 +213,7 @@ export default async function ResultadosPage({
                 CSV
               </a>
             ) : null}
-            {profile.role === "org_admin" && hasAnyData ? (
+            {(profile.role === "org_admin" || isCentralAdmin) && hasAnyData ? (
               <ButtonLink href={`/cliente/informes?encuesta=${id}`}>
                 <Sparkles />
                 Generar informe

@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
-import { Sparkles } from "lucide-react";
+import { Eye, Sparkles } from "lucide-react";
 import { PageHeader } from "@/components/ui/misc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ReportForm } from "./report-form";
 import { ReportLibrary } from "./library";
 import { createClient } from "@/lib/supabase/server";
 import { fetchAll } from "@/lib/supabase/fetch-all";
-import { requireOrganization } from "@/lib/auth";
+import { canManage, isClientReadOnly, requireClientViewer } from "@/lib/auth";
+import { listOrganizationsForPicker, resolveClientOrganization } from "@/lib/admin-org";
+import { AdminOrgPicker } from "@/components/admin-org-picker";
 import { isGeminiConfigured } from "@/lib/ai/gemini";
 import { isDemoMode } from "@/lib/demo/mode";
 import { toLibraryReport } from "@/lib/reports/library";
@@ -18,11 +20,25 @@ export const metadata: Metadata = { title: "Biblioteca de informes" };
 export default async function InformesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ encuesta?: string }>;
+  searchParams: Promise<{ encuesta?: string; org?: string }>;
 }) {
-  const { encuesta } = await searchParams;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
+  const { encuesta, org } = await searchParams;
+  const viewer = await requireClientViewer();
+  const organization = await resolveClientOrganization(viewer, org);
+  if (!organization) {
+    return (
+      <AdminOrgPicker
+        title="Biblioteca de informes"
+        description="Elegí el organismo. Acá se generan los informes que después lee el Político."
+        nextPath="/cliente/informes"
+        organizations={await listOrganizationsForPicker()}
+      />
+    );
+  }
+  const { profile, isCentralAdmin } = viewer;
   const supabase = await createClient();
+  const readOnly = isClientReadOnly(profile.role) && !isCentralAdmin;
+  const canGenerate = canManage(profile.role) || isCentralAdmin;
 
   const [reportRows, { data: surveyRows }, responseRows] = await Promise.all([
     fetchAll<AiReport & { surveys: { title: string } | null }>((from, to) =>
@@ -60,7 +76,6 @@ export default async function InformesPage({
     completed: counts.get(s.id) ?? 0,
   }));
 
-  const canGenerate = profile.role === "org_admin";
   const writer = isGeminiConfigured() ? "gemini" : isDemoMode() ? "local" : "missing";
 
   return (
@@ -68,11 +83,15 @@ export default async function InformesPage({
       <PageHeader
         eyebrow={
           <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)] uppercase">
-            Biblioteca
+            {readOnly ? "Lectura política" : "Producción de informes"}
           </p>
         }
-        title="Informes"
-        description="Quedan guardados todos: los de encuesta y los del radar. Buscá por título, tema o fuente."
+        title={readOnly ? "Informes para tu lectura" : "Biblioteca de informes"}
+        description={
+          readOnly
+            ? "Documentos preparados por el equipo técnico: lectura detallada, mapas y resultados al día."
+            : "Acá se generan los informes que después ve el Político en solo lectura: con mapa, gráficos y datos en vivo."
+        }
         actions={
           <p className="text-sm text-[var(--muted)]">
             <span className="display text-[28px] leading-none text-[var(--foreground)] tabular-nums">
@@ -85,9 +104,23 @@ export default async function InformesPage({
         }
       />
 
+      {readOnly ? (
+        <div className="flex items-start gap-3 rounded-2xl border border-[var(--border)] bg-[color-mix(in_oklab,var(--primary-soft)_45%,var(--surface))] p-4 text-sm text-[var(--foreground)]">
+          <Eye className="mt-0.5 size-4 shrink-0 text-[var(--primary)]" />
+          <p>
+            Modo solo lectura. Si necesitás un informe nuevo o más detalle, pedíselo a quien administra el
+            operativo.
+          </p>
+        </div>
+      ) : null}
+
       <div className="grid gap-4 xl:grid-cols-5">
         <div className={canGenerate ? "xl:col-span-3" : "xl:col-span-5"}>
-          <ReportLibrary reports={reports} canDelete={canGenerate} />
+          <ReportLibrary
+            reports={reports}
+            canDelete={canGenerate}
+            orgId={isCentralAdmin ? organization.id : null}
+          />
         </div>
 
         {canGenerate ? (
@@ -95,15 +128,20 @@ export default async function InformesPage({
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Sparkles className="size-4 text-[var(--accent)]" />
-                <CardTitle>Nuevo informe de encuesta</CardTitle>
+                <CardTitle>Generar informe</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="pt-4">
               <p className="mb-4 text-xs leading-relaxed text-[var(--muted)]">
-                El del radar se pide desde Conversación. Este arma uno sobre una encuesta y también
-                queda en la biblioteca.
+                Sale con tapa, hallazgos, gráficos, mapa territorial y enlace a resultados en vivo. El
+                Político lo ve en la biblioteca sin poder editarlo.
               </p>
-              <ReportForm surveys={surveys} defaultSurveyId={encuesta} writer={writer} />
+              <ReportForm
+                surveys={surveys}
+                defaultSurveyId={encuesta}
+                writer={writer}
+                organizationId={organization.id}
+              />
             </CardContent>
           </Card>
         ) : null}

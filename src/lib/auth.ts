@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isDemoMode, isSupabaseConfigured } from "@/lib/demo/mode";
 import { getDemoProfile } from "@/lib/demo/session";
 import { demoTables } from "@/lib/demo/store";
-import { CLIENT_READ_ROLES, type Organization, type Profile, type UserRole } from "@/lib/types";
+import { CLIENT_READ_ROLES, CLIENT_ROLES, type Organization, type Profile, type UserRole } from "@/lib/types";
 
 export type SessionProfile = {
   user: User;
@@ -107,6 +107,26 @@ export async function requireOrganization(roles: UserRole[]): Promise<
     redirect("/acceso-denegado?motivo=sin-organizacion");
   }
   return session as SessionProfile & { organization: Organization };
+}
+
+/**
+ * Panel del organismo o administración central mirando un cliente.
+ * `organization` puede ser null solo para `super_admin` (hay que cargarla del recurso).
+ */
+export async function requireClientViewer(roles: UserRole[] = CLIENT_ROLES): Promise<
+  SessionProfile & { organization: Organization | null; isCentralAdmin: boolean }
+> {
+  const session = await requireProfile();
+  if (session.profile.role === "super_admin") {
+    return { ...session, organization: null, isCentralAdmin: true };
+  }
+  if (!roles.includes(session.profile.role)) {
+    redirect(`/acceso-denegado?motivo=rol&destino=${homePathFor(session.profile.role)}`);
+  }
+  if (!session.organization) {
+    redirect("/acceso-denegado?motivo=sin-organizacion");
+  }
+  return { ...session, organization: session.organization, isCentralAdmin: false };
 }
 
 export function canManage(role: UserRole) {

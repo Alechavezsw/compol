@@ -1,4 +1,5 @@
 import * as React from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export function StatCard({
@@ -7,6 +8,7 @@ export function StatCard({
   hint,
   icon,
   tone = "primary",
+  href,
   className,
 }: {
   label: string;
@@ -14,6 +16,8 @@ export function StatCard({
   hint?: React.ReactNode;
   icon?: React.ReactNode;
   tone?: "primary" | "accent" | "success" | "warning";
+  /** Si hay `href`, la tarjeta entera es un enlace. */
+  href?: string;
   className?: string;
 }) {
   const toneClass = {
@@ -30,13 +34,8 @@ export function StatCard({
     warning: "from-[var(--warning)] to-[var(--primary)]",
   }[tone];
 
-  return (
-    <div
-      className={cn(
-        "relative overflow-hidden rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,transparent)] p-5 shadow-[var(--shadow-card)] backdrop-blur-sm",
-        className,
-      )}
-    >
+  const body = (
+    <>
       <div className={cn("absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r", bar)} />
       <div className="flex items-start justify-between gap-3">
         <p className="text-[13px] font-medium text-[var(--muted)]">{label}</p>
@@ -50,6 +49,23 @@ export function StatCard({
         {value}
       </p>
       {hint ? <div className="mt-2.5 text-xs text-[var(--muted)]">{hint}</div> : null}
-    </div>
+    </>
   );
+
+  const shell = cn(
+    "relative overflow-hidden rounded-[22px] border border-[var(--border)] bg-[color-mix(in_oklab,var(--surface)_92%,transparent)] p-5 shadow-[var(--shadow-card)] backdrop-blur-sm",
+    href &&
+      "transition-all hover:-translate-y-0.5 hover:border-[color-mix(in_oklab,var(--primary)_35%,var(--border))] hover:shadow-md focus-visible:outline-none",
+    className,
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={shell}>
+        {body}
+      </Link>
+    );
+  }
+
+  return <div className={shell}>{body}</div>;
 }

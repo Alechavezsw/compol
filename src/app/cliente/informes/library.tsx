@@ -19,9 +19,11 @@ const ORIGIN_LABEL: Record<"todos" | ReportOrigin, string> = {
 export function ReportLibrary({
   reports,
   canDelete,
+  orgId,
 }: {
   reports: LibraryReport[];
   canDelete: boolean;
+  orgId?: string | null;
 }) {
   const [q, setQ] = useState("");
   const [origin, setOrigin] = useState<"todos" | ReportOrigin>("todos");
@@ -98,7 +100,11 @@ export function ReportLibrary({
                       <Badge>{REPORT_KIND_LABEL[r.kind]}</Badge>
                     </div>
                     <Link
-                      href={`/cliente/informes/${r.id}`}
+                      href={
+                        orgId
+                          ? `/cliente/informes/${r.id}?org=${orgId}`
+                          : `/cliente/informes/${r.id}`
+                      }
                       className="text-[15px] font-semibold tracking-tight text-[var(--foreground)] hover:text-[var(--primary)]"
                     >
                       {r.title}
@@ -116,6 +122,7 @@ export function ReportLibrary({
                   {canDelete ? (
                     <form action={deleteReportAction}>
                       <input type="hidden" name="id" value={r.id} />
+                      {orgId ? <input type="hidden" name="org" value={orgId} /> : null}
                       <button
                         type="submit"
                         aria-label="Eliminar informe"

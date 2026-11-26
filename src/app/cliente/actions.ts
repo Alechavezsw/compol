@@ -3,7 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { requireClientViewer, requireOrganization } from "@/lib/auth";
+import { resolveClientOrganization } from "@/lib/admin-org";
 import { computeAnalytics, keyFindings, loadSurveyData, type AnalyticsFilters } from "@/lib/analytics";
 import { askAboutSurvey, generateSurveyReport, isGeminiConfigured } from "@/lib/ai/gemini";
 import { answerLocally } from "@/lib/ai/local-answer";
@@ -840,7 +841,15 @@ export async function createMedicionAction(
 // ---------------------------------------------------------------------------
 
 export async function generateReportAction(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const { organization, profile } = await requireOrganization([...MANAGERS]);
+  const viewer = await requireClientViewer();
+  if (viewer.profile.role !== "org_admin" && !viewer.isCentralAdmin) {
+    return { error: "Solo la administración puede generar informes." };
+  }
+  const organization = await resolveClientOrganization(viewer, String(formData.get("org") ?? "") || undefined);
+  if (!organization) {
+    return { error: "Elegí un organismo para generar el informe." };
+  }
+  const { profile } = viewer;
 
   // Sin clave, en modo demo caemos en el redactor local para que el recorrido
   // no quede cortado; fuera de demo es un error de configuración.
@@ -939,7 +948,8 @@ export async function generateReportAction(_prev: ActionState, formData: FormDat
   }
 
   revalidatePath("/cliente/informes");
-  redirect(`/cliente/informes/${report.id}`);
+  const orgQs = viewer.isCentralAdmin ? `?org=${organization.id}` : "";
+  redirect(`/cliente/informes/${report.id}${orgQs}`);
 }
 
 export type AskResult = { ok: boolean; answer?: string; source?: string; error?: string };

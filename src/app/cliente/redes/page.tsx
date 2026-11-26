@@ -20,7 +20,9 @@ import {
 import { deleteSourceAction, deleteTrackerAction } from "./actions";
 import { persistMissingTopics } from "@/lib/social/persist-topics";
 import { createClient } from "@/lib/supabase/server";
-import { requireOrganization } from "@/lib/auth";
+import { canManage, requireClientViewer } from "@/lib/auth";
+import { listOrganizationsForPicker, resolveClientOrganization } from "@/lib/admin-org";
+import { AdminOrgPicker } from "@/components/admin-org-picker";
 import { fetchAll } from "@/lib/supabase/fetch-all";
 import { computeSocial, countCaptured, moodLabel } from "@/lib/social/analytics";
 import { signed } from "@/lib/pulse";
@@ -65,10 +67,22 @@ function Delta({ value, unit, against }: { value: number | null; unit: string; a
 export default async function RedesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ dias?: string; red?: string; tema?: string; q?: string }>;
+  searchParams: Promise<{ dias?: string; red?: string; tema?: string; q?: string; org?: string }>;
 }) {
   const query = await searchParams;
-  const { organization, profile } = await requireOrganization(["org_admin", "org_analyst", "politico"]);
+  const viewer = await requireClientViewer();
+  const organization = await resolveClientOrganization(viewer, query.org);
+  if (!organization) {
+    return (
+      <AdminOrgPicker
+        title="Radar de conversación"
+        description="Elegí el organismo cuyo radar querés abrir."
+        nextPath="/cliente/redes"
+        organizations={await listOrganizationsForPicker()}
+      />
+    );
+  }
+  const { profile } = viewer;
   const supabase = await createClient();
   const days = [1, 7, 30].includes(Number(query.dias)) ? Number(query.dias) : 1;
   const today = todayKey();

@@ -13,12 +13,18 @@ export const metadata: Metadata = {
 };
 
 const NAV: NavItem[] = [
-  { href: "/admin", label: "Panel general", icon: "dashboard", exact: true },
-  { href: "/admin/organizaciones", label: "Organizaciones", icon: "orgs" },
-  { href: "/admin/usuarios", label: "Usuarios", icon: "users" },
-  { href: "/admin/encuestadores", label: "Encuestadores", icon: "field" },
-  { href: "/admin/proyectos", label: "Proyectos", icon: "projects" },
-  { href: "/admin/encuestas", label: "Encuestas", icon: "surveys" },
+  { href: "/admin", label: "Panel general", icon: "dashboard", exact: true, section: "Operación" },
+  { href: "/admin/organizaciones", label: "Organizaciones", icon: "orgs", section: "Operación" },
+  { href: "/admin/usuarios", label: "Usuarios", icon: "users", section: "Operación" },
+  { href: "/admin/encuestadores", label: "Encuestadores", icon: "field", section: "Operación" },
+  { href: "/admin/proyectos", label: "Proyectos", icon: "projects", section: "Operación" },
+  { href: "/admin/encuestas", label: "Encuestas", icon: "surveys", section: "Operación" },
+  { href: "/admin/resultados", label: "Resultados", icon: "results", section: "Mediciones" },
+  { href: "/cliente/informes", label: "Biblioteca", icon: "ai", section: "Mediciones" },
+  { href: "/cliente/redes", label: "Radar", icon: "social", section: "Mediciones" },
+  { href: "/cliente/dirigentes", label: "Dirigentes", icon: "leaders", section: "Mediciones" },
+  { href: "/admin/facturacion", label: "Facturación", icon: "billing", section: "Administración" },
+  { href: "/admin/contabilidad", label: "Contabilidad", icon: "accounting", section: "Administración" },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
