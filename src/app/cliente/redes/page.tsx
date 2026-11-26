@@ -159,7 +159,9 @@ export default async function RedesPage({
           <p className="text-[11px] font-semibold tracking-[0.18em] text-[var(--muted)] uppercase">Radar</p>
           <h1 className="display mt-1 text-[34px] leading-none text-[var(--foreground)]">Qué se dice de la gestión</h1>
           <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
-            Encendé el radar, revisá las notas y guardalas. Cada guardado suma a Hoy, a la semana y al mes.
+            {canManage
+              ? "Encendé el radar, revisá las notas y guardalas. Cada guardado suma a Hoy, a la semana y al mes."
+              : "Lo que circula sobre la gestión en redes y portales, ordenado por día, semana y mes."}
           </p>
         </div>
         <RadarActionBar canListen={canManage} days={days} notes={a.total} lastSync={lastSync} />
@@ -176,9 +178,13 @@ export default async function RedesPage({
           <CardContent className="py-14 text-center">
             <p className="display text-2xl">{query.q ? "Nada para esa búsqueda" : "Todavía no hay notas en este recorte"}</p>
             <p className="mx-auto mt-2 max-w-md text-sm text-[var(--muted)]">
-              {query.q
-                ? "Probá otro término o encendé el radar para buscarlo en los portales."
-                : `Encendé el radar para buscar notas de ${organization.name}. Guardalas y van a aparecer en Hoy.`}
+              {!canManage
+                ? query.q
+                  ? "Probá otro término."
+                  : "Cuando el equipo guarde notas, van a aparecer acá."
+                : query.q
+                  ? "Probá otro término o encendé el radar para buscarlo en los portales."
+                  : `Encendé el radar para buscar notas de ${organization.name}. Guardalas y van a aparecer en Hoy.`}
             </p>
           </CardContent>
         </Card>

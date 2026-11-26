@@ -213,10 +213,10 @@ export function PageHeader({
 }
 
 /** Contenedor con scroll horizontal para tablas anchas en movil. */
-export function TableWrap({ children }: { children: React.ReactNode }) {
+export function TableWrap({ children, minWidth = 640 }: { children: React.ReactNode; minWidth?: number }) {
   return (
     <div className="-mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0">
-      <div className="min-w-[640px]">{children}</div>
+      <div style={{ minWidth }}>{children}</div>
     </div>
   );
 }
