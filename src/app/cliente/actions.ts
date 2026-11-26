@@ -7,6 +7,7 @@ import { requireClientViewer, requireOrganization } from "@/lib/auth";
 import { resolveClientOrganization } from "@/lib/admin-org";
 import { computeAnalytics, keyFindings, loadSurveyData, type AnalyticsFilters } from "@/lib/analytics";
 import { askAboutSurvey, generateSurveyReport, isGeminiConfigured } from "@/lib/ai/gemini";
+import { humanizeAiError, isGeminiBillingError } from "@/lib/ai/gateway";
 import { answerLocally } from "@/lib/ai/local-answer";
 import { isDemoMode } from "@/lib/demo/mode";
 import { buildLocalReport } from "@/lib/demo/report";
@@ -918,9 +919,21 @@ export async function generateReportAction(_prev: ActionState, formData: FormDat
   const social = socialPosts.length >= 20 ? computeSocial(socialPosts, { days: 30 }, today) : null;
 
   try {
-    const generated = useLocalWriter
-      ? buildLocalReport({ analytics, findings, social, organizationName: organization.name, kind, audience, focus })
-      : await generateSurveyReport({
+    const localParams = {
+      analytics,
+      findings,
+      social,
+      organizationName: organization.name,
+      kind,
+      audience,
+      focus,
+    };
+    let generated;
+    if (useLocalWriter) {
+      generated = buildLocalReport(localParams);
+    } else {
+      try {
+        generated = await generateSurveyReport({
           analytics,
           findings,
           socialSummary: social ? socialBriefing(social) : undefined,
@@ -930,6 +943,17 @@ export async function generateReportAction(_prev: ActionState, formData: FormDat
           focus,
           organizationId: organization.id,
         });
+      } catch (modelError) {
+        const raw = modelError instanceof Error ? modelError.message : "";
+        // Sin crédito de Gemini, igual entregamos el informe con la plantilla
+        // sobre las mismas cifras agregadas para no dejar el flujo cortado.
+        if (isGeminiBillingError(raw)) {
+          generated = buildLocalReport(localParams);
+        } else {
+          throw modelError;
+        }
+      }
+    }
 
     await supabase
       .from("ai_reports")
@@ -942,7 +966,7 @@ export async function generateReportAction(_prev: ActionState, formData: FormDat
       })
       .eq("id", report.id);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Error desconocido del modelo.";
+    const message = humanizeAiError(e instanceof Error ? e.message : "Error desconocido del modelo.");
     await supabase.from("ai_reports").update({ status: "error", error_message: message }).eq("id", report.id);
     return { error: `El modelo no pudo generar el informe: ${message}` };
   }

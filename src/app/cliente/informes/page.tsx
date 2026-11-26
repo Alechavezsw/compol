@@ -78,6 +78,18 @@ export default async function InformesPage({
 
   const writer = isGeminiConfigured() ? "gemini" : isDemoMode() ? "local" : "missing";
 
+  const { data: lastGeminiError } = await supabase
+    .from("ai_calls")
+    .select("error_message")
+    .eq("provider", "gemini")
+    .eq("status", "error")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const geminiCreditsDown = /prepayment credits are depleted|ai\.studio|billing#prepay/i.test(
+    lastGeminiError?.error_message ?? "",
+  );
+
   return (
     <div className="space-y-7">
       <PageHeader
@@ -111,6 +123,14 @@ export default async function InformesPage({
             Modo solo lectura. Si necesitás un informe nuevo o más detalle, pedíselo a quien administra el
             operativo.
           </p>
+        </div>
+      ) : null}
+
+      {!readOnly && geminiCreditsDown ? (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--warning)]">
+          <strong className="font-semibold">Gemini sin crédito prepago.</strong>{" "}
+          Recargá en AI Studio para el análisis del modelo. Mientras tanto, al generar se usa la plantilla
+          local con las mismas cifras agregadas (JEV sigue clasificando el radar).
         </div>
       ) : null}
 

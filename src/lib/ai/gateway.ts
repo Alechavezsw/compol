@@ -11,16 +11,63 @@ export function isAiGatewayConfigured() {
 
 type AiErrorBody = { error?: string };
 
+/** Errores de facturación / crédito prepago de Gemini. */
+export function isGeminiBillingError(message: string) {
+  return /prepayment credits are depleted|créditos prepago|ai\.studio|billing#prepay|RESOURCE_EXHAUSTED|quota|insufficient.?credit/i.test(
+    message,
+  );
+}
+
+export function humanizeAiError(message: string) {
+  if (isGeminiBillingError(message)) {
+    return "Los créditos prepago de Gemini están agotados. Recargá en AI Studio (ai.studio) o usá una clave con saldo.";
+  }
+  if (/Edge Function returned a non-2xx/i.test(message)) {
+    return "La capa de IA respondió con error. Revisá los secretos de la función ai o los créditos de Gemini.";
+  }
+  return message;
+}
+
+async function readInvokeError(error: unknown, data: unknown): Promise<string> {
+  if (data && typeof data === "object" && data !== null && "error" in data) {
+    const msg = (data as AiErrorBody).error;
+    if (typeof msg === "string" && msg.trim()) return msg.trim();
+  }
+
+  const ctx =
+    error && typeof error === "object" && "context" in error
+      ? (error as { context?: unknown }).context
+      : null;
+
+  if (ctx && typeof Response !== "undefined" && ctx instanceof Response) {
+    try {
+      const body = (await ctx.clone().json()) as AiErrorBody;
+      if (typeof body?.error === "string" && body.error.trim()) return body.error.trim();
+    } catch {
+      try {
+        const text = await (ctx as Response).clone().text();
+        if (text.trim()) return text.trim().slice(0, 400);
+      } catch {
+        // seguimos con el mensaje del cliente
+      }
+    }
+  }
+
+  if (error instanceof Error && error.message) return error.message;
+  return "La capa de IA no respondió.";
+}
+
 async function invokeAiLayer<T>(body: Record<string, unknown>): Promise<T> {
   const supabase = await createClient();
   const { data, error } = await supabase.functions.invoke("ai", { body });
   const payload = data as (T & AiErrorBody) | null;
 
   if (error) {
-    throw new Error(payload?.error || error.message || "La capa de IA no respondió.");
+    const raw = await readInvokeError(error, payload);
+    throw new Error(humanizeAiError(raw));
   }
   if (payload && typeof payload === "object" && payload.error) {
-    throw new Error(payload.error);
+    throw new Error(humanizeAiError(payload.error));
   }
   if (!payload) throw new Error("La capa de IA no devolvió datos.");
   return payload;

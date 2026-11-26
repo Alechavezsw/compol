@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { requireOrganization } from "@/lib/auth";
 import { generateRadarReport, isGeminiConfigured } from "@/lib/ai/gemini";
+import { humanizeAiError, isGeminiBillingError } from "@/lib/ai/gateway";
 import { buildLocalRadarReport } from "@/lib/demo/report";
 import { isDemoMode } from "@/lib/demo/mode";
 import { computeSocial } from "@/lib/social/analytics";
@@ -750,14 +751,26 @@ export async function analyzeRadarAction(_prev: SocialActionState, formData: For
   }
 
   try {
-    const generated = useLocalWriter
-      ? buildLocalRadarReport({ social, organizationName: organization.name })
-      : await generateRadarReport({
+    let generated;
+    if (useLocalWriter) {
+      generated = buildLocalRadarReport({ social, organizationName: organization.name });
+    } else {
+      try {
+        generated = await generateRadarReport({
           social,
           organizationName: organization.name,
           organizationId: organization.id,
           focus: `Informe del radar de conversación de ${period}. No es una encuesta: leé solo las notas públicas.`,
         });
+      } catch (modelError) {
+        const raw = modelError instanceof Error ? modelError.message : "";
+        if (isGeminiBillingError(raw)) {
+          generated = buildLocalRadarReport({ social, organizationName: organization.name });
+        } else {
+          throw modelError;
+        }
+      }
+    }
 
     await supabase
       .from("ai_reports")
@@ -770,7 +783,7 @@ export async function analyzeRadarAction(_prev: SocialActionState, formData: For
       })
       .eq("id", report.id);
   } catch (e) {
-    const message = e instanceof Error ? e.message : "Error desconocido del modelo.";
+    const message = humanizeAiError(e instanceof Error ? e.message : "Error desconocido del modelo.");
     await supabase.from("ai_reports").update({ status: "error", error_message: message }).eq("id", report.id);
     return { error: `La IA no pudo armar el informe: ${message}` };
   }
