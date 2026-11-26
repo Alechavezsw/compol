@@ -242,21 +242,20 @@ export function RadarActionBar({
     setMounted(true);
   }, []);
 
+  // Escuchar y generar informes es del administrador: la lectura no ve la barra.
+  if (!canListen) return null;
+
   return (
     <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
       <div className="flex h-12 items-center rounded-full border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--shadow-card)]">
-        {canListen ? <RadarIgnition grouped /> : null}
+        <RadarIgnition grouped />
         <form action={action} className="contents">
           <input type="hidden" name="dias" value={String(days)} />
           <Button
             type="submit"
-            variant={canListen ? "ghost" : "primary"}
+            variant="ghost"
             disabled={pending || notes < 1}
-            className={cn(
-              "h-10 rounded-full px-4 hover:translate-y-0",
-              canListen &&
-                "text-[var(--foreground)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]",
-            )}
+            className="h-10 rounded-full px-4 text-[var(--foreground)] hover:translate-y-0 hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
           >
             {pending ? <Loader2 className="animate-spin" /> : <Sparkles />}
             {pending ? "Analizando…" : "Informe IA"}
@@ -264,7 +263,7 @@ export function RadarActionBar({
         </form>
       </div>
       {state.error ? <FormMessage>{state.error}</FormMessage> : null}
-      {canListen && lastSync ? (
+      {lastSync ? (
         <p suppressHydrationWarning className="text-right text-[11px] text-[var(--muted)]">
           Última búsqueda {formatDateTime(lastSync)}
         </p>
