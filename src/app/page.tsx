@@ -208,10 +208,18 @@ export default function LandingPage() {
               </a>
             ))}
           </nav>
+          <Link
+            href="/descargar"
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-white/75 transition-colors hover:bg-white/8 hover:text-white md:ml-0"
+          >
+            <Smartphone className="size-4" />
+            <span className="hidden sm:inline">Descargar la app</span>
+            <span className="sm:hidden">App</span>
+          </Link>
           <ButtonLink
             href="/login"
             size="sm"
-            className="ml-auto border border-white/20 bg-white/10 text-white shadow-none hover:translate-y-0 hover:bg-white/20 hover:shadow-none md:ml-0"
+            className="border border-white/20 bg-white/10 text-white shadow-none hover:translate-y-0 hover:bg-white/20 hover:shadow-none"
           >
             <LogIn />
             Ingresar
@@ -229,7 +237,8 @@ export default function LandingPage() {
             sizes="100vw"
             className="landing-ken object-cover object-[center_28%]"
           />
-          <div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(7,6,15,0.93)_0%,rgba(7,6,15,0.72)_42%,rgba(7,6,15,0.32)_70%,rgba(7,6,15,0.55)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(105deg,rgba(7,6,15,0.9)_0%,rgba(7,6,15,0.62)_42%,rgba(7,6,15,0.22)_70%,rgba(7,6,15,0.45)_100%)]" />
+          <div className="pointer-events-none absolute -bottom-40 left-1/3 size-[520px] rounded-full bg-[#3d2de0]/25 blur-[120px]" />
           <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,6,15,0.5)_0%,transparent_30%,rgba(7,6,15,0.88)_100%)]" />
 
           <div className="relative mx-auto grid min-h-[calc(100dvh-65px)] w-full max-w-6xl items-center gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.08fr_.92fr] md:gap-10 lg:gap-14 lg:py-16">
@@ -247,21 +256,11 @@ export default function LandingPage() {
                 Del trabajo de campo al informe, en la misma plataforma. El cuestionario, el
                 celular y el tablero viven juntos.
               </p>
-              <div className="mt-8 flex flex-wrap gap-2">
-                {["Cuestionarios", "Campo en vivo", "Tableros", "Informes con IA"].map((w) => (
-                  <span
-                    key={w}
-                    className="rounded-full border border-white/25 bg-black/40 px-3.5 py-1.5 text-[12px] font-medium tracking-wide text-white backdrop-blur-md"
-                  >
-                    {w}
-                  </span>
-                ))}
-              </div>
               <div className="mt-9 flex flex-wrap items-center gap-3">
                 <ButtonLink
                   href="/login"
                   size="lg"
-                  className="h-12 border-0 bg-[#f2e6c4] text-[#14111f] shadow-none hover:bg-white hover:text-[#14111f]"
+                  className="h-12 border-0 bg-[#f2e6c4] text-[#14111f] shadow-[0_18px_40px_-16px_rgba(242,230,196,0.55)] hover:bg-white hover:text-[#14111f]"
                 >
                   Ingresar a mi panel
                   <ArrowRight />
@@ -270,11 +269,23 @@ export default function LandingPage() {
                   href="#modulos"
                   size="lg"
                   variant="ghost"
-                  className="h-12 text-white/80 hover:bg-white/10 hover:text-white"
+                  className="h-12 border border-white/20 bg-white/5 text-white/85 backdrop-blur-md hover:bg-white/12 hover:text-white"
                 >
                   Ver los módulos
                 </ButtonLink>
               </div>
+              <dl className="mt-10 grid max-w-md grid-cols-3 divide-x divide-white/15 border-t border-white/15 pt-5">
+                {[
+                  ["Campo", "sin señal también"],
+                  ["Tablero", "en tiempo real"],
+                  ["Informe", "con base citada"],
+                ].map(([k, v]) => (
+                  <div key={k} className="px-4 first:pl-0">
+                    <dt className="display text-2xl text-white">{k}</dt>
+                    <dd className="mt-1 text-xs leading-snug text-white/60">{v}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
 
             <div className="force-light animate-rise md:translate-y-4" style={{ animationDelay: "90ms" }}>
@@ -295,7 +306,7 @@ export default function LandingPage() {
         </section>
 
         <section className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             {[
               [ClipboardList, "01", "Cuestionarios flexibles", "Armá, filtrá y salí a campo"],
               [Smartphone, "02", "Carga desde el celular", "Cara a cara, sin planilla"],
@@ -306,20 +317,20 @@ export default function LandingPage() {
               return (
                 <div
                   key={label as string}
-                  className="landing-rise group relative overflow-hidden rounded-[22px] border border-white/10 bg-white/[0.04] px-5 py-5 transition-all duration-300 hover:-translate-y-1.5 hover:border-white/25 hover:bg-white/[0.08]"
+                  className="landing-rise group relative overflow-hidden rounded-[22px] border border-white/10 bg-[linear-gradient(160deg,rgba(255,255,255,0.07),rgba(255,255,255,0.02))] px-4 py-4 transition-all duration-300 hover:-translate-y-1.5 hover:border-white/25 hover:bg-white/[0.08] sm:px-5 sm:py-5"
                   style={{ animationDelay: `${i * 80}ms` }}
                 >
                   <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#f2e6c4]/50 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                   <div className="flex items-center justify-between">
-                    <span className="flex size-10 items-center justify-center rounded-xl bg-white/8 text-white transition-transform duration-300 group-hover:scale-110">
+                    <span className="flex size-10 items-center justify-center rounded-xl bg-[#f2e6c4]/12 text-[#f2e6c4] transition-transform duration-300 group-hover:scale-110">
                       <I className="size-4" />
                     </span>
-                    <span className="display text-2xl text-white/25 transition-colors group-hover:text-[#f2e6c4]/70">
+                    <span className="display text-2xl text-white/30 transition-colors group-hover:text-[#f2e6c4]/80">
                       {n as string}
                     </span>
                   </div>
-                  <p className="mt-5 text-[15px] font-semibold text-white">{label as string}</p>
-                  <p className="mt-1 text-[13px] text-white/50">{hint as string}</p>
+                  <p className="mt-4 text-[14px] leading-snug font-semibold text-white sm:mt-5 sm:text-[15px]">{label as string}</p>
+                  <p className="mt-1 text-[12px] text-white/60 sm:text-[13px]">{hint as string}</p>
                 </div>
               );
             })}
@@ -366,7 +377,7 @@ export default function LandingPage() {
               </h2>
             </div>
             <p className="max-w-xs text-sm text-white/45">
-              Deslizá. Ocho piezas, un solo operativo.
+              Deslizá. Siete piezas, un solo operativo.
             </p>
           </div>
           <div className="mt-8">
@@ -589,6 +600,9 @@ export default function LandingPage() {
                 Contacto
               </a>
             ) : null}
+            <Link href="/descargar" className="transition-colors hover:text-white">
+              Descargar la app
+            </Link>
             <Link href="/login" className="font-semibold text-[#f2e6c4] transition-colors hover:text-white">
               Ingresar
             </Link>

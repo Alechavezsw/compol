@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Instrument_Serif } from "next/font/google";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_TAGLINE, siteOrigin } from "@/lib/site";
 import { themeScript } from "@/lib/theme-script";
+import { pwaInstallScript } from "@/lib/pwa-script";
+import { PwaBoot } from "@/components/pwa/pwa-boot";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -24,6 +26,14 @@ const instrument = Instrument_Serif({
 export const metadata: Metadata = {
   metadataBase: new URL(siteOrigin()),
   applicationName: SITE_NAME,
+  manifest: "/manifest.webmanifest",
+  // Instalada en iPhone: pantalla completa, con su nombre debajo del ícono.
+  appleWebApp: {
+    capable: true,
+    title: SITE_NAME,
+    statusBarStyle: "default",
+  },
+  formatDetection: { telephone: false },
   title: {
     default: `${SITE_NAME} — ${SITE_TAGLINE}`,
     template: `%s · ${SITE_NAME}`,
@@ -79,8 +89,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: pwaInstallScript }} />
       </head>
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <PwaBoot />
+      </body>
     </html>
   );
 }

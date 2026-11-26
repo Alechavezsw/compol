@@ -602,3 +602,32 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+ * Celular y app instalada
+ * ------------------------------------------------------------------------- */
+
+/* Sin el destello gris de Safari/Chrome al tocar botones y enlaces. */
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/*
+ * iPhone hace zoom al tocar un campo con letra menor a 16px y no vuelve solo.
+ * Va sin @layer a propósito: le gana a las utilidades `text-sm` de cada input.
+ */
+@media (max-width: 639px) {
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"]),
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+/* Instalada: sin el rebote del navegador al tirar hacia abajo, como una app. */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}

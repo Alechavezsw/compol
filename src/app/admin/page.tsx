@@ -102,7 +102,7 @@ export default async function AdminDashboard() {
                 Todavía no hay encuestas cargadas.
               </p>
             ) : (
-              <TableWrap>
+              <TableWrap minWidth={460}>
                 <table className="w-full border-collapse">
                   <thead>
                     <tr className="border-b border-[var(--border)]">

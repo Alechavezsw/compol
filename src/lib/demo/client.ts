@@ -427,7 +427,13 @@ class DemoQuery implements PromiseLike<Result<unknown>> {
 
   private async run(): Promise<Result<unknown>> {
     const tables = demoTables();
-    const store = tables[this.table] as unknown as Row[];
+    const store = tables[this.table] as unknown as Row[] | undefined;
+
+    // Tablas que la demo no simula (p. ej. ai_calls): se leen vacías y se
+    // ignoran al escribir, en vez de romper la página.
+    if (!store) {
+      return { data: [], error: null, count: 0 };
+    }
 
     // --- escrituras -------------------------------------------------------
     if (this.mode === "insert" || this.mode === "upsert") {
