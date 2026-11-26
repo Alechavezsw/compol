@@ -78,17 +78,20 @@ export default async function InformesPage({
 
   const writer = isGeminiConfigured() ? "gemini" : isDemoMode() ? "local" : "missing";
 
-  const { data: lastGeminiError } = await supabase
+  // Solo el último intento cuenta: si Gemini ya volvió a responder ok, no
+  // seguimos mostrando el aviso de un error de crédito anterior.
+  const { data: lastGeminiCall } = await supabase
     .from("ai_calls")
-    .select("error_message")
+    .select("status, error_message")
     .eq("provider", "gemini")
-    .eq("status", "error")
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  const geminiCreditsDown = /prepayment credits are depleted|ai\.studio|billing#prepay/i.test(
-    lastGeminiError?.error_message ?? "",
-  );
+  const geminiCreditsDown =
+    lastGeminiCall?.status === "error" &&
+    /prepayment credits are depleted|créditos prepago|ai\.studio|billing#prepay/i.test(
+      lastGeminiCall.error_message ?? "",
+    );
 
   return (
     <div className="space-y-7">
