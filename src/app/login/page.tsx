@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { ArrowLeft, ShieldCheck, Smartphone } from "lucide-react";
 import { DemoLogin } from "./demo-login";
 import { LoginForm } from "./login-form";
 import { Logo } from "@/components/logo";
@@ -103,6 +103,14 @@ export default async function LoginPage({
               proyecto.
             </div>
           ) : null}
+
+          <Link
+            href="/descargar"
+            className="mt-6 flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[var(--muted)] transition-colors hover:bg-[var(--surface-2)] hover:text-[var(--foreground)]"
+          >
+            <Smartphone className="size-4 text-[var(--primary)]" />
+            Instalar la app en el celular
+          </Link>
 
           <div className="mt-8 hidden justify-center lg:flex">
             <ThemeToggle />

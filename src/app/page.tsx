@@ -208,10 +208,18 @@ export default function LandingPage() {
               </a>
             ))}
           </nav>
+          <Link
+            href="/descargar"
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-white/75 transition-colors hover:bg-white/8 hover:text-white md:ml-0"
+          >
+            <Smartphone className="size-4" />
+            <span className="hidden sm:inline">Descargar la app</span>
+            <span className="sm:hidden">App</span>
+          </Link>
           <ButtonLink
             href="/login"
             size="sm"
-            className="ml-auto border border-white/20 bg-white/10 text-white shadow-none hover:translate-y-0 hover:bg-white/20 hover:shadow-none md:ml-0"
+            className="border border-white/20 bg-white/10 text-white shadow-none hover:translate-y-0 hover:bg-white/20 hover:shadow-none"
           >
             <LogIn />
             Ingresar
@@ -592,6 +600,9 @@ export default function LandingPage() {
                 Contacto
               </a>
             ) : null}
+            <Link href="/descargar" className="transition-colors hover:text-white">
+              Descargar la app
+            </Link>
             <Link href="/login" className="font-semibold text-[#f2e6c4] transition-colors hover:text-white">
               Ingresar
             </Link>

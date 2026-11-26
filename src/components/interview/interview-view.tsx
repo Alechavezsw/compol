@@ -202,7 +202,7 @@ export function InterviewView<Extra>({
         ) : null}
       </div>
 
-      <div className={cn("flex gap-3", !web && "sticky bottom-0 -mx-4 bg-[color-mix(in_oklab,var(--background)_88%,transparent)] px-4 py-4 backdrop-blur sm:mx-0 sm:px-0")}>
+      <div className={cn("flex gap-3", !web && "sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-4 lg:bottom-0 bg-[color-mix(in_oklab,var(--background)_88%,transparent)] px-4 py-4 backdrop-blur sm:mx-0 sm:px-0")}>
         <NavButton variant="outline" onClick={interview.prev} disabled={cursor === 0} aria-label="Anterior">
           <ArrowLeft className="size-4" />
         </NavButton>

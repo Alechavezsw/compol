@@ -3,7 +3,8 @@ import { createServerClient } from "@supabase/ssr";
 import { DEMO_COOKIE, isDemoMode } from "@/lib/demo/mode";
 
 // `/e` es la encuesta web y `/widget.js` el script embebible: los usa gente sin cuenta.
-const PUBLIC_PATHS = ["/", "/login", "/auth", "/acceso-denegado", "/e", "/widget.js"];
+// `/descargar` explica cómo instalar la app y `/offline` la guarda el service worker sin sesión.
+const PUBLIC_PATHS = ["/", "/login", "/auth", "/acceso-denegado", "/e", "/widget.js", "/descargar", "/offline"];
 
 function isPublic(pathname: string) {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
@@ -81,6 +82,6 @@ export default async function proxy(request: NextRequest) {
 export const config = {
   // Literal a propósito: Next analiza el matcher en el build y no admite valores calculados.
   matcher: [
-    "/((?!_next/static|_next/image|favicon\\.ico|(?:robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|opengraph-image|twitter-image|apple-icon)$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|sw\\.js$|(?:robots\\.txt|sitemap\\.xml|manifest\\.webmanifest|opengraph-image|twitter-image|apple-icon)$|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

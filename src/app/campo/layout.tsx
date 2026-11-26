@@ -24,6 +24,8 @@ export default async function CampoLayout({ children }: { children: React.ReactN
       nav={NAV}
       banner={isDemoMode() ? <DemoBanner /> : null}
       areaLabel="Trabajo de campo"
+      offlineHint="Podés seguir cargando: las entrevistas quedan guardadas en el teléfono y se suben solas cuando vuelva la señal."
+      installMessage="Instalala para abrir tus encuestas aunque no haya señal."
       orgName={organization?.name}
       user={{
         name: profile.full_name || "Encuestador",

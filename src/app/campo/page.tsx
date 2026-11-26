@@ -10,6 +10,7 @@ import { addDays, dayBoundsIso, dayKey, todayKey } from "@/lib/stats";
 import { acceptsResponses, isExpired } from "@/lib/survey-status";
 import { foldZone } from "@/lib/san-juan-zones";
 import type { Survey, SurveyZoneQuota } from "@/lib/types";
+import { FieldOfflineWarmup } from "@/components/pwa/field-offline-warmup";
 
 export default async function CampoPage() {
   const { profile } = await requireRole(["surveyor"]);
@@ -79,6 +80,8 @@ export default async function CampoPage() {
         title="Mis asignaciones"
         description="Estas son las encuestas que tenés para relevar. Tocá una para empezar a cargar entrevistas."
       />
+
+      <FieldOfflineWarmup urls={["/campo", ...activos.map((a) => `/campo/encuestas/${a.survey_id}`)]} />
 
       {/* Resumen compacto: en el celular no debe empujar las asignaciones fuera de pantalla. */}
       <dl className="grid grid-cols-3 gap-2 sm:gap-4">

@@ -37,6 +37,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: BASE_HEADERS },
+      {
+        // El service worker nunca se cachea: si no, una versión vieja quedaría pegada en los teléfonos.
+        source: "/sw.js",
+        headers: [
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
       { source: "/((?!e/).*)", headers: NO_FRAMING_HEADERS },
     ];
   },
